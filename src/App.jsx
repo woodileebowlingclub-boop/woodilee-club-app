@@ -206,23 +206,32 @@ export default function App() {
       return;
     }
 
-    const { error } = await supabase.from("events").insert([
-      {
-        title,
-        date_text: date,
-        note: ""
-      }
-    ]);
+    const newEntry = {
+      title,
+      date_text: date,
+      note: ""
+    };
+
+    const { data, error } = await supabase
+      .from("events")
+      .insert([newEntry])
+      .select()
+      .single();
 
     if (error) {
       setMessage(`Could not save diary entry: ${error.message}`);
       return;
     }
 
+    setEntries((prev) =>
+      [...prev, data].sort((a, b) =>
+        String(a.date_text || "").localeCompare(String(b.date_text || ""))
+      )
+    );
+
     setTitle("");
     setDate("");
     setMessage("Diary entry added.");
-    loadEntries();
   };
 
   const deleteEntry = async (id) => {
@@ -235,8 +244,8 @@ export default function App() {
       return;
     }
 
+    setEntries((prev) => prev.filter((item) => item.id !== id));
     setMessage("Diary entry deleted.");
-    loadEntries();
   };
 
   const addMember = async () => {
@@ -250,26 +259,35 @@ export default function App() {
       return;
     }
 
-    const { error } = await supabase.from("members").insert([
-      {
-        name: newMemberName,
-        section: newMemberSection,
-        phone: newMemberPhone,
-        email: newMemberEmail
-      }
-    ]);
+    const newMember = {
+      name: newMemberName,
+      section: newMemberSection,
+      phone: newMemberPhone,
+      email: newMemberEmail
+    };
+
+    const { data, error } = await supabase
+      .from("members")
+      .insert([newMember])
+      .select()
+      .single();
 
     if (error) {
       setMessage(`Could not save member: ${error.message}`);
       return;
     }
 
+    setMembers((prev) =>
+      [...prev, data].sort((a, b) =>
+        String(a.name || "").localeCompare(String(b.name || ""))
+      )
+    );
+
     setNewMemberName("");
     setNewMemberSection("Gents");
     setNewMemberPhone("");
     setNewMemberEmail("");
     setMessage("Member added.");
-    loadMembers();
   };
 
   const deleteMember = async (id) => {
@@ -282,8 +300,8 @@ export default function App() {
       return;
     }
 
+    setMembers((prev) => prev.filter((member) => member.id !== id));
     setMessage("Member deleted.");
-    loadMembers();
   };
 
   const addOfficeBearer = async () => {
@@ -297,24 +315,29 @@ export default function App() {
       return;
     }
 
-    const { error } = await supabase.from("office_bearers").insert([
-      {
-        role: newRole,
-        name: newOfficerName,
-        phone: newOfficerPhone
-      }
-    ]);
+    const newOfficeBearer = {
+      role: newRole,
+      name: newOfficerName,
+      phone: newOfficerPhone
+    };
+
+    const { data, error } = await supabase
+      .from("office_bearers")
+      .insert([newOfficeBearer])
+      .select()
+      .single();
 
     if (error) {
       setMessage(`Could not save office bearer: ${error.message}`);
       return;
     }
 
+    setOfficeBearers((prev) => [...prev, data]);
+
     setNewRole("");
     setNewOfficerName("");
     setNewOfficerPhone("");
     setMessage("Office bearer added.");
-    loadOfficeBearers();
   };
 
   const deleteOfficeBearer = async (id) => {
@@ -330,8 +353,8 @@ export default function App() {
       return;
     }
 
+    setOfficeBearers((prev) => prev.filter((person) => person.id !== id));
     setMessage("Office bearer deleted.");
-    loadOfficeBearers();
   };
 
   if (!loggedIn) {
