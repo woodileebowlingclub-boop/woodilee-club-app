@@ -3,44 +3,46 @@ import { supabase } from "./lib/supabase";
 
 const CLUB_PIN = "1911";
 const ADMIN_PIN = "1954";
-const STORAGE_BUCKET = "club-files";
+const BUCKET = "club-files";
 
 const styles = {
   page: {
     padding: 16,
     fontFamily: "Arial, sans-serif",
-    background: "#f7f3ee",
+    background: "linear-gradient(180deg,#f7f3ee,#fff8f1)",
     minHeight: "100vh",
-    color: "#222"
+    color: "#222",
   },
   wrap: {
     maxWidth: 1000,
-    margin: "0 auto"
+    margin: "0 auto",
   },
   panel: {
     background: "#fff",
-    border: "1px solid #d6d3d1",
+    border: "1px solid #ead7c4",
     borderRadius: 16,
     padding: 16,
-    boxShadow: "0 2px 8px rgba(0,0,0,0.06)"
+    marginBottom: 20,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
   },
   warmPanel: {
     background: "#fffaf5",
-    border: "1px solid #d6d3d1",
+    border: "1px solid #ead7c4",
     borderRadius: 16,
     padding: 16,
-    boxShadow: "0 2px 8px rgba(0,0,0,0.06)"
+    marginBottom: 20,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
   },
   title: {
     margin: "0 0 6px 0",
     color: "#7c2d12",
-    fontSize: 32
+    fontSize: 32,
   },
   tabs: {
     display: "flex",
     gap: 10,
     marginBottom: 16,
-    flexWrap: "wrap"
+    flexWrap: "wrap",
   },
   tab: (active) => ({
     padding: "12px 16px",
@@ -49,7 +51,7 @@ const styles = {
     border: "none",
     borderRadius: 12,
     fontWeight: 700,
-    cursor: "pointer"
+    cursor: "pointer",
   }),
   input: {
     width: "100%",
@@ -57,7 +59,7 @@ const styles = {
     marginBottom: 10,
     borderRadius: 12,
     border: "1px solid #cbd5e1",
-    boxSizing: "border-box"
+    boxSizing: "border-box",
   },
   textarea: {
     width: "100%",
@@ -67,7 +69,7 @@ const styles = {
     border: "1px solid #cbd5e1",
     boxSizing: "border-box",
     minHeight: 100,
-    resize: "vertical"
+    resize: "vertical",
   },
   button: {
     padding: "12px 16px",
@@ -78,7 +80,7 @@ const styles = {
     fontWeight: 700,
     cursor: "pointer",
     marginRight: 8,
-    marginBottom: 8
+    marginBottom: 8,
   },
   smallBtn: {
     padding: "8px 10px",
@@ -86,41 +88,54 @@ const styles = {
     border: "none",
     borderRadius: 10,
     cursor: "pointer",
-    marginLeft: 8
+    marginLeft: 8,
   },
   card: {
     border: "1px solid #e5e7eb",
     borderRadius: 12,
     padding: 14,
     background: "#fcfcfc",
-    marginBottom: 10
+    marginBottom: 10,
   },
   grid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-    gap: 14
+    gap: 14,
   },
   message: {
     marginBottom: 15,
     padding: 12,
     background: "#fff3cd",
     border: "1px solid #e0c36c",
-    borderRadius: 10
+    borderRadius: 10,
   },
   linkBtn: {
     display: "inline-block",
     padding: "10px 14px",
-    background: "#b45309",
+    background: "#2563eb",
     color: "#fff",
     borderRadius: 10,
     textDecoration: "none",
     fontWeight: 700,
-    marginTop: 10
-  }
+    marginTop: 10,
+  },
+  whatsappBtn: {
+    display: "inline-block",
+    background: "#25D366",
+    color: "#fff",
+    padding: "6px 10px",
+    borderRadius: 8,
+    textDecoration: "none",
+    fontSize: 13,
+    fontWeight: 700,
+    marginLeft: 8,
+  },
 };
 
 function sortEventsChronologically(list) {
-  return [...list].sort((a, b) => new Date(a.date_text) - new Date(b.date_text));
+  return [...list].sort(
+    (a, b) => new Date(a.date_text).getTime() - new Date(b.date_text).getTime()
+  );
 }
 
 function sortPosts(list) {
@@ -128,14 +143,24 @@ function sortPosts(list) {
     const aPinned = a.pinned ? 1 : 0;
     const bPinned = b.pinned ? 1 : 0;
     if (aPinned !== bPinned) return bPinned - aPinned;
-    return new Date(b.date_posted) - new Date(a.date_posted);
+    return (
+      new Date(b.date_posted).getTime() - new Date(a.date_posted).getTime()
+    );
   });
+}
+
+function normaliseUkPhoneForWhatsApp(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("44")) return digits;
+  if (digits.startsWith("0")) return `44${digits.slice(1)}`;
+  return digits;
 }
 
 export default function App() {
   const [pin, setPin] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
-  const [activeTab, setActiveTab] = useState("diary");
+  const [tab, setTab] = useState("diary");
 
   const [adminPin, setAdminPin] = useState("");
   const [adminUnlocked, setAdminUnlocked] = useState(false);
@@ -146,11 +171,14 @@ export default function App() {
   const [officeBearers, setOfficeBearers] = useState([]);
   const [posts, setPosts] = useState([]);
 
+  const [search, setSearch] = useState("");
+
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
 
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberSection, setNewMemberSection] = useState("Gents");
+  const [newMemberPhone, setNewMemberPhone] = useState("");
 
   const [newRole, setNewRole] = useState("");
   const [newOfficerName, setNewOfficerName] = useState("");
@@ -169,8 +197,75 @@ export default function App() {
   const [editingOfficerId, setEditingOfficerId] = useState(null);
   const [editingPostId, setEditingPostId] = useState(null);
 
-  const sortedEntries = useMemo(() => sortEventsChronologically(entries), [entries]);
+  const sortedEntries = useMemo(
+    () => sortEventsChronologically(entries),
+    [entries]
+  );
   const sortedPosts = useMemo(() => sortPosts(posts), [posts]);
+
+  const filteredMembers = useMemo(() => {
+    return members
+      .filter((m) =>
+        String(m.name || "")
+          .toLowerCase()
+          .includes(search.toLowerCase())
+      )
+      .sort((a, b) =>
+        String(a.name || "").localeCompare(String(b.name || ""))
+      );
+  }, [members, search]);
+
+  useEffect(() => {
+    if (!loggedIn) return;
+    loadAll();
+  }, [loggedIn]);
+
+  const loadAll = async () => {
+    await Promise.all([
+      loadEntries(),
+      loadMembers(),
+      loadOfficeBearers(),
+      loadPosts(),
+    ]);
+  };
+
+  const loadEntries = async () => {
+    const { data, error } = await supabase.from("events").select("*");
+    if (error) {
+      setMessage(`Could not load diary entries: ${error.message}`);
+      return;
+    }
+    setEntries(data || []);
+  };
+
+  const loadMembers = async () => {
+    const { data, error } = await supabase.from("members").select("*");
+    if (error) {
+      setMessage(`Could not load members: ${error.message}`);
+      return;
+    }
+    setMembers(data || []);
+  };
+
+  const loadOfficeBearers = async () => {
+    const { data, error } = await supabase.from("office_bearers").select("*");
+    if (error) {
+      setMessage(`Could not load office bearers: ${error.message}`);
+      return;
+    }
+    setOfficeBearers(data || []);
+  };
+
+  const loadPosts = async () => {
+    const { data, error } = await supabase
+      .from("information_posts")
+      .select("*");
+    if (error) {
+      setMessage(`Could not load information posts: ${error.message}`);
+      return;
+    }
+    setPosts(data || []);
+  };
 
   const handleLogin = () => {
     if (pin === CLUB_PIN) {
@@ -188,50 +283,6 @@ export default function App() {
     } else {
       alert("Wrong admin PIN");
     }
-  };
-
-  useEffect(() => {
-    if (!loggedIn) return;
-    loadEntries();
-    loadMembers();
-    loadOfficeBearers();
-    loadPosts();
-  }, [loggedIn]);
-
-  const loadEntries = async () => {
-    const { data, error } = await supabase.from("events").select("*");
-    if (error) {
-      setMessage(`Could not load diary entries: ${error.message}`);
-      return;
-    }
-    setEntries(data || []);
-  };
-
-  const loadMembers = async () => {
-    const { data, error } = await supabase.from("members").select("*").order("name", { ascending: true });
-    if (error) {
-      setMessage(`Could not load members: ${error.message}`);
-      return;
-    }
-    setMembers(data || []);
-  };
-
-  const loadOfficeBearers = async () => {
-    const { data, error } = await supabase.from("office_bearers").select("*").order("role", { ascending: true });
-    if (error) {
-      setMessage(`Could not load office bearers: ${error.message}`);
-      return;
-    }
-    setOfficeBearers(data || []);
-  };
-
-  const loadPosts = async () => {
-    const { data, error } = await supabase.from("information_posts").select("*");
-    if (error) {
-      setMessage(`Could not load information posts: ${error.message}`);
-      return;
-    }
-    setPosts(data || []);
   };
 
   const saveEntry = async () => {
@@ -253,7 +304,9 @@ export default function App() {
         return;
       }
 
-      setEntries((prev) => prev.map((x) => (x.id === editingEntryId ? data : x)));
+      setEntries((prev) =>
+        prev.map((x) => (x.id === editingEntryId ? data : x))
+      );
       setEditingEntryId(null);
       setMessage("Diary entry updated.");
     } else {
@@ -280,7 +333,7 @@ export default function App() {
     setEditingEntryId(entry.id);
     setTitle(entry.title || "");
     setDate(entry.date_text || "");
-    setActiveTab("admin");
+    setTab("admin");
   };
 
   const deleteEntry = async (id) => {
@@ -299,10 +352,16 @@ export default function App() {
       return;
     }
 
+    const payload = {
+      name: newMemberName,
+      section: newMemberSection,
+      phone: newMemberPhone,
+    };
+
     if (editingMemberId) {
       const { data, error } = await supabase
         .from("members")
-        .update({ name: newMemberName, section: newMemberSection })
+        .update(payload)
         .eq("id", editingMemberId)
         .select()
         .single();
@@ -312,13 +371,15 @@ export default function App() {
         return;
       }
 
-      setMembers((prev) => prev.map((x) => (x.id === editingMemberId ? data : x)));
+      setMembers((prev) =>
+        prev.map((x) => (x.id === editingMemberId ? data : x))
+      );
       setEditingMemberId(null);
       setMessage("Member updated.");
     } else {
       const { data, error } = await supabase
         .from("members")
-        .insert([{ name: newMemberName, section: newMemberSection }])
+        .insert([payload])
         .select()
         .single();
 
@@ -327,19 +388,21 @@ export default function App() {
         return;
       }
 
-      setMembers((prev) => [...prev, data].sort((a, b) => String(a.name).localeCompare(String(b.name))));
+      setMembers((prev) => [...prev, data]);
       setMessage("Member added.");
     }
 
     setNewMemberName("");
     setNewMemberSection("Gents");
+    setNewMemberPhone("");
   };
 
   const editMember = (member) => {
     setEditingMemberId(member.id);
     setNewMemberName(member.name || "");
     setNewMemberSection(member.section || "Gents");
-    setActiveTab("admin");
+    setNewMemberPhone(member.phone || "");
+    setTab("admin");
   };
 
   const deleteMember = async (id) => {
@@ -358,10 +421,16 @@ export default function App() {
       return;
     }
 
+    const payload = {
+      role: newRole,
+      name: newOfficerName,
+      phone: newOfficerPhone,
+    };
+
     if (editingOfficerId) {
       const { data, error } = await supabase
         .from("office_bearers")
-        .update({ role: newRole, name: newOfficerName, phone: newOfficerPhone })
+        .update(payload)
         .eq("id", editingOfficerId)
         .select()
         .single();
@@ -371,13 +440,15 @@ export default function App() {
         return;
       }
 
-      setOfficeBearers((prev) => prev.map((x) => (x.id === editingOfficerId ? data : x)));
+      setOfficeBearers((prev) =>
+        prev.map((x) => (x.id === editingOfficerId ? data : x))
+      );
       setEditingOfficerId(null);
       setMessage("Office bearer updated.");
     } else {
       const { data, error } = await supabase
         .from("office_bearers")
-        .insert([{ role: newRole, name: newOfficerName, phone: newOfficerPhone }])
+        .insert([payload])
         .select()
         .single();
 
@@ -400,7 +471,7 @@ export default function App() {
     setNewRole(person.role || "");
     setNewOfficerName(person.name || "");
     setNewOfficerPhone(person.phone || "");
-    setActiveTab("admin");
+    setTab("admin");
   };
 
   const deleteOfficeBearer = async (id) => {
@@ -414,21 +485,21 @@ export default function App() {
   };
 
   const uploadPostFile = async () => {
-    if (!postFile) return postLink;
+    if (!postFile) return postLink || null;
 
     const fileExt = postFile.name.split(".").pop();
-    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+    const fileName = `${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2)}.${fileExt}`;
     const filePath = `information/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
-      .from(STORAGE_BUCKET)
+      .from(BUCKET)
       .upload(filePath, postFile);
 
-    if (uploadError) {
-      throw new Error(uploadError.message);
-    }
+    if (uploadError) throw uploadError;
 
-    const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(filePath);
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
     return data.publicUrl;
   };
 
@@ -445,9 +516,9 @@ export default function App() {
         title: postTitle,
         message: postMessage,
         date_posted: postDate,
-        attachment_link: finalLink || postLink,
-        button_text: postButtonText,
-        pinned: postPinned
+        attachment_link: finalLink,
+        button_text: postButtonText || null,
+        pinned: postPinned,
       };
 
       if (editingPostId) {
@@ -463,7 +534,9 @@ export default function App() {
           return;
         }
 
-        setPosts((prev) => prev.map((x) => (x.id === editingPostId ? data : x)));
+        setPosts((prev) =>
+          prev.map((x) => (x.id === editingPostId ? data : x))
+        );
         setEditingPostId(null);
         setMessage("Information post updated.");
       } else {
@@ -490,7 +563,7 @@ export default function App() {
       setPostPinned(false);
       setPostFile(null);
     } catch (err) {
-      setMessage(`Could not upload file: ${err.message}`);
+      setMessage(`Could not save information post: ${err.message}`);
     }
   };
 
@@ -503,11 +576,14 @@ export default function App() {
     setPostButtonText(post.button_text || "");
     setPostPinned(!!post.pinned);
     setPostFile(null);
-    setActiveTab("admin");
+    setTab("admin");
   };
 
   const deletePost = async (id) => {
-    const { error } = await supabase.from("information_posts").delete().eq("id", id);
+    const { error } = await supabase
+      .from("information_posts")
+      .delete()
+      .eq("id", id);
     if (error) {
       setMessage(`Could not delete information post: ${error.message}`);
       return;
@@ -528,7 +604,9 @@ export default function App() {
             onChange={(e) => setPin(e.target.value)}
             style={styles.input}
           />
-          <button onClick={handleLogin} style={styles.button}>Enter</button>
+          <button onClick={handleLogin} style={styles.button}>
+            Enter
+          </button>
         </div>
       </div>
     );
@@ -537,27 +615,43 @@ export default function App() {
   return (
     <div style={styles.page}>
       <div style={styles.wrap}>
-        <div style={{ ...styles.warmPanel, marginBottom: 20 }}>
+        <div style={styles.warmPanel}>
           <h1 style={styles.title}>Woodilee Bowling Club</h1>
         </div>
 
         {message && <div style={styles.message}>{message}</div>}
 
         <div style={styles.tabs}>
-          <button style={styles.tab(activeTab === "diary")} onClick={() => setActiveTab("diary")}>Diary</button>
-          <button style={styles.tab(activeTab === "members")} onClick={() => setActiveTab("members")}>Members</button>
-          <button style={styles.tab(activeTab === "information")} onClick={() => setActiveTab("information")}>Information</button>
-          <button style={styles.tab(activeTab === "admin")} onClick={() => setActiveTab("admin")}>Admin</button>
+          <button style={styles.tab(tab === "diary")} onClick={() => setTab("diary")}>
+            Diary
+          </button>
+          <button
+            style={styles.tab(tab === "members")}
+            onClick={() => setTab("members")}
+          >
+            Members
+          </button>
+          <button
+            style={styles.tab(tab === "information")}
+            onClick={() => setTab("information")}
+          >
+            Information
+          </button>
+          <button style={styles.tab(tab === "admin")} onClick={() => setTab("admin")}>
+            Admin
+          </button>
         </div>
 
-        {activeTab === "diary" && (
+        {tab === "diary" && (
           <>
-            <div style={{ ...styles.panel, marginBottom: 20 }}>
+            <div style={styles.panel}>
               <h3 style={{ marginTop: 0 }}>Office Bearers</h3>
               <div style={styles.grid}>
                 {officeBearers.map((person) => (
                   <div key={person.id} style={styles.card}>
-                    <div><strong>{person.role}</strong></div>
+                    <div>
+                      <strong>{person.role}</strong>
+                    </div>
                     <div>{person.name}</div>
                     <div>{person.phone}</div>
                   </div>
@@ -576,35 +670,65 @@ export default function App() {
           </>
         )}
 
-        {activeTab === "members" && (
+        {tab === "members" && (
           <div style={styles.panel}>
             <h3 style={{ marginTop: 0 }}>Members</h3>
-            {members.map((m) => (
+            <input
+              placeholder="Search members..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={styles.input}
+            />
+
+            {filteredMembers.map((m) => (
               <div key={m.id} style={styles.card}>
-                <strong>{m.name}</strong> — {m.section}
+                <b>{m.name}</b> — {m.section}
+                <div style={{ marginTop: 8 }}>
+                  {m.phone ? (
+                    <>
+                      <a
+                        href={`tel:${m.phone}`}
+                        style={{ marginRight: 10, textDecoration: "none" }}
+                      >
+                        📞 {m.phone}
+                      </a>
+                      <a
+                        href={`https://wa.me/${normaliseUkPhoneForWhatsApp(m.phone)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={styles.whatsappBtn}
+                      >
+                        WhatsApp
+                      </a>
+                    </>
+                  ) : (
+                    <span style={{ color: "#888" }}>No phone</span>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         )}
 
-        {activeTab === "information" && (
+        {tab === "information" && (
           <div style={styles.panel}>
             <h3 style={{ marginTop: 0 }}>General Information</h3>
             {sortedPosts.map((post) => (
-              <div
-                key={post.id}
-                style={{
-                  ...styles.card,
-                  border: post.pinned ? "2px solid #d97706" : styles.card.border,
-                  background: post.pinned ? "#fff7ed" : styles.card.background
-                }}
-              >
+              <div key={post.id} style={styles.card}>
                 {post.pinned ? (
-                  <div style={{ color: "#b45309", fontWeight: 700, marginBottom: 6 }}>Pinned Notice</div>
+                  <div style={{ color: "#b45309", fontWeight: 700, marginBottom: 6 }}>
+                    📌 Pinned Notice
+                  </div>
                 ) : null}
-                <div style={{ color: "#92400e", fontWeight: 700 }}>{post.date_posted}</div>
-                <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>{post.title}</div>
-                <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{post.message}</div>
+                <div style={{ color: "#92400e", fontWeight: 700 }}>
+                  {post.date_posted}
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>
+                  {post.title}
+                </div>
+                <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
+                  {post.message}
+                </div>
                 {post.attachment_link ? (
                   <a
                     href={post.attachment_link}
@@ -620,7 +744,7 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === "admin" && (
+        {tab === "admin" && (
           <div>
             {!adminUnlocked ? (
               <div style={{ ...styles.panel, maxWidth: 420 }}>
@@ -631,91 +755,195 @@ export default function App() {
                   onChange={(e) => setAdminPin(e.target.value)}
                   style={styles.input}
                 />
-                <button onClick={handleAdminLogin} style={styles.button}>Enter</button>
+                <button onClick={handleAdminLogin} style={styles.button}>
+                  Enter
+                </button>
               </div>
             ) : (
               <>
-                <div style={{ ...styles.panel, marginBottom: 20 }}>
-                  <h3 style={{ marginTop: 0 }}>{editingEntryId ? "Edit Diary Entry" : "Add Diary Entry"}</h3>
-                  <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" style={styles.input} />
-                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={styles.input} />
+                <div style={styles.panel}>
+                  <h3 style={{ marginTop: 0 }}>
+                    {editingEntryId ? "Edit Diary Entry" : "Add Diary Entry"}
+                  </h3>
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Event title"
+                    style={styles.input}
+                  />
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    style={styles.input}
+                  />
                   <button onClick={saveEntry} style={styles.button}>
                     {editingEntryId ? "Update Diary Entry" : "Save Diary Entry"}
                   </button>
                 </div>
 
-                <div style={{ ...styles.panel, marginBottom: 20 }}>
+                <div style={styles.panel}>
                   <h3 style={{ marginTop: 0 }}>Manage Diary Entries</h3>
                   {sortedEntries.map((e) => (
                     <div key={e.id} style={styles.card}>
                       <strong>{e.date_text}</strong> — {e.title}
                       <div style={{ marginTop: 8 }}>
-                        <button onClick={() => editEntry(e)} style={styles.smallBtn}>Edit</button>
-                        <button onClick={() => deleteEntry(e.id)} style={styles.smallBtn}>Delete</button>
+                        <button onClick={() => editEntry(e)} style={styles.smallBtn}>
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteEntry(e.id)}
+                          style={styles.smallBtn}
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div style={{ ...styles.panel, marginBottom: 20 }}>
-                  <h3 style={{ marginTop: 0 }}>{editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}</h3>
-                  <input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Role" style={styles.input} />
-                  <input value={newOfficerName} onChange={(e) => setNewOfficerName(e.target.value)} placeholder="Name" style={styles.input} />
-                  <input value={newOfficerPhone} onChange={(e) => setNewOfficerPhone(e.target.value)} placeholder="Phone" style={styles.input} />
+                <div style={styles.panel}>
+                  <h3 style={{ marginTop: 0 }}>
+                    {editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}
+                  </h3>
+                  <input
+                    value={newRole}
+                    onChange={(e) => setNewRole(e.target.value)}
+                    placeholder="Role"
+                    style={styles.input}
+                  />
+                  <input
+                    value={newOfficerName}
+                    onChange={(e) => setNewOfficerName(e.target.value)}
+                    placeholder="Name"
+                    style={styles.input}
+                  />
+                  <input
+                    value={newOfficerPhone}
+                    onChange={(e) => setNewOfficerPhone(e.target.value)}
+                    placeholder="Phone"
+                    style={styles.input}
+                  />
                   <button onClick={saveOfficeBearer} style={styles.button}>
                     {editingOfficerId ? "Update Office Bearer" : "Save Office Bearer"}
                   </button>
                 </div>
 
-                <div style={{ ...styles.panel, marginBottom: 20 }}>
+                <div style={styles.panel}>
                   <h3 style={{ marginTop: 0 }}>Manage Office Bearers</h3>
                   {officeBearers.map((person) => (
                     <div key={person.id} style={styles.card}>
                       <strong>{person.role}</strong> — {person.name}
                       <div style={{ marginTop: 8 }}>
-                        <button onClick={() => editOfficeBearer(person)} style={styles.smallBtn}>Edit</button>
-                        <button onClick={() => deleteOfficeBearer(person.id)} style={styles.smallBtn}>Delete</button>
+                        <button
+                          onClick={() => editOfficeBearer(person)}
+                          style={styles.smallBtn}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteOfficeBearer(person.id)}
+                          style={styles.smallBtn}
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div style={{ ...styles.panel, marginBottom: 20 }}>
-                  <h3 style={{ marginTop: 0 }}>{editingMemberId ? "Edit Member" : "Add Member"}</h3>
-                  <input value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="Name" style={styles.input} />
-                  <select value={newMemberSection} onChange={(e) => setNewMemberSection(e.target.value)} style={styles.input}>
+                <div style={styles.panel}>
+                  <h3 style={{ marginTop: 0 }}>
+                    {editingMemberId ? "Edit Member" : "Add Member"}
+                  </h3>
+                  <input
+                    value={newMemberName}
+                    onChange={(e) => setNewMemberName(e.target.value)}
+                    placeholder="Name"
+                    style={styles.input}
+                  />
+                  <select
+                    value={newMemberSection}
+                    onChange={(e) => setNewMemberSection(e.target.value)}
+                    style={styles.input}
+                  >
                     <option>Gents</option>
                     <option>Ladies</option>
                     <option>Associate</option>
                   </select>
+                  <input
+                    value={newMemberPhone}
+                    onChange={(e) => setNewMemberPhone(e.target.value)}
+                    placeholder="Phone"
+                    style={styles.input}
+                  />
                   <button onClick={saveMember} style={styles.button}>
                     {editingMemberId ? "Update Member" : "Save Member"}
                   </button>
                 </div>
 
-                <div style={{ ...styles.panel, marginBottom: 20 }}>
+                <div style={styles.panel}>
                   <h3 style={{ marginTop: 0 }}>Manage Members</h3>
                   {members.map((m) => (
                     <div key={m.id} style={styles.card}>
-                      <strong>{m.name}</strong> — {m.section}
+                      <strong>{m.name}</strong> — {m.section} — {m.phone || "no phone"}
                       <div style={{ marginTop: 8 }}>
-                        <button onClick={() => editMember(m)} style={styles.smallBtn}>Edit</button>
-                        <button onClick={() => deleteMember(m.id)} style={styles.smallBtn}>Delete</button>
+                        <button onClick={() => editMember(m)} style={styles.smallBtn}>
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteMember(m.id)}
+                          style={styles.smallBtn}
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div style={{ ...styles.panel, marginBottom: 20 }}>
-                  <h3 style={{ marginTop: 0 }}>{editingPostId ? "Edit Information Post" : "Add Information Post"}</h3>
-                  <input value={postTitle} onChange={(e) => setPostTitle(e.target.value)} placeholder="Title" style={styles.input} />
-                  <textarea value={postMessage} onChange={(e) => setPostMessage(e.target.value)} placeholder="Message" style={styles.textarea} />
-                  <input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} style={styles.input} />
-                  <input value={postLink} onChange={(e) => setPostLink(e.target.value)} placeholder="Attachment link (optional if uploading file)" style={styles.input} />
-                  <input value={postButtonText} onChange={(e) => setPostButtonText(e.target.value)} placeholder="Button text e.g. Download Form" style={styles.input} />
+                <div style={styles.panel}>
+                  <h3 style={{ marginTop: 0 }}>
+                    {editingPostId ? "Edit Information Post" : "Add Information Post"}
+                  </h3>
+                  <input
+                    value={postTitle}
+                    onChange={(e) => setPostTitle(e.target.value)}
+                    placeholder="Title"
+                    style={styles.input}
+                  />
+                  <textarea
+                    value={postMessage}
+                    onChange={(e) => setPostMessage(e.target.value)}
+                    placeholder="Message"
+                    style={styles.textarea}
+                  />
+                  <input
+                    type="date"
+                    value={postDate}
+                    onChange={(e) => setPostDate(e.target.value)}
+                    style={styles.input}
+                  />
+                  <input
+                    value={postLink}
+                    onChange={(e) => setPostLink(e.target.value)}
+                    placeholder="Attachment link"
+                    style={styles.input}
+                  />
+                  <input
+                    value={postButtonText}
+                    onChange={(e) => setPostButtonText(e.target.value)}
+                    placeholder="Button text e.g. Download Form"
+                    style={styles.input}
+                  />
                   <div style={{ marginBottom: 10 }}>
-                    <label style={{ display: "block", marginBottom: 6, fontWeight: 700 }}>Upload file</label>
-                    <input type="file" onChange={(e) => setPostFile(e.target.files?.[0] || null)} />
+                    <label style={{ display: "block", marginBottom: 6, fontWeight: 700 }}>
+                      Upload file
+                    </label>
+                    <input
+                      type="file"
+                      onChange={(e) => setPostFile(e.target.files?.[0] || null)}
+                    />
                   </div>
                   <label style={{ display: "block", marginBottom: 10 }}>
                     <input
@@ -735,10 +963,18 @@ export default function App() {
                   <h3 style={{ marginTop: 0 }}>Manage Information Posts</h3>
                   {sortedPosts.map((post) => (
                     <div key={post.id} style={styles.card}>
-                      <strong>{post.date_posted}</strong> — {post.title} {post.pinned ? "• PINNED" : ""}
+                      <strong>{post.date_posted}</strong> — {post.title}{" "}
+                      {post.pinned ? "• PINNED" : ""}
                       <div style={{ marginTop: 8 }}>
-                        <button onClick={() => editPost(post)} style={styles.smallBtn}>Edit</button>
-                        <button onClick={() => deletePost(post.id)} style={styles.smallBtn}>Delete</button>
+                        <button onClick={() => editPost(post)} style={styles.smallBtn}>
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deletePost(post.id)}
+                          style={styles.smallBtn}
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
                   ))}
