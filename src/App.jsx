@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "./lib/supabase";
 
 const CLUB_PIN = "1911";
@@ -10,6 +10,7 @@ export default function App() {
 
   const [entries, setEntries] = useState([]);
   const [members, setMembers] = useState([]);
+  const [points, setPoints] = useState([]);
 
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
@@ -27,6 +28,7 @@ export default function App() {
     if (!loggedIn) return;
     loadEntries();
     loadMembers();
+    loadPoints();
   }, [loggedIn]);
 
   const loadEntries = async () => {
@@ -69,6 +71,24 @@ export default function App() {
     }
   };
 
+  const loadPoints = async () => {
+    if (!supabase) {
+      alert("Supabase not connected");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("monday_points")
+      .select("*")
+      .order("week_date", { ascending: true });
+
+    if (error) {
+      alert("Could not load leaderboard");
+    } else {
+      setPoints(data || []);
+    }
+  };
+
   const addEntry = async () => {
     if (!title || !date) return;
 
@@ -89,6 +109,25 @@ export default function App() {
     setDate("");
     loadEntries();
   };
+
+  const leaderboard = useMemo(() => {
+    const totals = {};
+
+    points.forEach((row) => {
+      const name = String(row.member_name || "").trim();
+      if (!name) return;
+      totals[name] = (totals[name] || 0) + Number(row.points || 0);
+    });
+
+    return Object.entries(totals)
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name))
+      .map((row, index) => ({
+        position: index + 1,
+        name: row.name,
+        total: row.total
+      }));
+  }, [points]);
 
   if (!loggedIn) {
     return (
@@ -135,6 +174,7 @@ export default function App() {
           onClick={() => setActiveTab("members")}
           style={{
             padding: 10,
+            marginRight: 10,
             background: activeTab === "members" ? "#d97706" : "#eee",
             color: activeTab === "members" ? "white" : "black",
             border: "none",
@@ -142,6 +182,19 @@ export default function App() {
           }}
         >
           Members
+        </button>
+
+        <button
+          onClick={() => setActiveTab("leaderboard")}
+          style={{
+            padding: 10,
+            background: activeTab === "leaderboard" ? "#d97706" : "#eee",
+            color: activeTab === "leaderboard" ? "white" : "black",
+            border: "none",
+            cursor: "pointer"
+          }}
+        >
+          Leaderboard
         </button>
       </div>
 
@@ -207,6 +260,37 @@ export default function App() {
                   <td style={{ border: "1px solid #ccc", padding: 10 }}>{member.section}</td>
                   <td style={{ border: "1px solid #ccc", padding: 10 }}>{member.phone}</td>
                   <td style={{ border: "1px solid #ccc", padding: 10 }}>{member.email}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {activeTab === "leaderboard" && (
+        <div>
+          <h3>Monday Points Leaderboard</h3>
+
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              marginTop: 20
+            }}
+          >
+            <thead>
+              <tr style={{ background: "#f3f4f6" }}>
+                <th style={{ border: "1px solid #ccc", padding: 10, textAlign: "left" }}>Position</th>
+                <th style={{ border: "1px solid #ccc", padding: 10, textAlign: "left" }}>Name</th>
+                <th style={{ border: "1px solid #ccc", padding: 10, textAlign: "left" }}>Total Points</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leaderboard.map((row) => (
+                <tr key={row.name}>
+                  <td style={{ border: "1px solid #ccc", padding: 10 }}>{row.position}</td>
+                  <td style={{ border: "1px solid #ccc", padding: 10 }}>{row.name}</td>
+                  <td style={{ border: "1px solid #ccc", padding: 10 }}>{row.total}</td>
                 </tr>
               ))}
             </tbody>
