@@ -30,40 +30,126 @@ function sortOfficeBearers(list) {
   });
 }
 
-function panelStyle(background = "#fff", border = "#d6d3d1") {
-  return {
-    background,
-    border: `1px solid ${border}`,
-    borderRadius: 14,
+const styles = {
+  page: {
+    padding: 16,
+    fontFamily: "Arial, sans-serif",
+    background: "#f7f3ee",
+    minHeight: "100vh",
+    color: "#222"
+  },
+  wrap: {
+    maxWidth: 1100,
+    margin: "0 auto"
+  },
+  panel: {
+    background: "#fff",
+    border: "1px solid #d6d3d1",
+    borderRadius: 16,
     padding: 16,
     boxShadow: "0 2px 8px rgba(0,0,0,0.06)"
-  };
-}
-
-function buttonStyle(active = false) {
-  return {
-    padding: "10px 14px",
-    marginRight: 10,
-    marginBottom: 10,
+  },
+  warmPanel: {
+    background: "#fffaf5",
+    border: "1px solid #d6d3d1",
+    borderRadius: 16,
+    padding: 16,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)"
+  },
+  title: {
+    margin: "0 0 6px 0",
+    color: "#7c2d12",
+    fontSize: 34
+  },
+  subtitle: {
+    margin: 0,
+    fontSize: 24
+  },
+  tabs: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 16
+  },
+  tabButton: (active) => ({
+    padding: "12px 16px",
     background: active ? "#b45309" : "#eee7df",
-    color: active ? "white" : "#222",
+    color: active ? "#fff" : "#222",
+    border: "none",
+    borderRadius: 12,
+    cursor: "pointer",
+    fontWeight: 700,
+    fontSize: 16,
+    minHeight: 46
+  }),
+  input: {
+    width: "100%",
+    padding: 12,
+    marginBottom: 10,
+    border: "1px solid #cbd5e1",
+    borderRadius: 12,
+    boxSizing: "border-box",
+    fontSize: 16
+  },
+  actionButton: {
+    padding: "12px 16px",
+    background: "#b45309",
+    color: "#fff",
+    border: "none",
+    borderRadius: 12,
+    cursor: "pointer",
+    fontWeight: 700,
+    fontSize: 16,
+    minHeight: 46
+  },
+  smallButton: {
+    padding: "10px 12px",
+    background: "#eee7df",
+    color: "#222",
     border: "none",
     borderRadius: 10,
     cursor: "pointer",
-    fontWeight: 600
-  };
-}
-
-function inputStyle(width = "auto") {
-  return {
-    padding: 10,
-    marginRight: 10,
-    marginBottom: 10,
-    border: "1px solid #cbd5e1",
+    fontWeight: 700,
+    fontSize: 14
+  },
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+    gap: 14
+  },
+  card: {
+    border: "1px solid #d6d3d1",
+    borderRadius: 14,
+    padding: 16,
+    background: "#fcfcfc"
+  },
+  keyCard: {
+    border: "2px solid #d97706",
+    borderRadius: 14,
+    padding: 16,
+    background: "#fff7ed",
+    boxShadow: "0 2px 6px rgba(0,0,0,0.06)"
+  },
+  message: {
+    marginBottom: 15,
+    padding: 12,
+    background: "#fff3cd",
+    border: "1px solid #e0c36c",
+    borderRadius: 10
+  },
+  listRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    border: "1px solid #e5e7eb",
     borderRadius: 10,
-    width
-  };
-}
+    background: "#fcfcfc",
+    marginBottom: 10,
+    flexWrap: "wrap"
+  }
+};
 
 export default function App() {
   const [pin, setPin] = useState("");
@@ -184,9 +270,7 @@ export default function App() {
       return;
     }
 
-    const { data, error } = await supabase
-      .from("office_bearers")
-      .select("*");
+    const { data, error } = await supabase.from("office_bearers").select("*");
 
     if (error) {
       setMessage(`Could not load office bearers: ${error.message}`);
@@ -206,15 +290,9 @@ export default function App() {
       return;
     }
 
-    const newEntry = {
-      title,
-      date_text: date,
-      note: ""
-    };
-
     const { data, error } = await supabase
       .from("events")
-      .insert([newEntry])
+      .insert([{ title, date_text: date, note: "" }])
       .select()
       .single();
 
@@ -228,15 +306,12 @@ export default function App() {
         String(a.date_text || "").localeCompare(String(b.date_text || ""))
       )
     );
-
     setTitle("");
     setDate("");
     setMessage("Diary entry added.");
   };
 
   const deleteEntry = async (id) => {
-    if (!supabase) return;
-
     const { error } = await supabase.from("events").delete().eq("id", id);
 
     if (error) {
@@ -249,26 +324,21 @@ export default function App() {
   };
 
   const addMember = async () => {
-    if (!supabase) {
-      setMessage("Supabase not connected.");
-      return;
-    }
-
     if (!newMemberName) {
       setMessage("Enter member name.");
       return;
     }
 
-    const newMember = {
-      name: newMemberName,
-      section: newMemberSection,
-      phone: newMemberPhone,
-      email: newMemberEmail
-    };
-
     const { data, error } = await supabase
       .from("members")
-      .insert([newMember])
+      .insert([
+        {
+          name: newMemberName,
+          section: newMemberSection,
+          phone: newMemberPhone,
+          email: newMemberEmail
+        }
+      ])
       .select()
       .single();
 
@@ -282,7 +352,6 @@ export default function App() {
         String(a.name || "").localeCompare(String(b.name || ""))
       )
     );
-
     setNewMemberName("");
     setNewMemberSection("Gents");
     setNewMemberPhone("");
@@ -291,8 +360,6 @@ export default function App() {
   };
 
   const deleteMember = async (id) => {
-    if (!supabase) return;
-
     const { error } = await supabase.from("members").delete().eq("id", id);
 
     if (error) {
@@ -305,25 +372,20 @@ export default function App() {
   };
 
   const addOfficeBearer = async () => {
-    if (!supabase) {
-      setMessage("Supabase not connected.");
-      return;
-    }
-
     if (!newRole || !newOfficerName) {
       setMessage("Enter role and name.");
       return;
     }
 
-    const newOfficeBearer = {
-      role: newRole,
-      name: newOfficerName,
-      phone: newOfficerPhone
-    };
-
     const { data, error } = await supabase
       .from("office_bearers")
-      .insert([newOfficeBearer])
+      .insert([
+        {
+          role: newRole,
+          name: newOfficerName,
+          phone: newOfficerPhone
+        }
+      ])
       .select()
       .single();
 
@@ -333,7 +395,6 @@ export default function App() {
     }
 
     setOfficeBearers((prev) => [...prev, data]);
-
     setNewRole("");
     setNewOfficerName("");
     setNewOfficerPhone("");
@@ -341,8 +402,6 @@ export default function App() {
   };
 
   const deleteOfficeBearer = async (id) => {
-    if (!supabase) return;
-
     const { error } = await supabase
       .from("office_bearers")
       .delete()
@@ -359,90 +418,56 @@ export default function App() {
 
   if (!loggedIn) {
     return (
-      <div
-        style={{
-          padding: 24,
-          fontFamily: "Arial, sans-serif",
-          background: "#f7f3ee",
-          minHeight: "100vh"
-        }}
-      >
-        <div style={{ maxWidth: 460, margin: "60px auto", ...panelStyle("#fffaf5") }}>
-          <h1 style={{ marginTop: 0, color: "#7c2d12" }}>Woodilee Bowling Club</h1>
-          <h2 style={{ marginTop: 0 }}>Members Diary</h2>
+      <div style={styles.page}>
+        <div style={{ maxWidth: 460, margin: "40px auto", ...styles.warmPanel }}>
+          <h1 style={styles.title}>Woodilee Bowling Club</h1>
+          <h2 style={styles.subtitle}>Members Diary</h2>
 
-          <input
-            type="password"
-            placeholder="Enter PIN"
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            style={{ ...inputStyle("100%"), boxSizing: "border-box" }}
-          />
-
-          <button onClick={handleLogin} style={{ ...buttonStyle(true), width: "100%", marginRight: 0 }}>
-            Enter
-          </button>
+          <div style={{ marginTop: 16 }}>
+            <input
+              type="password"
+              placeholder="Enter PIN"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              style={styles.input}
+            />
+            <button onClick={handleLogin} style={{ ...styles.actionButton, width: "100%" }}>
+              Enter
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        padding: 24,
-        fontFamily: "Arial, sans-serif",
-        background: "#f7f3ee",
-        minHeight: "100vh",
-        color: "#222"
-      }}
-    >
-      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ ...panelStyle("#fffaf5"), marginBottom: 20 }}>
-          <h1 style={{ margin: "0 0 6px 0", color: "#7c2d12" }}>Woodilee Bowling Club</h1>
-          <h2 style={{ margin: 0 }}>Members Diary</h2>
+    <div style={styles.page}>
+      <div style={styles.wrap}>
+        <div style={{ ...styles.warmPanel, marginBottom: 20 }}>
+          <h1 style={styles.title}>Woodilee Bowling Club</h1>
+          <h2 style={styles.subtitle}>Members Diary</h2>
         </div>
 
-        {message && (
-          <div
-            style={{
-              marginBottom: 15,
-              padding: 12,
-              background: "#fff3cd",
-              border: "1px solid #e0c36c",
-              borderRadius: 10
-            }}
-          >
-            {message}
-          </div>
-        )}
+        {message && <div style={styles.message}>{message}</div>}
 
-        <div style={{ marginBottom: 16 }}>
-          <button onClick={() => setActiveTab("diary")} style={buttonStyle(activeTab === "diary")}>
+        <div style={styles.tabs}>
+          <button onClick={() => setActiveTab("diary")} style={styles.tabButton(activeTab === "diary")}>
             Diary
           </button>
-
-          <button onClick={() => setActiveTab("members")} style={buttonStyle(activeTab === "members")}>
+          <button onClick={() => setActiveTab("members")} style={styles.tabButton(activeTab === "members")}>
             Members
           </button>
-
-          <button onClick={() => setActiveTab("admin")} style={buttonStyle(activeTab === "admin")}>
+          <button onClick={() => setActiveTab("admin")} style={styles.tabButton(activeTab === "admin")}>
             Admin
           </button>
         </div>
 
         {activeTab === "diary" && (
           <div>
-            <div style={{ ...panelStyle("#fffaf5"), marginBottom: 20 }}>
+            <div style={{ ...styles.warmPanel, marginBottom: 20 }}>
               <h3 style={{ marginTop: 0 }}>Office Bearers</h3>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-                  gap: 16
-                }}
-              >
+              <div style={styles.grid}>
                 {uniqueOfficeBearers.map((person) => {
                   const isKeyRole =
                     String(person.role || "").includes("President") ||
@@ -450,16 +475,7 @@ export default function App() {
                     String(person.role || "").includes("Treasurer");
 
                   return (
-                    <div
-                      key={person.id}
-                      style={{
-                        border: isKeyRole ? "2px solid #d97706" : "1px solid #d6d3d1",
-                        borderRadius: 12,
-                        padding: 16,
-                        background: isKeyRole ? "#fff7ed" : "#ffffff",
-                        boxShadow: "0 2px 6px rgba(0,0,0,0.06)"
-                      }}
-                    >
+                    <div key={person.id} style={isKeyRole ? styles.keyCard : styles.card}>
                       <div
                         style={{
                           fontSize: 13,
@@ -472,17 +488,9 @@ export default function App() {
                       >
                         {person.role}
                       </div>
-
-                      <div
-                        style={{
-                          fontSize: 20,
-                          fontWeight: "bold",
-                          marginBottom: 8
-                        }}
-                      >
+                      <div style={{ fontSize: 20, fontWeight: "bold", marginBottom: 8 }}>
                         {person.name}
                       </div>
-
                       <div style={{ color: "#444" }}>
                         {person.phone || "No phone listed"}
                       </div>
@@ -492,22 +500,13 @@ export default function App() {
               </div>
             </div>
 
-            <div style={panelStyle("#fff")}>
+            <div style={styles.panel}>
               <h3 style={{ marginTop: 0 }}>Diary Entries</h3>
-
               {loading && <p>Loading...</p>}
 
               <div style={{ display: "grid", gap: 12 }}>
                 {entries.map((item) => (
-                  <div
-                    key={item.id}
-                    style={{
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 12,
-                      padding: 14,
-                      background: "#fcfcfc"
-                    }}
-                  >
+                  <div key={item.id} style={styles.card}>
                     <div style={{ fontSize: 14, color: "#92400e", fontWeight: 700 }}>
                       {item.date_text}
                     </div>
@@ -522,32 +521,18 @@ export default function App() {
         )}
 
         {activeTab === "members" && (
-          <div style={panelStyle("#fff")}>
+          <div style={styles.panel}>
             <h3 style={{ marginTop: 0 }}>Members List</h3>
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                gap: 16
-              }}
-            >
+            <div style={styles.grid}>
               {members.map((member) => (
-                <div
-                  key={member.id}
-                  style={{
-                    border: "1px solid #d6d3d1",
-                    borderRadius: 12,
-                    padding: 16,
-                    background: "#fcfcfc"
-                  }}
-                >
+                <div key={member.id} style={styles.card}>
                   <div style={{ fontSize: 20, fontWeight: 700 }}>{member.name}</div>
                   <div style={{ marginTop: 6, color: "#92400e", fontWeight: 700 }}>
                     {member.section}
                   </div>
                   <div style={{ marginTop: 8 }}>{member.phone}</div>
-                  <div style={{ marginTop: 4 }}>{member.email}</div>
+                  <div style={{ marginTop: 4, wordBreak: "break-word" }}>{member.email}</div>
                 </div>
               ))}
             </div>
@@ -557,207 +542,139 @@ export default function App() {
         {activeTab === "admin" && (
           <div>
             {!adminUnlocked ? (
-              <div style={{ maxWidth: 460, ...panelStyle("#fffaf5") }}>
+              <div style={{ maxWidth: 460, ...styles.warmPanel }}>
                 <h3 style={{ marginTop: 0 }}>Admin Login</h3>
-
                 <input
                   type="password"
                   placeholder="Enter Admin PIN"
                   value={adminPin}
                   onChange={(e) => setAdminPin(e.target.value)}
-                  style={{ ...inputStyle("100%"), boxSizing: "border-box" }}
+                  style={styles.input}
                 />
-
-                <button
-                  onClick={handleAdminLogin}
-                  style={{ ...buttonStyle(true), width: "100%", marginRight: 0 }}
-                >
+                <button onClick={handleAdminLogin} style={{ ...styles.actionButton, width: "100%" }}>
                   Enter
                 </button>
               </div>
             ) : (
               <div style={{ display: "grid", gap: 20 }}>
-                <div style={panelStyle("#fff")}>
+                <div style={styles.panel}>
                   <h3 style={{ marginTop: 0 }}>Add Diary Entry</h3>
-
                   <input
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Event title"
-                    style={inputStyle("240px")}
+                    style={styles.input}
                   />
-
                   <input
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    style={inputStyle("180px")}
+                    style={styles.input}
                   />
-
-                  <br />
-
-                  <button onClick={addEntry} style={buttonStyle(true)}>
+                  <button onClick={addEntry} style={styles.actionButton}>
                     Save Diary Entry
                   </button>
                 </div>
 
-                <div style={panelStyle("#fff")}>
+                <div style={styles.panel}>
                   <h3 style={{ marginTop: 0 }}>Delete Diary Entry</h3>
-
-                  <div style={{ display: "grid", gap: 10 }}>
-                    {entries.map((item) => (
-                      <div
-                        key={item.id}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          gap: 12,
-                          padding: 12,
-                          border: "1px solid #e5e7eb",
-                          borderRadius: 10,
-                          background: "#fcfcfc"
-                        }}
-                      >
-                        <div>
-                          <strong>{item.date_text}</strong> — {item.title}
-                        </div>
-                        <button onClick={() => deleteEntry(item.id)} style={buttonStyle()}>
-                          Delete
-                        </button>
+                  {entries.map((item) => (
+                    <div key={item.id} style={styles.listRow}>
+                      <div>
+                        <strong>{item.date_text}</strong> — {item.title}
                       </div>
-                    ))}
-                  </div>
+                      <button onClick={() => deleteEntry(item.id)} style={styles.smallButton}>
+                        Delete
+                      </button>
+                    </div>
+                  ))}
                 </div>
 
-                <div style={panelStyle("#fff")}>
+                <div style={styles.panel}>
                   <h3 style={{ marginTop: 0 }}>Add Office Bearer</h3>
-
                   <input
                     value={newRole}
                     onChange={(e) => setNewRole(e.target.value)}
                     placeholder="Role"
-                    style={inputStyle("220px")}
+                    style={styles.input}
                   />
-
                   <input
                     value={newOfficerName}
                     onChange={(e) => setNewOfficerName(e.target.value)}
                     placeholder="Name"
-                    style={inputStyle("220px")}
+                    style={styles.input}
                   />
-
                   <input
                     value={newOfficerPhone}
                     onChange={(e) => setNewOfficerPhone(e.target.value)}
                     placeholder="Phone"
-                    style={inputStyle("180px")}
+                    style={styles.input}
                   />
-
-                  <br />
-
-                  <button onClick={addOfficeBearer} style={buttonStyle(true)}>
+                  <button onClick={addOfficeBearer} style={styles.actionButton}>
                     Save Office Bearer
                   </button>
                 </div>
 
-                <div style={panelStyle("#fff")}>
+                <div style={styles.panel}>
                   <h3 style={{ marginTop: 0 }}>Delete Office Bearer</h3>
-
-                  <div style={{ display: "grid", gap: 10 }}>
-                    {sortedOfficeBearers.map((person) => (
-                      <div
-                        key={person.id}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          gap: 12,
-                          padding: 12,
-                          border: "1px solid #e5e7eb",
-                          borderRadius: 10,
-                          background: "#fcfcfc"
-                        }}
-                      >
-                        <div>
-                          <strong>{person.role}</strong> — {person.name}
-                        </div>
-                        <button onClick={() => deleteOfficeBearer(person.id)} style={buttonStyle()}>
-                          Delete
-                        </button>
+                  {sortedOfficeBearers.map((person) => (
+                    <div key={person.id} style={styles.listRow}>
+                      <div>
+                        <strong>{person.role}</strong> — {person.name}
                       </div>
-                    ))}
-                  </div>
+                      <button onClick={() => deleteOfficeBearer(person.id)} style={styles.smallButton}>
+                        Delete
+                      </button>
+                    </div>
+                  ))}
                 </div>
 
-                <div style={panelStyle("#fff")}>
+                <div style={styles.panel}>
                   <h3 style={{ marginTop: 0 }}>Add Member</h3>
-
                   <input
                     value={newMemberName}
                     onChange={(e) => setNewMemberName(e.target.value)}
                     placeholder="Name"
-                    style={inputStyle("220px")}
+                    style={styles.input}
                   />
-
                   <select
                     value={newMemberSection}
                     onChange={(e) => setNewMemberSection(e.target.value)}
-                    style={inputStyle("180px")}
+                    style={styles.input}
                   >
                     <option>Gents</option>
                     <option>Ladies</option>
                     <option>Associate</option>
                   </select>
-
                   <input
                     value={newMemberPhone}
                     onChange={(e) => setNewMemberPhone(e.target.value)}
                     placeholder="Phone"
-                    style={inputStyle("180px")}
+                    style={styles.input}
                   />
-
                   <input
                     value={newMemberEmail}
                     onChange={(e) => setNewMemberEmail(e.target.value)}
                     placeholder="Email"
-                    style={inputStyle("220px")}
+                    style={styles.input}
                   />
-
-                  <br />
-
-                  <button onClick={addMember} style={buttonStyle(true)}>
+                  <button onClick={addMember} style={styles.actionButton}>
                     Save Member
                   </button>
                 </div>
 
-                <div style={panelStyle("#fff")}>
+                <div style={styles.panel}>
                   <h3 style={{ marginTop: 0 }}>Delete Member</h3>
-
-                  <div style={{ display: "grid", gap: 10 }}>
-                    {members.map((member) => (
-                      <div
-                        key={member.id}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          gap: 12,
-                          padding: 12,
-                          border: "1px solid #e5e7eb",
-                          borderRadius: 10,
-                          background: "#fcfcfc"
-                        }}
-                      >
-                        <div>
-                          <strong>{member.name}</strong> — {member.section}
-                        </div>
-                        <button onClick={() => deleteMember(member.id)} style={buttonStyle()}>
-                          Delete
-                        </button>
+                  {members.map((member) => (
+                    <div key={member.id} style={styles.listRow}>
+                      <div>
+                        <strong>{member.name}</strong> — {member.section}
                       </div>
-                    ))}
-                  </div>
+                      <button onClick={() => deleteMember(member.id)} style={styles.smallButton}>
+                        Delete
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
