@@ -58,6 +58,16 @@ const styles = {
     border: "1px solid #cbd5e1",
     boxSizing: "border-box"
   },
+  textarea: {
+    width: "100%",
+    padding: 12,
+    marginBottom: 10,
+    borderRadius: 12,
+    border: "1px solid #cbd5e1",
+    boxSizing: "border-box",
+    minHeight: 100,
+    resize: "vertical"
+  },
   button: {
     padding: "12px 16px",
     background: "#b45309",
@@ -95,15 +105,25 @@ const styles = {
     background: "#fff3cd",
     border: "1px solid #e0c36c",
     borderRadius: 10
+  },
+  linkBtn: {
+    display: "inline-block",
+    padding: "10px 14px",
+    background: "#b45309",
+    color: "#fff",
+    borderRadius: 10,
+    textDecoration: "none",
+    fontWeight: 700,
+    marginTop: 10
   }
 };
 
 function sortEventsChronologically(list) {
-  return [...list].sort((a, b) => {
-    const aDate = new Date(a.date_text);
-    const bDate = new Date(b.date_text);
-    return aDate - bDate;
-  });
+  return [...list].sort((a, b) => new Date(a.date_text) - new Date(b.date_text));
+}
+
+function sortPostsNewestFirst(list) {
+  return [...list].sort((a, b) => new Date(b.date_posted) - new Date(a.date_posted));
 }
 
 export default function App() {
@@ -118,6 +138,7 @@ export default function App() {
   const [entries, setEntries] = useState([]);
   const [members, setMembers] = useState([]);
   const [officeBearers, setOfficeBearers] = useState([]);
+  const [posts, setPosts] = useState([]);
 
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
@@ -129,11 +150,19 @@ export default function App() {
   const [newOfficerName, setNewOfficerName] = useState("");
   const [newOfficerPhone, setNewOfficerPhone] = useState("");
 
+  const [postTitle, setPostTitle] = useState("");
+  const [postMessage, setPostMessage] = useState("");
+  const [postDate, setPostDate] = useState("");
+  const [postLink, setPostLink] = useState("");
+  const [postButtonText, setPostButtonText] = useState("");
+
   const [editingEntryId, setEditingEntryId] = useState(null);
   const [editingMemberId, setEditingMemberId] = useState(null);
   const [editingOfficerId, setEditingOfficerId] = useState(null);
+  const [editingPostId, setEditingPostId] = useState(null);
 
   const sortedEntries = useMemo(() => sortEventsChronologically(entries), [entries]);
+  const sortedPosts = useMemo(() => sortPostsNewestFirst(posts), [posts]);
 
   const handleLogin = () => {
     if (pin === CLUB_PIN) {
@@ -158,6 +187,7 @@ export default function App() {
     loadEntries();
     loadMembers();
     loadOfficeBearers();
+    loadPosts();
   }, [loggedIn]);
 
   const loadEntries = async () => {
@@ -187,6 +217,15 @@ export default function App() {
     setOfficeBearers(data || []);
   };
 
+  const loadPosts = async () => {
+    const { data, error } = await supabase.from("information_posts").select("*");
+    if (error) {
+      setMessage(`Could not load information posts: ${error.message}`);
+      return;
+    }
+    setPosts(data || []);
+  };
+
   const saveEntry = async () => {
     if (!title || !date) {
       setMessage("Enter event title and date.");
@@ -207,8 +246,8 @@ export default function App() {
       }
 
       setEntries((prev) => prev.map((x) => (x.id === editingEntryId ? data : x)));
-      setMessage("Diary entry updated.");
       setEditingEntryId(null);
+      setMessage("Diary entry updated.");
     } else {
       const { data, error } = await supabase
         .from("events")
@@ -266,8 +305,8 @@ export default function App() {
       }
 
       setMembers((prev) => prev.map((x) => (x.id === editingMemberId ? data : x)));
-      setMessage("Member updated.");
       setEditingMemberId(null);
+      setMessage("Member updated.");
     } else {
       const { data, error } = await supabase
         .from("members")
@@ -325,8 +364,8 @@ export default function App() {
       }
 
       setOfficeBearers((prev) => prev.map((x) => (x.id === editingOfficerId ? data : x)));
-      setMessage("Office bearer updated.");
       setEditingOfficerId(null);
+      setMessage("Office bearer updated.");
     } else {
       const { data, error } = await supabase
         .from("office_bearers")
@@ -366,6 +405,79 @@ export default function App() {
     setMessage("Office bearer deleted.");
   };
 
+  const savePost = async () => {
+    if (!postTitle || !postMessage || !postDate) {
+      setMessage("Enter post title, message and date.");
+      return;
+    }
+
+    const payload = {
+      title: postTitle,
+      message: postMessage,
+      date_posted: postDate,
+      attachment_link: postLink,
+      button_text: postButtonText
+    };
+
+    if (editingPostId) {
+      const { data, error } = await supabase
+        .from("information_posts")
+        .update(payload)
+        .eq("id", editingPostId)
+        .select()
+        .single();
+
+      if (error) {
+        setMessage(`Could not update information post: ${error.message}`);
+        return;
+      }
+
+      setPosts((prev) => prev.map((x) => (x.id === editingPostId ? data : x)));
+      setEditingPostId(null);
+      setMessage("Information post updated.");
+    } else {
+      const { data, error } = await supabase
+        .from("information_posts")
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) {
+        setMessage(`Could not save information post: ${error.message}`);
+        return;
+      }
+
+      setPosts((prev) => [...prev, data]);
+      setMessage("Information post added.");
+    }
+
+    setPostTitle("");
+    setPostMessage("");
+    setPostDate("");
+    setPostLink("");
+    setPostButtonText("");
+  };
+
+  const editPost = (post) => {
+    setEditingPostId(post.id);
+    setPostTitle(post.title || "");
+    setPostMessage(post.message || "");
+    setPostDate(post.date_posted || "");
+    setPostLink(post.attachment_link || "");
+    setPostButtonText(post.button_text || "");
+    setActiveTab("admin");
+  };
+
+  const deletePost = async (id) => {
+    const { error } = await supabase.from("information_posts").delete().eq("id", id);
+    if (error) {
+      setMessage(`Could not delete information post: ${error.message}`);
+      return;
+    }
+    setPosts((prev) => prev.filter((x) => x.id !== id));
+    setMessage("Information post deleted.");
+  };
+
   if (!loggedIn) {
     return (
       <div style={styles.page}>
@@ -396,6 +508,7 @@ export default function App() {
         <div style={styles.tabs}>
           <button style={styles.tab(activeTab === "diary")} onClick={() => setActiveTab("diary")}>Diary</button>
           <button style={styles.tab(activeTab === "members")} onClick={() => setActiveTab("members")}>Members</button>
+          <button style={styles.tab(activeTab === "information")} onClick={() => setActiveTab("information")}>Information</button>
           <button style={styles.tab(activeTab === "admin")} onClick={() => setActiveTab("admin")}>Admin</button>
         </div>
 
@@ -436,6 +549,29 @@ export default function App() {
           </div>
         )}
 
+        {activeTab === "information" && (
+          <div style={styles.panel}>
+            <h3 style={{ marginTop: 0 }}>General Information</h3>
+            {sortedPosts.map((post) => (
+              <div key={post.id} style={styles.card}>
+                <div style={{ color: "#92400e", fontWeight: 700 }}>{post.date_posted}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>{post.title}</div>
+                <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{post.message}</div>
+                {post.attachment_link ? (
+                  <a
+                    href={post.attachment_link}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={styles.linkBtn}
+                  >
+                    {post.button_text || "Open Attachment"}
+                  </a>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+
         {activeTab === "admin" && (
           <div>
             {!adminUnlocked ? (
@@ -453,18 +589,8 @@ export default function App() {
               <>
                 <div style={{ ...styles.panel, marginBottom: 20 }}>
                   <h3 style={{ marginTop: 0 }}>{editingEntryId ? "Edit Diary Entry" : "Add Diary Entry"}</h3>
-                  <input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Event title"
-                    style={styles.input}
-                  />
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    style={styles.input}
-                  />
+                  <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" style={styles.input} />
+                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={styles.input} />
                   <button onClick={saveEntry} style={styles.button}>
                     {editingEntryId ? "Update Diary Entry" : "Save Diary Entry"}
                   </button>
@@ -485,24 +611,9 @@ export default function App() {
 
                 <div style={{ ...styles.panel, marginBottom: 20 }}>
                   <h3 style={{ marginTop: 0 }}>{editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}</h3>
-                  <input
-                    value={newRole}
-                    onChange={(e) => setNewRole(e.target.value)}
-                    placeholder="Role"
-                    style={styles.input}
-                  />
-                  <input
-                    value={newOfficerName}
-                    onChange={(e) => setNewOfficerName(e.target.value)}
-                    placeholder="Name"
-                    style={styles.input}
-                  />
-                  <input
-                    value={newOfficerPhone}
-                    onChange={(e) => setNewOfficerPhone(e.target.value)}
-                    placeholder="Phone"
-                    style={styles.input}
-                  />
+                  <input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Role" style={styles.input} />
+                  <input value={newOfficerName} onChange={(e) => setNewOfficerName(e.target.value)} placeholder="Name" style={styles.input} />
+                  <input value={newOfficerPhone} onChange={(e) => setNewOfficerPhone(e.target.value)} placeholder="Phone" style={styles.input} />
                   <button onClick={saveOfficeBearer} style={styles.button}>
                     {editingOfficerId ? "Update Office Bearer" : "Save Office Bearer"}
                   </button>
@@ -523,17 +634,8 @@ export default function App() {
 
                 <div style={{ ...styles.panel, marginBottom: 20 }}>
                   <h3 style={{ marginTop: 0 }}>{editingMemberId ? "Edit Member" : "Add Member"}</h3>
-                  <input
-                    value={newMemberName}
-                    onChange={(e) => setNewMemberName(e.target.value)}
-                    placeholder="Name"
-                    style={styles.input}
-                  />
-                  <select
-                    value={newMemberSection}
-                    onChange={(e) => setNewMemberSection(e.target.value)}
-                    style={styles.input}
-                  >
+                  <input value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="Name" style={styles.input} />
+                  <select value={newMemberSection} onChange={(e) => setNewMemberSection(e.target.value)} style={styles.input}>
                     <option>Gents</option>
                     <option>Ladies</option>
                     <option>Associate</option>
@@ -543,7 +645,7 @@ export default function App() {
                   </button>
                 </div>
 
-                <div style={styles.panel}>
+                <div style={{ ...styles.panel, marginBottom: 20 }}>
                   <h3 style={{ marginTop: 0 }}>Manage Members</h3>
                   {members.map((m) => (
                     <div key={m.id} style={styles.card}>
@@ -551,6 +653,31 @@ export default function App() {
                       <div style={{ marginTop: 8 }}>
                         <button onClick={() => editMember(m)} style={styles.smallBtn}>Edit</button>
                         <button onClick={() => deleteMember(m.id)} style={styles.smallBtn}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ ...styles.panel, marginBottom: 20 }}>
+                  <h3 style={{ marginTop: 0 }}>{editingPostId ? "Edit Information Post" : "Add Information Post"}</h3>
+                  <input value={postTitle} onChange={(e) => setPostTitle(e.target.value)} placeholder="Title" style={styles.input} />
+                  <textarea value={postMessage} onChange={(e) => setPostMessage(e.target.value)} placeholder="Message" style={styles.textarea} />
+                  <input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} style={styles.input} />
+                  <input value={postLink} onChange={(e) => setPostLink(e.target.value)} placeholder="Attachment link" style={styles.input} />
+                  <input value={postButtonText} onChange={(e) => setPostButtonText(e.target.value)} placeholder="Button text e.g. Download Form" style={styles.input} />
+                  <button onClick={savePost} style={styles.button}>
+                    {editingPostId ? "Update Information Post" : "Save Information Post"}
+                  </button>
+                </div>
+
+                <div style={styles.panel}>
+                  <h3 style={{ marginTop: 0 }}>Manage Information Posts</h3>
+                  {sortedPosts.map((post) => (
+                    <div key={post.id} style={styles.card}>
+                      <strong>{post.date_posted}</strong> — {post.title}
+                      <div style={{ marginTop: 8 }}>
+                        <button onClick={() => editPost(post)} style={styles.smallBtn}>Edit</button>
+                        <button onClick={() => deletePost(post.id)} style={styles.smallBtn}>Delete</button>
                       </div>
                     </div>
                   ))}
