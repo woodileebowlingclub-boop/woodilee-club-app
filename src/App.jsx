@@ -2,11 +2,15 @@ import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "./lib/supabase";
 
 const CLUB_PIN = "1911";
+const ADMIN_PIN = "1954";
 
 export default function App() {
   const [pin, setPin] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState("diary");
+
+  const [adminPin, setAdminPin] = useState("");
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
 
   const [entries, setEntries] = useState([]);
   const [members, setMembers] = useState([]);
@@ -16,11 +20,28 @@ export default function App() {
   const [date, setDate] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberSection, setNewMemberSection] = useState("Gents");
+  const [newMemberPhone, setNewMemberPhone] = useState("");
+  const [newMemberEmail, setNewMemberEmail] = useState("");
+
+  const [pointsName, setPointsName] = useState("");
+  const [pointsDate, setPointsDate] = useState("");
+  const [pointsValue, setPointsValue] = useState("");
+
   const handleLogin = () => {
     if (pin === CLUB_PIN) {
       setLoggedIn(true);
     } else {
       alert("Wrong PIN");
+    }
+  };
+
+  const handleAdminLogin = () => {
+    if (adminPin === ADMIN_PIN) {
+      setAdminUnlocked(true);
+    } else {
+      alert("Wrong admin PIN");
     }
   };
 
@@ -110,6 +131,52 @@ export default function App() {
     loadEntries();
   };
 
+  const addMember = async () => {
+    if (!newMemberName) return;
+
+    const { error } = await supabase.from("members").insert([
+      {
+        name: newMemberName,
+        section: newMemberSection,
+        phone: newMemberPhone,
+        email: newMemberEmail
+      }
+    ]);
+
+    if (error) {
+      alert("Could not save member");
+      return;
+    }
+
+    setNewMemberName("");
+    setNewMemberSection("Gents");
+    setNewMemberPhone("");
+    setNewMemberEmail("");
+    loadMembers();
+  };
+
+  const addPoints = async () => {
+    if (!pointsName || !pointsDate || pointsValue === "") return;
+
+    const { error } = await supabase.from("monday_points").insert([
+      {
+        member_name: pointsName,
+        week_date: pointsDate,
+        points: Number(pointsValue)
+      }
+    ]);
+
+    if (error) {
+      alert("Could not save Monday Points");
+      return;
+    }
+
+    setPointsName("");
+    setPointsDate("");
+    setPointsValue("");
+    loadPoints();
+  };
+
   const mondayPoints = useMemo(() => {
     const totals = {};
 
@@ -188,6 +255,7 @@ export default function App() {
           onClick={() => setActiveTab("monday-points")}
           style={{
             padding: 10,
+            marginRight: 10,
             background: activeTab === "monday-points" ? "#d97706" : "#eee",
             color: activeTab === "monday-points" ? "white" : "black",
             border: "none",
@@ -195,6 +263,19 @@ export default function App() {
           }}
         >
           Monday Points
+        </button>
+
+        <button
+          onClick={() => setActiveTab("admin")}
+          style={{
+            padding: 10,
+            background: activeTab === "admin" ? "#d97706" : "#eee",
+            color: activeTab === "admin" ? "white" : "black",
+            border: "none",
+            cursor: "pointer"
+          }}
+        >
+          Admin
         </button>
       </div>
 
@@ -295,6 +376,129 @@ export default function App() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {activeTab === "admin" && (
+        <div>
+          {!adminUnlocked ? (
+            <div>
+              <h3>Admin Login</h3>
+
+              <input
+                type="password"
+                placeholder="Enter Admin PIN"
+                value={adminPin}
+                onChange={(e) => setAdminPin(e.target.value)}
+                style={{ padding: 10, marginRight: 10 }}
+              />
+
+              <button onClick={handleAdminLogin} style={{ padding: 10 }}>
+                Enter
+              </button>
+            </div>
+          ) : (
+            <div>
+              <h3>Admin Panel</h3>
+
+              <div style={{ marginBottom: 30 }}>
+                <h4>Add Member</h4>
+
+                <input
+                  value={newMemberName}
+                  onChange={(e) => setNewMemberName(e.target.value)}
+                  placeholder="Name"
+                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
+                />
+
+                <select
+                  value={newMemberSection}
+                  onChange={(e) => setNewMemberSection(e.target.value)}
+                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
+                >
+                  <option>Gents</option>
+                  <option>Ladies</option>
+                  <option>Associate</option>
+                </select>
+
+                <input
+                  value={newMemberPhone}
+                  onChange={(e) => setNewMemberPhone(e.target.value)}
+                  placeholder="Phone"
+                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
+                />
+
+                <input
+                  value={newMemberEmail}
+                  onChange={(e) => setNewMemberEmail(e.target.value)}
+                  placeholder="Email"
+                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
+                />
+
+                <br />
+
+                <button onClick={addMember} style={{ padding: 10 }}>
+                  Save Member
+                </button>
+              </div>
+
+              <div style={{ marginBottom: 30 }}>
+                <h4>Add Diary Entry</h4>
+
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Event title"
+                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
+                />
+
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
+                />
+
+                <br />
+
+                <button onClick={addEntry} style={{ padding: 10 }}>
+                  Save Diary Entry
+                </button>
+              </div>
+
+              <div>
+                <h4>Add Monday Points</h4>
+
+                <input
+                  value={pointsName}
+                  onChange={(e) => setPointsName(e.target.value)}
+                  placeholder="Member name"
+                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
+                />
+
+                <input
+                  type="date"
+                  value={pointsDate}
+                  onChange={(e) => setPointsDate(e.target.value)}
+                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
+                />
+
+                <input
+                  type="number"
+                  value={pointsValue}
+                  onChange={(e) => setPointsValue(e.target.value)}
+                  placeholder="Points"
+                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
+                />
+
+                <br />
+
+                <button onClick={addPoints} style={{ padding: 10 }}>
+                  Save Monday Points
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
