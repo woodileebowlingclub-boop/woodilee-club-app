@@ -9,34 +9,62 @@ const styles = {
   page: {
     padding: 16,
     fontFamily: "Arial, sans-serif",
-    background: "linear-gradient(180deg,#f7f3ee,#fff8f1)",
+    background: "linear-gradient(180deg, #f5efe7 0%, #fffaf4 100%)",
     minHeight: "100vh",
     color: "#222",
   },
   wrap: {
-    maxWidth: 1000,
+    maxWidth: 1050,
     margin: "0 auto",
+  },
+  header: {
+    background: "linear-gradient(135deg, #7c2d12 0%, #b45309 100%)",
+    color: "#fff",
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 18,
+    boxShadow: "0 4px 14px rgba(0,0,0,0.12)",
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
+    flexWrap: "wrap",
+  },
+  logo: {
+    width: 68,
+    height: 68,
+    borderRadius: "50%",
+    background: "#fff",
+    color: "#7c2d12",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 30,
+    fontWeight: 700,
+    border: "3px solid #fbbf24",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+    flexShrink: 0,
+  },
+  titleWrap: {
+    flex: 1,
+    minWidth: 220,
+  },
+  title: {
+    margin: 0,
+    fontSize: 30,
+    lineHeight: 1.1,
+  },
+  subtitle: {
+    margin: "6px 0 0 0",
+    opacity: 0.95,
+    fontSize: 15,
   },
   panel: {
     background: "#fff",
     border: "1px solid #ead7c4",
     borderRadius: 16,
     padding: 16,
-    marginBottom: 20,
+    marginBottom: 18,
     boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-  },
-  warmPanel: {
-    background: "#fffaf5",
-    border: "1px solid #ead7c4",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-  },
-  title: {
-    margin: "0 0 6px 0",
-    color: "#7c2d12",
-    fontSize: 32,
   },
   tabs: {
     display: "flex",
@@ -46,9 +74,9 @@ const styles = {
   },
   tab: (active) => ({
     padding: "12px 16px",
-    background: active ? "#b45309" : "#eee7df",
-    color: active ? "#fff" : "#222",
-    border: "none",
+    background: active ? "#b45309" : "#f3e8dc",
+    color: active ? "#fff" : "#5c2c0c",
+    border: active ? "1px solid #b45309" : "1px solid #e3d2c1",
     borderRadius: 12,
     fontWeight: 700,
     cursor: "pointer",
@@ -60,6 +88,7 @@ const styles = {
     borderRadius: 12,
     border: "1px solid #cbd5e1",
     boxSizing: "border-box",
+    background: "#fffdfb",
   },
   textarea: {
     width: "100%",
@@ -70,6 +99,7 @@ const styles = {
     boxSizing: "border-box",
     minHeight: 100,
     resize: "vertical",
+    background: "#fffdfb",
   },
   button: {
     padding: "12px 16px",
@@ -85,16 +115,18 @@ const styles = {
   smallBtn: {
     padding: "8px 10px",
     background: "#eee7df",
-    border: "none",
+    border: "1px solid #e3d2c1",
     borderRadius: 10,
     cursor: "pointer",
     marginLeft: 8,
+    color: "#5c2c0c",
+    fontWeight: 700,
   },
   card: {
-    border: "1px solid #e5e7eb",
-    borderRadius: 12,
+    border: "1px solid #e9dfd3",
+    borderRadius: 14,
     padding: 14,
-    background: "#fcfcfc",
+    background: "#fffdfa",
     marginBottom: 10,
   },
   grid: {
@@ -123,12 +155,34 @@ const styles = {
     display: "inline-block",
     background: "#25D366",
     color: "#fff",
-    padding: "6px 10px",
+    padding: "7px 10px",
     borderRadius: 8,
     textDecoration: "none",
     fontSize: 13,
     fontWeight: 700,
     marginLeft: 8,
+  },
+  callBtn: {
+    display: "inline-block",
+    background: "#2563eb",
+    color: "#fff",
+    padding: "7px 10px",
+    borderRadius: 8,
+    textDecoration: "none",
+    fontSize: 13,
+    fontWeight: 700,
+    marginRight: 8,
+  },
+  badge: {
+    display: "inline-block",
+    padding: "4px 8px",
+    borderRadius: 999,
+    background: "#fff7ed",
+    color: "#b45309",
+    fontWeight: 700,
+    fontSize: 12,
+    marginBottom: 8,
+    border: "1px solid #fed7aa",
   },
 };
 
@@ -143,9 +197,31 @@ function sortPosts(list) {
     const aPinned = a.pinned ? 1 : 0;
     const bPinned = b.pinned ? 1 : 0;
     if (aPinned !== bPinned) return bPinned - aPinned;
-    return (
-      new Date(b.date_posted).getTime() - new Date(a.date_posted).getTime()
-    );
+    return new Date(b.date_posted).getTime() - new Date(a.date_posted).getTime();
+  });
+}
+
+function sortOfficeBearers(list) {
+  const order = {
+    President: 1,
+    Secretary: 2,
+    Treasurer: 3,
+    "Vice President": 4,
+    "Bar Convenor": 5,
+  };
+
+  return [...list].sort((a, b) => {
+    const aRole = String(a.role || "");
+    const bRole = String(b.role || "");
+
+    const aMatch = Object.keys(order).find((x) => aRole.includes(x));
+    const bMatch = Object.keys(order).find((x) => bRole.includes(x));
+
+    const aRank = aMatch ? order[aMatch] : 99;
+    const bRank = bMatch ? order[bMatch] : 99;
+
+    if (aRank !== bRank) return aRank - bRank;
+    return aRole.localeCompare(bRole);
   });
 }
 
@@ -197,11 +273,12 @@ export default function App() {
   const [editingOfficerId, setEditingOfficerId] = useState(null);
   const [editingPostId, setEditingPostId] = useState(null);
 
-  const sortedEntries = useMemo(
-    () => sortEventsChronologically(entries),
-    [entries]
-  );
+  const sortedEntries = useMemo(() => sortEventsChronologically(entries), [entries]);
   const sortedPosts = useMemo(() => sortPosts(posts), [posts]);
+  const sortedOfficeBearers = useMemo(
+    () => sortOfficeBearers(officeBearers),
+    [officeBearers]
+  );
 
   const filteredMembers = useMemo(() => {
     return members
@@ -210,9 +287,7 @@ export default function App() {
           .toLowerCase()
           .includes(search.toLowerCase())
       )
-      .sort((a, b) =>
-        String(a.name || "").localeCompare(String(b.name || ""))
-      );
+      .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
   }, [members, search]);
 
   useEffect(() => {
@@ -221,12 +296,7 @@ export default function App() {
   }, [loggedIn]);
 
   const loadAll = async () => {
-    await Promise.all([
-      loadEntries(),
-      loadMembers(),
-      loadOfficeBearers(),
-      loadPosts(),
-    ]);
+    await Promise.all([loadEntries(), loadMembers(), loadOfficeBearers(), loadPosts()]);
   };
 
   const loadEntries = async () => {
@@ -257,9 +327,7 @@ export default function App() {
   };
 
   const loadPosts = async () => {
-    const { data, error } = await supabase
-      .from("information_posts")
-      .select("*");
+    const { data, error } = await supabase.from("information_posts").select("*");
     if (error) {
       setMessage(`Could not load information posts: ${error.message}`);
       return;
@@ -304,9 +372,7 @@ export default function App() {
         return;
       }
 
-      setEntries((prev) =>
-        prev.map((x) => (x.id === editingEntryId ? data : x))
-      );
+      setEntries((prev) => prev.map((x) => (x.id === editingEntryId ? data : x)));
       setEditingEntryId(null);
       setMessage("Diary entry updated.");
     } else {
@@ -371,9 +437,7 @@ export default function App() {
         return;
       }
 
-      setMembers((prev) =>
-        prev.map((x) => (x.id === editingMemberId ? data : x))
-      );
+      setMembers((prev) => prev.map((x) => (x.id === editingMemberId ? data : x)));
       setEditingMemberId(null);
       setMessage("Member updated.");
     } else {
@@ -488,9 +552,7 @@ export default function App() {
     if (!postFile) return postLink || null;
 
     const fileExt = postFile.name.split(".").pop();
-    const fileName = `${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2)}.${fileExt}`;
+    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
     const filePath = `information/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
@@ -534,9 +596,7 @@ export default function App() {
           return;
         }
 
-        setPosts((prev) =>
-          prev.map((x) => (x.id === editingPostId ? data : x))
-        );
+        setPosts((prev) => prev.map((x) => (x.id === editingPostId ? data : x)));
         setEditingPostId(null);
         setMessage("Information post updated.");
       } else {
@@ -580,10 +640,7 @@ export default function App() {
   };
 
   const deletePost = async (id) => {
-    const { error } = await supabase
-      .from("information_posts")
-      .delete()
-      .eq("id", id);
+    const { error } = await supabase.from("information_posts").delete().eq("id", id);
     if (error) {
       setMessage(`Could not delete information post: ${error.message}`);
       return;
@@ -595,8 +652,11 @@ export default function App() {
   if (!loggedIn) {
     return (
       <div style={styles.page}>
-        <div style={{ ...styles.warmPanel, maxWidth: 420, margin: "60px auto" }}>
-          <h1 style={styles.title}>Woodilee Bowling Club</h1>
+        <div style={{ ...styles.panel, maxWidth: 420, margin: "80px auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 12 }}>
+            <div style={{ ...styles.logo, margin: "0 auto 12px auto" }}>♣</div>
+            <h1 style={{ ...styles.title, marginBottom: 8 }}>Woodilee Bowling Club</h1>
+          </div>
           <input
             type="password"
             placeholder="Enter PIN"
@@ -615,8 +675,12 @@ export default function App() {
   return (
     <div style={styles.page}>
       <div style={styles.wrap}>
-        <div style={styles.warmPanel}>
-          <h1 style={styles.title}>Woodilee Bowling Club</h1>
+        <div style={styles.header}>
+          <div style={styles.logo}>♣</div>
+          <div style={styles.titleWrap}>
+            <h1 style={styles.title}>Woodilee Bowling Club</h1>
+            <p style={styles.subtitle}>Members diary, notices and contact details</p>
+          </div>
         </div>
 
         {message && <div style={styles.message}>{message}</div>}
@@ -625,10 +689,7 @@ export default function App() {
           <button style={styles.tab(tab === "diary")} onClick={() => setTab("diary")}>
             Diary
           </button>
-          <button
-            style={styles.tab(tab === "members")}
-            onClick={() => setTab("members")}
-          >
+          <button style={styles.tab(tab === "members")} onClick={() => setTab("members")}>
             Members
           </button>
           <button
@@ -645,25 +706,43 @@ export default function App() {
         {tab === "diary" && (
           <>
             <div style={styles.panel}>
-              <h3 style={{ marginTop: 0 }}>Office Bearers</h3>
+              <h3 style={{ marginTop: 0, color: "#7c2d12" }}>Office Bearers</h3>
               <div style={styles.grid}>
-                {officeBearers.map((person) => (
+                {sortedOfficeBearers.map((person) => (
                   <div key={person.id} style={styles.card}>
-                    <div>
-                      <strong>{person.role}</strong>
+                    <span style={styles.badge}>{person.role}</span>
+                    <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
+                      {person.name}
                     </div>
-                    <div>{person.name}</div>
-                    <div>{person.phone}</div>
+                    <div style={{ marginBottom: 10, color: "#444" }}>
+                      {person.phone || "No phone listed"}
+                    </div>
+
+                    {person.phone ? (
+                      <div>
+                        <a href={`tel:${person.phone}`} style={styles.callBtn}>
+                          📞 Call
+                        </a>
+                        <a
+                          href={`https://wa.me/${normaliseUkPhoneForWhatsApp(person.phone)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={styles.whatsappBtn}
+                        >
+                          WhatsApp
+                        </a>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
             </div>
 
             <div style={styles.panel}>
-              <h3 style={{ marginTop: 0 }}>Diary Events</h3>
+              <h3 style={{ marginTop: 0, color: "#7c2d12" }}>Diary Events</h3>
               {sortedEntries.map((e) => (
                 <div key={e.id} style={styles.card}>
-                  <strong>{e.date_text}</strong> — {e.title}
+                  <strong style={{ color: "#92400e" }}>{e.date_text}</strong> — {e.title}
                 </div>
               ))}
             </div>
@@ -672,7 +751,8 @@ export default function App() {
 
         {tab === "members" && (
           <div style={styles.panel}>
-            <h3 style={{ marginTop: 0 }}>Members</h3>
+            <h3 style={{ marginTop: 0, color: "#7c2d12" }}>Members</h3>
+
             <input
               placeholder="Search members..."
               value={search}
@@ -682,14 +762,14 @@ export default function App() {
 
             {filteredMembers.map((m) => (
               <div key={m.id} style={styles.card}>
-                <b>{m.name}</b> — {m.section}
-                <div style={{ marginTop: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: 18 }}>
+                  {m.name}
+                </div>
+                <div style={{ color: "#92400e", marginTop: 4 }}>{m.section}</div>
+                <div style={{ marginTop: 10 }}>
                   {m.phone ? (
                     <>
-                      <a
-                        href={`tel:${m.phone}`}
-                        style={{ marginRight: 10, textDecoration: "none" }}
-                      >
+                      <a href={`tel:${m.phone}`} style={styles.callBtn}>
                         📞 {m.phone}
                       </a>
                       <a
@@ -712,23 +792,15 @@ export default function App() {
 
         {tab === "information" && (
           <div style={styles.panel}>
-            <h3 style={{ marginTop: 0 }}>General Information</h3>
+            <h3 style={{ marginTop: 0, color: "#7c2d12" }}>General Information</h3>
             {sortedPosts.map((post) => (
               <div key={post.id} style={styles.card}>
-                {post.pinned ? (
-                  <div style={{ color: "#b45309", fontWeight: 700, marginBottom: 6 }}>
-                    📌 Pinned Notice
-                  </div>
-                ) : null}
-                <div style={{ color: "#92400e", fontWeight: 700 }}>
-                  {post.date_posted}
-                </div>
+                {post.pinned ? <div style={styles.badge}>📌 Pinned Notice</div> : null}
+                <div style={{ color: "#92400e", fontWeight: 700 }}>{post.date_posted}</div>
                 <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>
                   {post.title}
                 </div>
-                <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
-                  {post.message}
-                </div>
+                <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{post.message}</div>
                 {post.attachment_link ? (
                   <a
                     href={post.attachment_link}
@@ -748,7 +820,7 @@ export default function App() {
           <div>
             {!adminUnlocked ? (
               <div style={{ ...styles.panel, maxWidth: 420 }}>
-                <h3 style={{ marginTop: 0 }}>Admin Login</h3>
+                <h3 style={{ marginTop: 0, color: "#7c2d12" }}>Admin Login</h3>
                 <input
                   type="password"
                   value={adminPin}
@@ -791,10 +863,7 @@ export default function App() {
                         <button onClick={() => editEntry(e)} style={styles.smallBtn}>
                           Edit
                         </button>
-                        <button
-                          onClick={() => deleteEntry(e.id)}
-                          style={styles.smallBtn}
-                        >
+                        <button onClick={() => deleteEntry(e.id)} style={styles.smallBtn}>
                           Delete
                         </button>
                       </div>
@@ -831,7 +900,7 @@ export default function App() {
 
                 <div style={styles.panel}>
                   <h3 style={{ marginTop: 0 }}>Manage Office Bearers</h3>
-                  {officeBearers.map((person) => (
+                  {sortedOfficeBearers.map((person) => (
                     <div key={person.id} style={styles.card}>
                       <strong>{person.role}</strong> — {person.name}
                       <div style={{ marginTop: 8 }}>
@@ -891,10 +960,7 @@ export default function App() {
                         <button onClick={() => editMember(m)} style={styles.smallBtn}>
                           Edit
                         </button>
-                        <button
-                          onClick={() => deleteMember(m.id)}
-                          style={styles.smallBtn}
-                        >
+                        <button onClick={() => deleteMember(m.id)} style={styles.smallBtn}>
                           Delete
                         </button>
                       </div>
@@ -969,10 +1035,7 @@ export default function App() {
                         <button onClick={() => editPost(post)} style={styles.smallBtn}>
                           Edit
                         </button>
-                        <button
-                          onClick={() => deletePost(post.id)}
-                          style={styles.smallBtn}
-                        >
+                        <button onClick={() => deletePost(post.id)} style={styles.smallBtn}>
                           Delete
                         </button>
                       </div>
