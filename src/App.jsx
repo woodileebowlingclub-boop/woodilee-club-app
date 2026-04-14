@@ -83,7 +83,7 @@ export default function App() {
       .order("week_date", { ascending: true });
 
     if (error) {
-      alert("Could not load leaderboard");
+      alert("Could not load Monday Points");
     } else {
       setPoints(data || []);
     }
@@ -110,7 +110,7 @@ export default function App() {
     loadEntries();
   };
 
-  const leaderboard = useMemo(() => {
+  const mondayPoints = useMemo(() => {
     const totals = {};
 
     points.forEach((row) => {
@@ -185,16 +185,16 @@ export default function App() {
         </button>
 
         <button
-          onClick={() => setActiveTab("leaderboard")}
+          onClick={() => setActiveTab("monday-points")}
           style={{
             padding: 10,
-            background: activeTab === "leaderboard" ? "#d97706" : "#eee",
-            color: activeTab === "leaderboard" ? "white" : "black",
+            background: activeTab === "monday-points" ? "#d97706" : "#eee",
+            color: activeTab === "monday-points" ? "white" : "black",
             border: "none",
             cursor: "pointer"
           }}
         >
-          Leaderboard
+          Monday Points
         </button>
       </div>
 
@@ -267,9 +267,9 @@ export default function App() {
         </div>
       )}
 
-      {activeTab === "leaderboard" && (
+      {activeTab === "monday-points" && (
         <div>
-          <h3>Monday Points Leaderboard</h3>
+          <h3>Monday Points</h3>
 
           <table
             style={{
@@ -286,7 +286,7 @@ export default function App() {
               </tr>
             </thead>
             <tbody>
-              {leaderboard.map((row) => (
+              {mondayPoints.map((row) => (
                 <tr key={row.name}>
                   <td style={{ border: "1px solid #ccc", padding: 10 }}>{row.position}</td>
                   <td style={{ border: "1px solid #ccc", padding: 10 }}>{row.name}</td>
