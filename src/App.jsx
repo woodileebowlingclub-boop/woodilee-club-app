@@ -3,6 +3,7 @@ import { supabase } from "./lib/supabase";
 
 const CLUB_PIN = "1911";
 const ADMIN_PIN = "1954";
+const STORAGE_BUCKET = "club-files";
 
 const styles = {
   page: {
@@ -122,8 +123,13 @@ function sortEventsChronologically(list) {
   return [...list].sort((a, b) => new Date(a.date_text) - new Date(b.date_text));
 }
 
-function sortPostsNewestFirst(list) {
-  return [...list].sort((a, b) => new Date(b.date_posted) - new Date(a.date_posted));
+function sortPosts(list) {
+  return [...list].sort((a, b) => {
+    const aPinned = a.pinned ? 1 : 0;
+    const bPinned = b.pinned ? 1 : 0;
+    if (aPinned !== bPinned) return bPinned - aPinned;
+    return new Date(b.date_posted) - new Date(a.date_posted);
+  });
 }
 
 export default function App() {
@@ -155,6 +161,8 @@ export default function App() {
   const [postDate, setPostDate] = useState("");
   const [postLink, setPostLink] = useState("");
   const [postButtonText, setPostButtonText] = useState("");
+  const [postPinned, setPostPinned] = useState(false);
+  const [postFile, setPostFile] = useState(null);
 
   const [editingEntryId, setEditingEntryId] = useState(null);
   const [editingMemberId, setEditingMemberId] = useState(null);
@@ -162,7 +170,7 @@ export default function App() {
   const [editingPostId, setEditingPostId] = useState(null);
 
   const sortedEntries = useMemo(() => sortEventsChronologically(entries), [entries]);
-  const sortedPosts = useMemo(() => sortPostsNewestFirst(posts), [posts]);
+  const sortedPosts = useMemo(() => sortPosts(posts), [posts]);
 
   const handleLogin = () => {
     if (pin === CLUB_PIN) {
@@ -405,57 +413,85 @@ export default function App() {
     setMessage("Office bearer deleted.");
   };
 
+  const uploadPostFile = async () => {
+    if (!postFile) return postLink;
+
+    const fileExt = postFile.name.split(".").pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+    const filePath = `information/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(filePath, postFile);
+
+    if (uploadError) {
+      throw new Error(uploadError.message);
+    }
+
+    const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
   const savePost = async () => {
     if (!postTitle || !postMessage || !postDate) {
       setMessage("Enter post title, message and date.");
       return;
     }
 
-    const payload = {
-      title: postTitle,
-      message: postMessage,
-      date_posted: postDate,
-      attachment_link: postLink,
-      button_text: postButtonText
-    };
+    try {
+      const finalLink = await uploadPostFile();
 
-    if (editingPostId) {
-      const { data, error } = await supabase
-        .from("information_posts")
-        .update(payload)
-        .eq("id", editingPostId)
-        .select()
-        .single();
+      const payload = {
+        title: postTitle,
+        message: postMessage,
+        date_posted: postDate,
+        attachment_link: finalLink || postLink,
+        button_text: postButtonText,
+        pinned: postPinned
+      };
 
-      if (error) {
-        setMessage(`Could not update information post: ${error.message}`);
-        return;
+      if (editingPostId) {
+        const { data, error } = await supabase
+          .from("information_posts")
+          .update(payload)
+          .eq("id", editingPostId)
+          .select()
+          .single();
+
+        if (error) {
+          setMessage(`Could not update information post: ${error.message}`);
+          return;
+        }
+
+        setPosts((prev) => prev.map((x) => (x.id === editingPostId ? data : x)));
+        setEditingPostId(null);
+        setMessage("Information post updated.");
+      } else {
+        const { data, error } = await supabase
+          .from("information_posts")
+          .insert([payload])
+          .select()
+          .single();
+
+        if (error) {
+          setMessage(`Could not save information post: ${error.message}`);
+          return;
+        }
+
+        setPosts((prev) => [...prev, data]);
+        setMessage("Information post added.");
       }
 
-      setPosts((prev) => prev.map((x) => (x.id === editingPostId ? data : x)));
-      setEditingPostId(null);
-      setMessage("Information post updated.");
-    } else {
-      const { data, error } = await supabase
-        .from("information_posts")
-        .insert([payload])
-        .select()
-        .single();
-
-      if (error) {
-        setMessage(`Could not save information post: ${error.message}`);
-        return;
-      }
-
-      setPosts((prev) => [...prev, data]);
-      setMessage("Information post added.");
+      setPostTitle("");
+      setPostMessage("");
+      setPostDate("");
+      setPostLink("");
+      setPostButtonText("");
+      setPostPinned(false);
+      setPostFile(null);
+    } catch (err) {
+      setMessage(`Could not upload file: ${err.message}`);
     }
-
-    setPostTitle("");
-    setPostMessage("");
-    setPostDate("");
-    setPostLink("");
-    setPostButtonText("");
   };
 
   const editPost = (post) => {
@@ -465,6 +501,8 @@ export default function App() {
     setPostDate(post.date_posted || "");
     setPostLink(post.attachment_link || "");
     setPostButtonText(post.button_text || "");
+    setPostPinned(!!post.pinned);
+    setPostFile(null);
     setActiveTab("admin");
   };
 
@@ -553,7 +591,17 @@ export default function App() {
           <div style={styles.panel}>
             <h3 style={{ marginTop: 0 }}>General Information</h3>
             {sortedPosts.map((post) => (
-              <div key={post.id} style={styles.card}>
+              <div
+                key={post.id}
+                style={{
+                  ...styles.card,
+                  border: post.pinned ? "2px solid #d97706" : styles.card.border,
+                  background: post.pinned ? "#fff7ed" : styles.card.background
+                }}
+              >
+                {post.pinned ? (
+                  <div style={{ color: "#b45309", fontWeight: 700, marginBottom: 6 }}>Pinned Notice</div>
+                ) : null}
                 <div style={{ color: "#92400e", fontWeight: 700 }}>{post.date_posted}</div>
                 <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>{post.title}</div>
                 <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{post.message}</div>
@@ -663,8 +711,21 @@ export default function App() {
                   <input value={postTitle} onChange={(e) => setPostTitle(e.target.value)} placeholder="Title" style={styles.input} />
                   <textarea value={postMessage} onChange={(e) => setPostMessage(e.target.value)} placeholder="Message" style={styles.textarea} />
                   <input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} style={styles.input} />
-                  <input value={postLink} onChange={(e) => setPostLink(e.target.value)} placeholder="Attachment link" style={styles.input} />
+                  <input value={postLink} onChange={(e) => setPostLink(e.target.value)} placeholder="Attachment link (optional if uploading file)" style={styles.input} />
                   <input value={postButtonText} onChange={(e) => setPostButtonText(e.target.value)} placeholder="Button text e.g. Download Form" style={styles.input} />
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={{ display: "block", marginBottom: 6, fontWeight: 700 }}>Upload file</label>
+                    <input type="file" onChange={(e) => setPostFile(e.target.files?.[0] || null)} />
+                  </div>
+                  <label style={{ display: "block", marginBottom: 10 }}>
+                    <input
+                      type="checkbox"
+                      checked={postPinned}
+                      onChange={(e) => setPostPinned(e.target.checked)}
+                      style={{ marginRight: 8 }}
+                    />
+                    Pin this post to the top
+                  </label>
                   <button onClick={savePost} style={styles.button}>
                     {editingPostId ? "Update Information Post" : "Save Information Post"}
                   </button>
@@ -674,7 +735,7 @@ export default function App() {
                   <h3 style={{ marginTop: 0 }}>Manage Information Posts</h3>
                   {sortedPosts.map((post) => (
                     <div key={post.id} style={styles.card}>
-                      <strong>{post.date_posted}</strong> — {post.title}
+                      <strong>{post.date_posted}</strong> — {post.title} {post.pinned ? "• PINNED" : ""}
                       <div style={{ marginTop: 8 }}>
                         <button onClick={() => editPost(post)} style={styles.smallBtn}>Edit</button>
                         <button onClick={() => deletePost(post.id)} style={styles.smallBtn}>Delete</button>
