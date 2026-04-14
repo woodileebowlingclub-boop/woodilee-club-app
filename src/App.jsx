@@ -14,7 +14,9 @@ const officeRoleOrder = {
 
 function getOfficeRolePriority(role) {
   const roleText = String(role || "");
-  const match = Object.keys(officeRoleOrder).find((key) => roleText.includes(key));
+  const match = Object.keys(officeRoleOrder).find((key) =>
+    roleText.includes(key)
+  );
   return match ? officeRoleOrder[match] : 99;
 }
 
@@ -94,6 +96,22 @@ export default function App() {
     () => sortOfficeBearers(officeBearers),
     [officeBearers]
   );
+
+  const uniqueOfficeBearers = useMemo(() => {
+    const seen = new Set();
+    return sortedOfficeBearers.filter((person) => {
+      const key = `${String(person.role || "").trim().toLowerCase()}|${String(
+        person.name || ""
+      )
+        .trim()
+        .toLowerCase()}|${String(person.phone || "")
+        .trim()
+        .toLowerCase()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [sortedOfficeBearers]);
 
   const handleLogin = () => {
     if (pin === CLUB_PIN) {
@@ -377,24 +395,15 @@ export default function App() {
         )}
 
         <div style={{ marginBottom: 16 }}>
-          <button
-            onClick={() => setActiveTab("diary")}
-            style={buttonStyle(activeTab === "diary")}
-          >
+          <button onClick={() => setActiveTab("diary")} style={buttonStyle(activeTab === "diary")}>
             Diary
           </button>
 
-          <button
-            onClick={() => setActiveTab("members")}
-            style={buttonStyle(activeTab === "members")}
-          >
+          <button onClick={() => setActiveTab("members")} style={buttonStyle(activeTab === "members")}>
             Members
           </button>
 
-          <button
-            onClick={() => setActiveTab("admin")}
-            style={buttonStyle(activeTab === "admin")}
-          >
+          <button onClick={() => setActiveTab("admin")} style={buttonStyle(activeTab === "admin")}>
             Admin
           </button>
         </div>
@@ -411,7 +420,7 @@ export default function App() {
                   gap: 16
                 }}
               >
-                {sortedOfficeBearers.map((person) => {
+                {uniqueOfficeBearers.map((person) => {
                   const isKeyRole =
                     String(person.role || "").includes("President") ||
                     String(person.role || "").includes("Secretary") ||
