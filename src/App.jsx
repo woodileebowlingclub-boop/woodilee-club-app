@@ -4,6 +4,65 @@ import { supabase } from "./lib/supabase";
 const CLUB_PIN = "1911";
 const ADMIN_PIN = "1954";
 
+const officeRoleOrder = {
+  President: 1,
+  Secretary: 2,
+  Treasurer: 3,
+  "Vice President": 4,
+  "Bar Convenor": 5
+};
+
+function getOfficeRolePriority(role) {
+  const roleText = String(role || "");
+  const match = Object.keys(officeRoleOrder).find((key) => roleText.includes(key));
+  return match ? officeRoleOrder[match] : 99;
+}
+
+function sortOfficeBearers(list) {
+  return [...list].sort((a, b) => {
+    const aPriority = getOfficeRolePriority(a.role);
+    const bPriority = getOfficeRolePriority(b.role);
+
+    if (aPriority !== bPriority) return aPriority - bPriority;
+    return String(a.role || "").localeCompare(String(b.role || ""));
+  });
+}
+
+function panelStyle(background = "#fff", border = "#d6d3d1") {
+  return {
+    background,
+    border: `1px solid ${border}`,
+    borderRadius: 14,
+    padding: 16,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)"
+  };
+}
+
+function buttonStyle(active = false) {
+  return {
+    padding: "10px 14px",
+    marginRight: 10,
+    marginBottom: 10,
+    background: active ? "#b45309" : "#eee7df",
+    color: active ? "white" : "#222",
+    border: "none",
+    borderRadius: 10,
+    cursor: "pointer",
+    fontWeight: 600
+  };
+}
+
+function inputStyle(width = "auto") {
+  return {
+    padding: 10,
+    marginRight: 10,
+    marginBottom: 10,
+    border: "1px solid #cbd5e1",
+    borderRadius: 10,
+    width
+  };
+}
+
 export default function App() {
   const [pin, setPin] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
@@ -15,20 +74,26 @@ export default function App() {
 
   const [entries, setEntries] = useState([]);
   const [members, setMembers] = useState([]);
-  const [points, setPoints] = useState([]);
+  const [officeBearers, setOfficeBearers] = useState([]);
 
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
-  const [loading, setLoading] = useState(false);
 
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberSection, setNewMemberSection] = useState("Gents");
   const [newMemberPhone, setNewMemberPhone] = useState("");
   const [newMemberEmail, setNewMemberEmail] = useState("");
 
-  const [pointsName, setPointsName] = useState("");
-  const [pointsDate, setPointsDate] = useState("");
-  const [pointsValue, setPointsValue] = useState("");
+  const [newRole, setNewRole] = useState("");
+  const [newOfficerName, setNewOfficerName] = useState("");
+  const [newOfficerPhone, setNewOfficerPhone] = useState("");
+
+  const [loading, setLoading] = useState(false);
+
+  const sortedOfficeBearers = useMemo(
+    () => sortOfficeBearers(officeBearers),
+    [officeBearers]
+  );
 
   const handleLogin = () => {
     if (pin === CLUB_PIN) {
@@ -52,7 +117,7 @@ export default function App() {
     if (!loggedIn) return;
     loadEntries();
     loadMembers();
-    loadPoints();
+    loadOfficeBearers();
   }, [loggedIn]);
 
   const loadEntries = async () => {
@@ -66,10 +131,10 @@ export default function App() {
     const { data, error } = await supabase
       .from("events")
       .select("*")
-      .order("id", { ascending: false });
+      .order("date_text", { ascending: true });
 
     if (error) {
-      setMessage("Could not load diary entries.");
+      setMessage(`Could not load diary entries: ${error.message}`);
     } else {
       setEntries(data || []);
     }
@@ -89,27 +154,26 @@ export default function App() {
       .order("name", { ascending: true });
 
     if (error) {
-      setMessage("Could not load members.");
+      setMessage(`Could not load members: ${error.message}`);
     } else {
       setMembers(data || []);
     }
   };
 
-  const loadPoints = async () => {
+  const loadOfficeBearers = async () => {
     if (!supabase) {
       setMessage("Supabase not connected.");
       return;
     }
 
     const { data, error } = await supabase
-      .from("monday_points")
-      .select("*")
-      .order("week_date", { ascending: true });
+      .from("office_bearers")
+      .select("*");
 
     if (error) {
-      setMessage("Could not load Monday Points.");
+      setMessage(`Could not load office bearers: ${error.message}`);
     } else {
-      setPoints(data || []);
+      setOfficeBearers(data || []);
     }
   };
 
@@ -126,7 +190,7 @@ export default function App() {
 
     const { error } = await supabase.from("events").insert([
       {
-        title: title,
+        title,
         date_text: date,
         note: ""
       }
@@ -140,6 +204,20 @@ export default function App() {
     setTitle("");
     setDate("");
     setMessage("Diary entry added.");
+    loadEntries();
+  };
+
+  const deleteEntry = async (id) => {
+    if (!supabase) return;
+
+    const { error } = await supabase.from("events").delete().eq("id", id);
+
+    if (error) {
+      setMessage(`Could not delete diary entry: ${error.message}`);
+      return;
+    }
+
+    setMessage("Diary entry deleted.");
     loadEntries();
   };
 
@@ -176,51 +254,6 @@ export default function App() {
     loadMembers();
   };
 
-  const addPoints = async () => {
-    if (!supabase) {
-      setMessage("Supabase not connected.");
-      return;
-    }
-
-    if (!pointsName || !pointsDate || pointsValue === "") {
-      setMessage("Enter member name, date and points.");
-      return;
-    }
-
-    const { error } = await supabase.from("monday_points").insert([
-      {
-        member_name: pointsName,
-        week_date: pointsDate,
-        points: Number(pointsValue)
-      }
-    ]);
-
-    if (error) {
-      setMessage(`Could not save Monday Points: ${error.message}`);
-      return;
-    }
-
-    setPointsName("");
-    setPointsDate("");
-    setPointsValue("");
-    setMessage("Monday Points added.");
-    loadPoints();
-  };
-
-  const deleteEntry = async (id) => {
-    if (!supabase) return;
-
-    const { error } = await supabase.from("events").delete().eq("id", id);
-
-    if (error) {
-      setMessage(`Could not delete diary entry: ${error.message}`);
-      return;
-    }
-
-    setMessage("Diary entry deleted.");
-    loadEntries();
-  };
-
   const deleteMember = async (id) => {
     if (!supabase) return;
 
@@ -235,375 +268,470 @@ export default function App() {
     loadMembers();
   };
 
-  const deletePoints = async (id) => {
-    if (!supabase) return;
-
-    const { error } = await supabase.from("monday_points").delete().eq("id", id);
-
-    if (error) {
-      setMessage(`Could not delete Monday Points row: ${error.message}`);
+  const addOfficeBearer = async () => {
+    if (!supabase) {
+      setMessage("Supabase not connected.");
       return;
     }
 
-    setMessage("Monday Points row deleted.");
-    loadPoints();
+    if (!newRole || !newOfficerName) {
+      setMessage("Enter role and name.");
+      return;
+    }
+
+    const { error } = await supabase.from("office_bearers").insert([
+      {
+        role: newRole,
+        name: newOfficerName,
+        phone: newOfficerPhone
+      }
+    ]);
+
+    if (error) {
+      setMessage(`Could not save office bearer: ${error.message}`);
+      return;
+    }
+
+    setNewRole("");
+    setNewOfficerName("");
+    setNewOfficerPhone("");
+    setMessage("Office bearer added.");
+    loadOfficeBearers();
   };
 
-  const mondayPoints = useMemo(() => {
-    const totals = {};
+  const deleteOfficeBearer = async (id) => {
+    if (!supabase) return;
 
-    points.forEach((row) => {
-      const name = String(row.member_name || "").trim();
-      if (!name) return;
-      totals[name] = (totals[name] || 0) + Number(row.points || 0);
-    });
+    const { error } = await supabase
+      .from("office_bearers")
+      .delete()
+      .eq("id", id);
 
-    return Object.entries(totals)
-      .map(([name, total]) => ({ name, total }))
-      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name))
-      .map((row, index) => ({
-        position: index + 1,
-        name: row.name,
-        total: row.total
-      }));
-  }, [points]);
+    if (error) {
+      setMessage(`Could not delete office bearer: ${error.message}`);
+      return;
+    }
+
+    setMessage("Office bearer deleted.");
+    loadOfficeBearers();
+  };
 
   if (!loggedIn) {
     return (
-      <div style={{ padding: 20, fontFamily: "Arial" }}>
-        <h1>Woodilee Bowling Club</h1>
-        <h2>Members Diary</h2>
+      <div
+        style={{
+          padding: 24,
+          fontFamily: "Arial, sans-serif",
+          background: "#f7f3ee",
+          minHeight: "100vh"
+        }}
+      >
+        <div style={{ maxWidth: 460, margin: "60px auto", ...panelStyle("#fffaf5") }}>
+          <h1 style={{ marginTop: 0, color: "#7c2d12" }}>Woodilee Bowling Club</h1>
+          <h2 style={{ marginTop: 0 }}>Members Diary</h2>
 
-        <input
-          type="password"
-          placeholder="Enter PIN"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-          style={{ padding: 10, marginRight: 10 }}
-        />
+          <input
+            type="password"
+            placeholder="Enter PIN"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            style={{ ...inputStyle("100%"), boxSizing: "border-box" }}
+          />
 
-        <button onClick={handleLogin} style={{ padding: 10 }}>
-          Enter
-        </button>
+          <button onClick={handleLogin} style={{ ...buttonStyle(true), width: "100%", marginRight: 0 }}>
+            Enter
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 20, fontFamily: "Arial" }}>
-      <h1>Woodilee Bowling Club</h1>
-      <h2>Members Diary</h2>
-
-      {message && (
-        <div style={{ marginBottom: 15, padding: 10, background: "#fff3cd", border: "1px solid #e0c36c" }}>
-          {message}
+    <div
+      style={{
+        padding: 24,
+        fontFamily: "Arial, sans-serif",
+        background: "#f7f3ee",
+        minHeight: "100vh",
+        color: "#222"
+      }}
+    >
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+        <div style={{ ...panelStyle("#fffaf5"), marginBottom: 20 }}>
+          <h1 style={{ margin: "0 0 6px 0", color: "#7c2d12" }}>Woodilee Bowling Club</h1>
+          <h2 style={{ margin: 0 }}>Members Diary</h2>
         </div>
-      )}
 
-      <div style={{ marginBottom: 20 }}>
-        <button
-          onClick={() => setActiveTab("diary")}
-          style={{
-            padding: 10,
-            marginRight: 10,
-            background: activeTab === "diary" ? "#d97706" : "#eee",
-            color: activeTab === "diary" ? "white" : "black",
-            border: "none",
-            cursor: "pointer"
-          }}
-        >
-          Diary
-        </button>
-
-        <button
-          onClick={() => setActiveTab("members")}
-          style={{
-            padding: 10,
-            marginRight: 10,
-            background: activeTab === "members" ? "#d97706" : "#eee",
-            color: activeTab === "members" ? "white" : "black",
-            border: "none",
-            cursor: "pointer"
-          }}
-        >
-          Members
-        </button>
-
-        <button
-          onClick={() => setActiveTab("monday-points")}
-          style={{
-            padding: 10,
-            marginRight: 10,
-            background: activeTab === "monday-points" ? "#d97706" : "#eee",
-            color: activeTab === "monday-points" ? "white" : "black",
-            border: "none",
-            cursor: "pointer"
-          }}
-        >
-          Monday Points
-        </button>
-
-        <button
-          onClick={() => setActiveTab("admin")}
-          style={{
-            padding: 10,
-            background: activeTab === "admin" ? "#d97706" : "#eee",
-            color: activeTab === "admin" ? "white" : "black",
-            border: "none",
-            cursor: "pointer"
-          }}
-        >
-          Admin
-        </button>
-      </div>
-
-      {activeTab === "diary" && (
-        <div>
-          <h3>Diary Entries</h3>
-
-          {loading && <p>Loading...</p>}
-
-          <ul>
-            {entries.map((item) => (
-              <li key={item.id} style={{ marginBottom: 8 }}>
-                <strong>{item.date_text}</strong> — {item.title}
-                <button
-                  onClick={() => deleteEntry(item.id)}
-                  style={{ marginLeft: 10, padding: "4px 8px" }}
-                >
-                  Delete
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {activeTab === "members" && (
-        <div>
-          <h3>Members List</h3>
-
-          <table
+        {message && (
+          <div
             style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              marginTop: 20
+              marginBottom: 15,
+              padding: 12,
+              background: "#fff3cd",
+              border: "1px solid #e0c36c",
+              borderRadius: 10
             }}
           >
-            <thead>
-              <tr style={{ background: "#f3f4f6" }}>
-                <th style={{ border: "1px solid #ccc", padding: 10, textAlign: "left" }}>Name</th>
-                <th style={{ border: "1px solid #ccc", padding: 10, textAlign: "left" }}>Section</th>
-                <th style={{ border: "1px solid #ccc", padding: 10, textAlign: "left" }}>Phone</th>
-                <th style={{ border: "1px solid #ccc", padding: 10, textAlign: "left" }}>Email</th>
-                <th style={{ border: "1px solid #ccc", padding: 10, textAlign: "left" }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
+            {message}
+          </div>
+        )}
+
+        <div style={{ marginBottom: 16 }}>
+          <button
+            onClick={() => setActiveTab("diary")}
+            style={buttonStyle(activeTab === "diary")}
+          >
+            Diary
+          </button>
+
+          <button
+            onClick={() => setActiveTab("members")}
+            style={buttonStyle(activeTab === "members")}
+          >
+            Members
+          </button>
+
+          <button
+            onClick={() => setActiveTab("admin")}
+            style={buttonStyle(activeTab === "admin")}
+          >
+            Admin
+          </button>
+        </div>
+
+        {activeTab === "diary" && (
+          <div>
+            <div style={{ ...panelStyle("#fffaf5"), marginBottom: 20 }}>
+              <h3 style={{ marginTop: 0 }}>Office Bearers</h3>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                  gap: 16
+                }}
+              >
+                {sortedOfficeBearers.map((person) => {
+                  const isKeyRole =
+                    String(person.role || "").includes("President") ||
+                    String(person.role || "").includes("Secretary") ||
+                    String(person.role || "").includes("Treasurer");
+
+                  return (
+                    <div
+                      key={person.id}
+                      style={{
+                        border: isKeyRole ? "2px solid #d97706" : "1px solid #d6d3d1",
+                        borderRadius: 12,
+                        padding: 16,
+                        background: isKeyRole ? "#fff7ed" : "#ffffff",
+                        boxShadow: "0 2px 6px rgba(0,0,0,0.06)"
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: "bold",
+                          color: isKeyRole ? "#b45309" : "#666",
+                          marginBottom: 8,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px"
+                        }}
+                      >
+                        {person.role}
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: 20,
+                          fontWeight: "bold",
+                          marginBottom: 8
+                        }}
+                      >
+                        {person.name}
+                      </div>
+
+                      <div style={{ color: "#444" }}>
+                        {person.phone || "No phone listed"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={panelStyle("#fff")}>
+              <h3 style={{ marginTop: 0 }}>Diary Entries</h3>
+
+              {loading && <p>Loading...</p>}
+
+              <div style={{ display: "grid", gap: 12 }}>
+                {entries.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 12,
+                      padding: 14,
+                      background: "#fcfcfc"
+                    }}
+                  >
+                    <div style={{ fontSize: 14, color: "#92400e", fontWeight: 700 }}>
+                      {item.date_text}
+                    </div>
+                    <div style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>
+                      {item.title}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "members" && (
+          <div style={panelStyle("#fff")}>
+            <h3 style={{ marginTop: 0 }}>Members List</h3>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                gap: 16
+              }}
+            >
               {members.map((member) => (
-                <tr key={member.id}>
-                  <td style={{ border: "1px solid #ccc", padding: 10 }}>{member.name}</td>
-                  <td style={{ border: "1px solid #ccc", padding: 10 }}>{member.section}</td>
-                  <td style={{ border: "1px solid #ccc", padding: 10 }}>{member.phone}</td>
-                  <td style={{ border: "1px solid #ccc", padding: 10 }}>{member.email}</td>
-                  <td style={{ border: "1px solid #ccc", padding: 10 }}>
-                    <button onClick={() => deleteMember(member.id)} style={{ padding: "4px 8px" }}>
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {activeTab === "monday-points" && (
-        <div>
-          <h3>Monday Points</h3>
-
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              marginTop: 20,
-              marginBottom: 30
-            }}
-          >
-            <thead>
-              <tr style={{ background: "#f3f4f6" }}>
-                <th style={{ border: "1px solid #ccc", padding: 10, textAlign: "left" }}>Position</th>
-                <th style={{ border: "1px solid #ccc", padding: 10, textAlign: "left" }}>Name</th>
-                <th style={{ border: "1px solid #ccc", padding: 10, textAlign: "left" }}>Total Points</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mondayPoints.map((row) => (
-                <tr key={row.name}>
-                  <td style={{ border: "1px solid #ccc", padding: 10 }}>{row.position}</td>
-                  <td style={{ border: "1px solid #ccc", padding: 10 }}>{row.name}</td>
-                  <td style={{ border: "1px solid #ccc", padding: 10 }}>{row.total}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <h4>Raw Monday Points Rows</h4>
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              marginTop: 20
-            }}
-          >
-            <thead>
-              <tr style={{ background: "#f3f4f6" }}>
-                <th style={{ border: "1px solid #ccc", padding: 10, textAlign: "left" }}>Name</th>
-                <th style={{ border: "1px solid #ccc", padding: 10, textAlign: "left" }}>Date</th>
-                <th style={{ border: "1px solid #ccc", padding: 10, textAlign: "left" }}>Points</th>
-                <th style={{ border: "1px solid #ccc", padding: 10, textAlign: "left" }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {points.map((row) => (
-                <tr key={row.id}>
-                  <td style={{ border: "1px solid #ccc", padding: 10 }}>{row.member_name}</td>
-                  <td style={{ border: "1px solid #ccc", padding: 10 }}>{row.week_date}</td>
-                  <td style={{ border: "1px solid #ccc", padding: 10 }}>{row.points}</td>
-                  <td style={{ border: "1px solid #ccc", padding: 10 }}>
-                    <button onClick={() => deletePoints(row.id)} style={{ padding: "4px 8px" }}>
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {activeTab === "admin" && (
-        <div>
-          {!adminUnlocked ? (
-            <div>
-              <h3>Admin Login</h3>
-
-              <input
-                type="password"
-                placeholder="Enter Admin PIN"
-                value={adminPin}
-                onChange={(e) => setAdminPin(e.target.value)}
-                style={{ padding: 10, marginRight: 10 }}
-              />
-
-              <button onClick={handleAdminLogin} style={{ padding: 10 }}>
-                Enter
-              </button>
-            </div>
-          ) : (
-            <div>
-              <h3>Admin Panel</h3>
-
-              <div style={{ marginBottom: 30 }}>
-                <h4>Add Member</h4>
-
-                <input
-                  value={newMemberName}
-                  onChange={(e) => setNewMemberName(e.target.value)}
-                  placeholder="Name"
-                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
-                />
-
-                <select
-                  value={newMemberSection}
-                  onChange={(e) => setNewMemberSection(e.target.value)}
-                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
+                <div
+                  key={member.id}
+                  style={{
+                    border: "1px solid #d6d3d1",
+                    borderRadius: 12,
+                    padding: 16,
+                    background: "#fcfcfc"
+                  }}
                 >
-                  <option>Gents</option>
-                  <option>Ladies</option>
-                  <option>Associate</option>
-                </select>
-
-                <input
-                  value={newMemberPhone}
-                  onChange={(e) => setNewMemberPhone(e.target.value)}
-                  placeholder="Phone"
-                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
-                />
-
-                <input
-                  value={newMemberEmail}
-                  onChange={(e) => setNewMemberEmail(e.target.value)}
-                  placeholder="Email"
-                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
-                />
-
-                <br />
-
-                <button onClick={addMember} style={{ padding: 10 }}>
-                  Save Member
-                </button>
-              </div>
-
-              <div style={{ marginBottom: 30 }}>
-                <h4>Add Diary Entry</h4>
-
-                <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Event title"
-                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
-                />
-
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
-                />
-
-                <br />
-
-                <button onClick={addEntry} style={{ padding: 10 }}>
-                  Save Diary Entry
-                </button>
-              </div>
-
-              <div>
-                <h4>Add Monday Points</h4>
-
-                <input
-                  value={pointsName}
-                  onChange={(e) => setPointsName(e.target.value)}
-                  placeholder="Member name"
-                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
-                />
-
-                <input
-                  type="date"
-                  value={pointsDate}
-                  onChange={(e) => setPointsDate(e.target.value)}
-                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
-                />
-
-                <input
-                  type="number"
-                  value={pointsValue}
-                  onChange={(e) => setPointsValue(e.target.value)}
-                  placeholder="Points"
-                  style={{ padding: 10, marginRight: 10, marginBottom: 10 }}
-                />
-
-                <br />
-
-                <button onClick={addPoints} style={{ padding: 10 }}>
-                  Save Monday Points
-                </button>
-              </div>
+                  <div style={{ fontSize: 20, fontWeight: 700 }}>{member.name}</div>
+                  <div style={{ marginTop: 6, color: "#92400e", fontWeight: 700 }}>
+                    {member.section}
+                  </div>
+                  <div style={{ marginTop: 8 }}>{member.phone}</div>
+                  <div style={{ marginTop: 4 }}>{member.email}</div>
+                </div>
+              ))}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+
+        {activeTab === "admin" && (
+          <div>
+            {!adminUnlocked ? (
+              <div style={{ maxWidth: 460, ...panelStyle("#fffaf5") }}>
+                <h3 style={{ marginTop: 0 }}>Admin Login</h3>
+
+                <input
+                  type="password"
+                  placeholder="Enter Admin PIN"
+                  value={adminPin}
+                  onChange={(e) => setAdminPin(e.target.value)}
+                  style={{ ...inputStyle("100%"), boxSizing: "border-box" }}
+                />
+
+                <button
+                  onClick={handleAdminLogin}
+                  style={{ ...buttonStyle(true), width: "100%", marginRight: 0 }}
+                >
+                  Enter
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: 20 }}>
+                <div style={panelStyle("#fff")}>
+                  <h3 style={{ marginTop: 0 }}>Add Diary Entry</h3>
+
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Event title"
+                    style={inputStyle("240px")}
+                  />
+
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    style={inputStyle("180px")}
+                  />
+
+                  <br />
+
+                  <button onClick={addEntry} style={buttonStyle(true)}>
+                    Save Diary Entry
+                  </button>
+                </div>
+
+                <div style={panelStyle("#fff")}>
+                  <h3 style={{ marginTop: 0 }}>Delete Diary Entry</h3>
+
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {entries.map((item) => (
+                      <div
+                        key={item.id}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 12,
+                          padding: 12,
+                          border: "1px solid #e5e7eb",
+                          borderRadius: 10,
+                          background: "#fcfcfc"
+                        }}
+                      >
+                        <div>
+                          <strong>{item.date_text}</strong> — {item.title}
+                        </div>
+                        <button onClick={() => deleteEntry(item.id)} style={buttonStyle()}>
+                          Delete
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={panelStyle("#fff")}>
+                  <h3 style={{ marginTop: 0 }}>Add Office Bearer</h3>
+
+                  <input
+                    value={newRole}
+                    onChange={(e) => setNewRole(e.target.value)}
+                    placeholder="Role"
+                    style={inputStyle("220px")}
+                  />
+
+                  <input
+                    value={newOfficerName}
+                    onChange={(e) => setNewOfficerName(e.target.value)}
+                    placeholder="Name"
+                    style={inputStyle("220px")}
+                  />
+
+                  <input
+                    value={newOfficerPhone}
+                    onChange={(e) => setNewOfficerPhone(e.target.value)}
+                    placeholder="Phone"
+                    style={inputStyle("180px")}
+                  />
+
+                  <br />
+
+                  <button onClick={addOfficeBearer} style={buttonStyle(true)}>
+                    Save Office Bearer
+                  </button>
+                </div>
+
+                <div style={panelStyle("#fff")}>
+                  <h3 style={{ marginTop: 0 }}>Delete Office Bearer</h3>
+
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {sortedOfficeBearers.map((person) => (
+                      <div
+                        key={person.id}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 12,
+                          padding: 12,
+                          border: "1px solid #e5e7eb",
+                          borderRadius: 10,
+                          background: "#fcfcfc"
+                        }}
+                      >
+                        <div>
+                          <strong>{person.role}</strong> — {person.name}
+                        </div>
+                        <button onClick={() => deleteOfficeBearer(person.id)} style={buttonStyle()}>
+                          Delete
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={panelStyle("#fff")}>
+                  <h3 style={{ marginTop: 0 }}>Add Member</h3>
+
+                  <input
+                    value={newMemberName}
+                    onChange={(e) => setNewMemberName(e.target.value)}
+                    placeholder="Name"
+                    style={inputStyle("220px")}
+                  />
+
+                  <select
+                    value={newMemberSection}
+                    onChange={(e) => setNewMemberSection(e.target.value)}
+                    style={inputStyle("180px")}
+                  >
+                    <option>Gents</option>
+                    <option>Ladies</option>
+                    <option>Associate</option>
+                  </select>
+
+                  <input
+                    value={newMemberPhone}
+                    onChange={(e) => setNewMemberPhone(e.target.value)}
+                    placeholder="Phone"
+                    style={inputStyle("180px")}
+                  />
+
+                  <input
+                    value={newMemberEmail}
+                    onChange={(e) => setNewMemberEmail(e.target.value)}
+                    placeholder="Email"
+                    style={inputStyle("220px")}
+                  />
+
+                  <br />
+
+                  <button onClick={addMember} style={buttonStyle(true)}>
+                    Save Member
+                  </button>
+                </div>
+
+                <div style={panelStyle("#fff")}>
+                  <h3 style={{ marginTop: 0 }}>Delete Member</h3>
+
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {members.map((member) => (
+                      <div
+                        key={member.id}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 12,
+                          padding: 12,
+                          border: "1px solid #e5e7eb",
+                          borderRadius: 10,
+                          background: "#fcfcfc"
+                        }}
+                      >
+                        <div>
+                          <strong>{member.name}</strong> — {member.section}
+                        </div>
+                        <button onClick={() => deleteMember(member.id)} style={buttonStyle()}>
+                          Delete
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
