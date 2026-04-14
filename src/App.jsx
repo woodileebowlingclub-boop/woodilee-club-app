@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { supabase } from "./lib/supabase";
 
 const CLUB_PIN = "1911";
 
@@ -8,6 +9,7 @@ export default function App() {
 
   const [entries, setEntries] = useState([]);
   const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = () => {
     if (pin === CLUB_PIN) {
@@ -17,13 +19,58 @@ export default function App() {
     }
   };
 
-  const addEntry = () => {
-    if (text === "") return;
-    setEntries([...entries, text]);
-    setText("");
+  useEffect(() => {
+    if (!loggedIn) return;
+    loadEntries();
+  }, [loggedIn]);
+
+  const loadEntries = async () => {
+    if (!supabase) {
+      alert("Supabase not connected");
+      return;
+    }
+
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from("events")
+      .select("*")
+      .order("id", { ascending: false });
+
+    if (error) {
+      alert("Could not load entries");
+    } else {
+      setEntries(data || []);
+    }
+
+    setLoading(false);
   };
 
-  // 🔐 LOGIN SCREEN
+  const addEntry = async () => {
+    if (text === "") return;
+
+    if (!supabase) {
+      alert("Supabase not connected");
+      return;
+    }
+
+    const { error } = await supabase.from("events").insert([
+      {
+        title: text,
+        date_text: new Date().toLocaleDateString("en-GB"),
+        note: ""
+      }
+    ]);
+
+    if (error) {
+      alert("Could not save entry");
+      return;
+    }
+
+    setText("");
+    loadEntries();
+  };
+
   if (!loggedIn) {
     return (
       <div style={{ padding: 20 }}>
@@ -42,7 +89,6 @@ export default function App() {
     );
   }
 
-  // ✅ MAIN APP
   return (
     <div style={{ padding: 20 }}>
       <h1>Woodilee Bowling Club</h1>
@@ -60,9 +106,13 @@ export default function App() {
 
       <h3>Entries</h3>
 
+      {loading && <p>Loading...</p>}
+
       <ul>
-        {entries.map((item, i) => (
-          <li key={i}>{item}</li>
+        {entries.map((item) => (
+          <li key={item.id}>
+            <strong>{item.date_text}</strong> — {item.title}
+          </li>
         ))}
       </ul>
     </div>
