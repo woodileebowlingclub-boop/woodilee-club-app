@@ -237,6 +237,20 @@ function normaliseUkPhoneForWhatsApp(phone) {
   return digits;
 }
 
+function formatDiaryDate(dateValue) {
+  if (!dateValue) return "";
+
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return dateValue;
+
+  return date.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export default function App() {
   const [pin, setPin] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
@@ -258,6 +272,7 @@ export default function App() {
 
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
+  const [note, setNote] = useState("");
 
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberSection, setNewMemberSection] = useState("Gents");
@@ -468,6 +483,7 @@ export default function App() {
     setEditingEntryId(null);
     setTitle("");
     setDate("");
+    setNote("");
   };
 
   const clearMemberForm = () => {
@@ -515,7 +531,7 @@ export default function App() {
     if (editingEntryId) {
       const { data, error } = await supabase
         .from("events")
-        .update({ title, date_text: date })
+        .update({ title, date_text: date, note })
         .eq("id", editingEntryId)
         .select()
         .single();
@@ -526,7 +542,7 @@ export default function App() {
     } else {
       const { data, error } = await supabase
         .from("events")
-        .insert([{ title, date_text: date, note: "" }])
+        .insert([{ title, date_text: date, note }])
         .select()
         .single();
 
@@ -542,6 +558,7 @@ export default function App() {
     setEditingEntryId(entry.id);
     setTitle(entry.title || "");
     setDate(entry.date_text || "");
+    setNote(entry.note || "");
     setTab("admin");
   };
 
@@ -1028,7 +1045,12 @@ export default function App() {
               <h3 style={styles.sectionTitle}>Diary Events</h3>
               {sortedEntries.map((e) => (
                 <div key={e.id} style={styles.card}>
-                  <strong style={{ color: "#92400e" }}>{e.date_text}</strong> — {e.title}
+                  <strong style={{ color: "#92400e" }}>{formatDiaryDate(e.date_text)}</strong> — {e.title}
+                  {e.note ? (
+                    <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>
+                      {e.note}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -1094,19 +1116,39 @@ export default function App() {
             ) : (
               <>
                 <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>{editingEntryId ? "Edit Diary Entry" : "Add Diary Entry"}</h3>
+                  <h3 style={styles.sectionTitle}>
+                    {editingEntryId ? "Edit Diary Entry" : "Add Diary Entry"}
+                  </h3>
+
                   <input
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Event title"
                     style={styles.input}
                   />
-                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={styles.input} />
+
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    style={styles.input}
+                  />
+
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Optional note"
+                    style={styles.textarea}
+                  />
+
                   <button onClick={saveEntry} style={styles.button}>
                     {editingEntryId ? "Update Diary Entry" : "Save Diary Entry"}
                   </button>
-                  {(editingEntryId || title || date) && (
-                    <button onClick={clearEntryForm} style={styles.secondaryButton}>Clear</button>
+
+                  {(editingEntryId || title || date || note) && (
+                    <button onClick={clearEntryForm} style={styles.secondaryButton}>
+                      Clear
+                    </button>
                   )}
                 </div>
 
@@ -1114,7 +1156,12 @@ export default function App() {
                   <h3 style={styles.sectionTitle}>Manage Diary Entries</h3>
                   {sortedEntries.map((e) => (
                     <div key={e.id} style={styles.card}>
-                      <strong>{e.date_text}</strong> — {e.title}
+                      <strong>{formatDiaryDate(e.date_text)}</strong> — {e.title}
+                      {e.note ? (
+                        <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>
+                          {e.note}
+                        </div>
+                      ) : null}
                       <div style={{ marginTop: 8 }}>
                         <button onClick={() => editEntry(e)} style={styles.smallBtn}>Edit</button>
                         <button onClick={() => deleteEntry(e.id)} style={styles.smallBtn}>Delete</button>
