@@ -1,1480 +1,479 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "./lib/supabase";
-import logo from "./assets/logo.png";
 
 const CLUB_PIN = "1911";
 const ADMIN_PIN = "1954";
-const BUCKET = "club-files";
 
-const styles = {
-  page: {
-    padding: 16,
-    fontFamily: "Arial, sans-serif",
-    background: "linear-gradient(180deg, #5b1d2a 0%, #7a2638 45%, #a33a4d 100%)",
-    minHeight: "100vh",
-    color: "#222",
-  },
-  wrap: {
-    maxWidth: 1100,
-    margin: "0 auto",
-  },
-  header: {
-    background: "linear-gradient(135deg, #5a1323 0%, #7b1e32 55%, #a12f45 100%)",
-    color: "#fff",
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 18,
-    boxShadow: "0 8px 20px rgba(0,0,0,0.22)",
-    display: "flex",
-    alignItems: "center",
-    gap: 16,
-    flexWrap: "wrap",
-  },
-  logo: {
-    width: 78,
-    height: 78,
-    borderRadius: "50%",
-    objectFit: "cover",
-    background: "#fff",
-    border: "3px solid #f3c76b",
-    boxShadow: "0 3px 10px rgba(0,0,0,0.25)",
-    flexShrink: 0,
-  },
-  titleWrap: {
-    flex: 1,
-    minWidth: 220,
-  },
-  title: {
-    margin: 0,
-    fontSize: 30,
-    lineHeight: 1.1,
-  },
-  subtitle: {
-    margin: "6px 0 0 0",
-    opacity: 0.95,
-    fontSize: 15,
-  },
-  panel: {
-    background: "#fffaf8",
-    border: "1px solid #e5c8cf",
+const defaultOfficeBearers = [
+  { role: "Gents President", name: "Peter Anderson", phone: "07929 878444" },
+  { role: "Ladies President", name: "Rita Gordon", phone: "07806 780022" },
+  { role: "Secretary", name: "Peter Barber", phone: "07954 698489" },
+  { role: "Treasurer", name: "Trevor Barraclough", phone: "07974 954382" },
+  { role: "Bar Convenor", name: "David Munro", phone: "07780 131049" },
+];
+
+function panel(bg = "#fff", border = "#202020") {
+  return {
+    background: bg,
+    border: `2px solid ${border}`,
     borderRadius: 18,
     padding: 16,
-    marginBottom: 18,
-    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-  },
-  loginPanel: {
-    background: "#fffaf8",
-    border: "1px solid #e5c8cf",
-    borderRadius: 18,
-    padding: 20,
-    maxWidth: 420,
-    margin: "80px auto",
-    boxShadow: "0 8px 20px rgba(0,0,0,0.18)",
-    textAlign: "center",
-  },
-  tabs: {
-    display: "flex",
-    gap: 10,
-    marginBottom: 16,
-    flexWrap: "wrap",
-  },
-  tab: (active) => ({
-    padding: "12px 16px",
-    background: active ? "#8b1e3f" : "#f3d9df",
-    color: active ? "#fff" : "#5b1d2a",
-    border: active ? "1px solid #8b1e3f" : "1px solid #e5c8cf",
-    borderRadius: 12,
-    fontWeight: 700,
-    cursor: "pointer",
-  }),
-  input: {
-    width: "100%",
-    padding: 12,
-    marginBottom: 10,
-    borderRadius: 12,
-    border: "1px solid #d7b7be",
-    boxSizing: "border-box",
-    background: "#fffefe",
-    fontSize: 15,
-  },
-  textarea: {
-    width: "100%",
-    padding: 12,
-    marginBottom: 10,
-    borderRadius: 12,
-    border: "1px solid #d7b7be",
-    boxSizing: "border-box",
-    minHeight: 100,
-    resize: "vertical",
-    background: "#fffefe",
-    fontSize: 15,
-  },
-  button: {
-    padding: "12px 16px",
-    background: "#8b1e3f",
-    color: "#fff",
-    border: "none",
-    borderRadius: 12,
-    fontWeight: 700,
-    cursor: "pointer",
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  secondaryButton: {
-    padding: "12px 16px",
-    background: "#f3d9df",
-    color: "#5b1d2a",
-    border: "1px solid #e5c8cf",
-    borderRadius: 12,
-    fontWeight: 700,
-    cursor: "pointer",
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  smallBtn: {
-    padding: "8px 10px",
-    background: "#f2e4e7",
-    border: "1px solid #e0c5cb",
-    borderRadius: 10,
-    cursor: "pointer",
-    marginLeft: 8,
-    color: "#5b1d2a",
-    fontWeight: 700,
-  },
-  reorderBtn: {
-    padding: "8px 10px",
-    background: "#dbeafe",
-    border: "1px solid #93c5fd",
-    borderRadius: 10,
-    cursor: "pointer",
-    marginLeft: 8,
-    color: "#1d4ed8",
-    fontWeight: 700,
-  },
-  disabledReorderBtn: {
-    padding: "8px 10px",
-    background: "#e5e7eb",
-    border: "1px solid #d1d5db",
-    borderRadius: 10,
-    cursor: "not-allowed",
-    marginLeft: 8,
-    color: "#9ca3af",
-    fontWeight: 700,
-  },
-  card: {
-    border: "1px solid #ead7dc",
+    boxShadow: "0 3px 10px rgba(0,0,0,0.08)",
+  };
+}
+
+function navButton(active = false) {
+  return {
+    padding: "10px 16px",
     borderRadius: 14,
-    padding: 14,
-    background: "#fffdfd",
-    marginBottom: 10,
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-    gap: 14,
-  },
-  sectionTitle: {
-    marginTop: 0,
-    color: "#7a2138",
-  },
-  memberSectionTitle: {
-    color: "#7a2138",
-    borderBottom: "2px solid #efd6dc",
-    paddingBottom: 6,
-    marginTop: 22,
-    marginBottom: 12,
-  },
-  message: {
-    marginBottom: 15,
+    border: "2px solid #222",
+    background: active ? "#8f5a2a" : "#fff",
+    color: active ? "#fff" : "#222",
+    fontWeight: 700,
+    cursor: "pointer",
+  };
+}
+
+function inputStyle() {
+  return {
+    width: "100%",
     padding: 12,
-    background: "#fff1c7",
-    border: "1px solid #e6c768",
+    fontSize: 16,
     borderRadius: 10,
-  },
-  linkBtn: {
-    display: "inline-block",
-    padding: "10px 14px",
-    background: "#2563eb",
-    color: "#fff",
-    borderRadius: 10,
-    textDecoration: "none",
-    fontWeight: 700,
-    marginTop: 10,
-  },
-  whatsappBtn: {
-    display: "inline-block",
-    background: "#25D366",
-    color: "#fff",
-    padding: "7px 10px",
-    borderRadius: 8,
-    textDecoration: "none",
-    fontSize: 13,
-    fontWeight: 700,
-    marginLeft: 8,
-  },
-  callBtn: {
-    display: "inline-block",
-    background: "#2563eb",
-    color: "#fff",
-    padding: "7px 10px",
-    borderRadius: 8,
-    textDecoration: "none",
-    fontSize: 13,
-    fontWeight: 700,
-    marginRight: 8,
-  },
-  badge: {
-    display: "inline-block",
-    padding: "4px 8px",
-    borderRadius: 999,
-    background: "#fff1e8",
-    color: "#9a3412",
-    fontWeight: 700,
-    fontSize: 12,
-    marginBottom: 8,
-    border: "1px solid #fdba74",
-  },
-  pinnedCard: {
-    border: "2px solid #f59e0b",
-    background: "#fff7ed",
-  },
-};
-
-function sortEventsChronologically(list) {
-  return [...list].sort(
-    (a, b) => new Date(a.date_text).getTime() - new Date(b.date_text).getTime()
-  );
+    border: "2px solid #333",
+    boxSizing: "border-box",
+  };
 }
 
-function sortPosts(list) {
-  return [...list].sort((a, b) => {
-    const aPinned = a.pinned ? 1 : 0;
-    const bPinned = b.pinned ? 1 : 0;
-    if (aPinned !== bPinned) return bPinned - aPinned;
-    return new Date(b.date_posted).getTime() - new Date(a.date_posted).getTime();
-  });
+function cleanPhone(phone) {
+  if (!phone) return "";
+  return String(phone).split(/\s+or\s+/i)[0].replace(/\s+/g, "").trim();
 }
 
-function sortByPositionThenName(list) {
-  return [...list].sort((a, b) => {
-    const aPos = Number.isFinite(Number(a.position)) ? Number(a.position) : 999;
-    const bPos = Number.isFinite(Number(b.position)) ? Number(b.position) : 999;
-    if (aPos !== bPos) return aPos - bPos;
-    return String(a.name || "").localeCompare(String(b.name || ""));
-  });
+function formatDate(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function normaliseUkPhoneForWhatsApp(phone) {
-  const digits = String(phone || "").replace(/\D/g, "");
-  if (!digits) return "";
-  if (digits.startsWith("44")) return digits;
-  if (digits.startsWith("0")) return `44${digits.slice(1)}`;
-  return digits;
+function monthLabel(value) {
+  if (!value) return "Other";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "Other";
+  return d.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
 }
 
 export default function App() {
-  const [pin, setPin] = useState("");
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [tab, setTab] = useState("diary");
-
+  const [clubPin, setClubPin] = useState("");
+  const [clubUnlocked, setClubUnlocked] = useState(false);
   const [adminPin, setAdminPin] = useState("");
   const [adminUnlocked, setAdminUnlocked] = useState(false);
+  const [page, setPage] = useState("home");
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const [entries, setEntries] = useState([]);
   const [members, setMembers] = useState([]);
-  const [officeBearers, setOfficeBearers] = useState([]);
-  const [clubCoaches, setClubCoaches] = useState([]);
-  const [posts, setPosts] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [points, setPoints] = useState([]);
+  const [officeBearers, setOfficeBearers] = useState(defaultOfficeBearers);
 
-  const [search, setSearch] = useState("");
+  const [memberSearch, setMemberSearch] = useState("");
+  const [memberSection, setMemberSection] = useState("All");
 
-  const [title, setTitle] = useState("");
-  const [date, setDate] = useState("");
-
-  const [newMemberName, setNewMemberName] = useState("");
-  const [newMemberSection, setNewMemberSection] = useState("Gents");
-  const [newMemberPhone, setNewMemberPhone] = useState("");
-
-  const [newRole, setNewRole] = useState("");
-  const [newOfficerName, setNewOfficerName] = useState("");
-  const [newOfficerPhone, setNewOfficerPhone] = useState("");
-  const [newOfficerPosition, setNewOfficerPosition] = useState("");
-
-  const [newCoachName, setNewCoachName] = useState("");
-  const [newCoachPhone, setNewCoachPhone] = useState("");
-  const [newCoachPosition, setNewCoachPosition] = useState("");
-
-  const [postTitle, setPostTitle] = useState("");
-  const [postMessage, setPostMessage] = useState("");
-  const [postDate, setPostDate] = useState("");
-  const [postLink, setPostLink] = useState("");
-  const [postButtonText, setPostButtonText] = useState("");
-  const [postPinned, setPostPinned] = useState(false);
-  const [postFile, setPostFile] = useState(null);
-
-  const [editingEntryId, setEditingEntryId] = useState(null);
-  const [editingMemberId, setEditingMemberId] = useState(null);
-  const [editingOfficerId, setEditingOfficerId] = useState(null);
-  const [editingCoachId, setEditingCoachId] = useState(null);
-  const [editingPostId, setEditingPostId] = useState(null);
-
-  const sortedEntries = useMemo(() => sortEventsChronologically(entries), [entries]);
-  const sortedPosts = useMemo(() => sortPosts(posts), [posts]);
-  const sortedOfficeBearers = useMemo(
-    () => sortByPositionThenName(officeBearers),
-    [officeBearers]
-  );
-  const sortedClubCoaches = useMemo(
-    () => sortByPositionThenName(clubCoaches),
-    [clubCoaches]
-  );
-
-  const filteredMembers = useMemo(() => {
-    return members.filter((m) =>
-      String(m.name || "").toLowerCase().includes(search.toLowerCase())
-    );
-  }, [members, search]);
-
-  const gentsMembers = useMemo(
-    () =>
-      filteredMembers
-        .filter((m) => String(m.section || "").trim().toLowerCase() === "gents")
-        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
-    [filteredMembers]
-  );
-
-  const ladiesMembers = useMemo(
-    () =>
-      filteredMembers
-        .filter((m) => String(m.section || "").trim().toLowerCase() === "ladies")
-        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
-    [filteredMembers]
-  );
-
-  const associateMembers = useMemo(
-    () =>
-      filteredMembers
-        .filter((m) => String(m.section || "").trim().toLowerCase() === "associate")
-        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
-    [filteredMembers]
-  );
+  const [newMember, setNewMember] = useState({ name: "", section: "Gents", phone: "", email: "" });
+  const [newEvent, setNewEvent] = useState({ date_text: "", title: "", note: "" });
+  const [newPoint, setNewPoint] = useState({ member_name: "", week_date: "", points: "" });
+  const [officeDraft, setOfficeDraft] = useState(defaultOfficeBearers);
 
   useEffect(() => {
-    if (!loggedIn) return;
-    loadAll();
-  }, [loggedIn]);
+    if (!clubUnlocked || !supabase) return;
 
-  const loadAll = async () => {
-    await Promise.all([
-      loadEntries(),
-      loadMembers(),
-      loadOfficeBearers(),
-      loadClubCoaches(),
-      loadPosts(),
-    ]);
-  };
+    let dead = false;
 
-  const loadEntries = async () => {
-    const { data, error } = await supabase.from("events").select("*");
-    if (error) {
-      setMessage(`Could not load diary entries: ${error.message}`);
-      return;
-    }
-    setEntries(data || []);
-  };
+    async function loadAll() {
+      setLoading(true);
+      const [membersRes, eventsRes, pointsRes] = await Promise.all([
+        supabase.from("members").select("*").order("name"),
+        supabase.from("events").select("*").order("date_text"),
+        supabase.from("monday_points").select("*").order("week_date"),
+      ]);
 
-  const loadMembers = async () => {
-    const { data, error } = await supabase.from("members").select("*");
-    if (error) {
-      setMessage(`Could not load members: ${error.message}`);
-      return;
-    }
-    setMembers(data || []);
-  };
+      if (dead) return;
 
-  const loadOfficeBearers = async () => {
-    const { data, error } = await supabase
-      .from("office_bearers")
-      .select("*")
-      .order("position", { ascending: true });
-    if (error) {
-      setMessage(`Could not load office bearers: ${error.message}`);
-      return;
-    }
-    setOfficeBearers(data || []);
-  };
+      setMembers(Array.isArray(membersRes.data) ? membersRes.data : []);
+      setEvents(Array.isArray(eventsRes.data) ? eventsRes.data : []);
+      setPoints(Array.isArray(pointsRes.data) ? pointsRes.data : []);
 
-  const loadClubCoaches = async () => {
-    const { data, error } = await supabase
-      .from("club_coaches")
-      .select("*")
-      .order("position", { ascending: true });
-    if (error) {
-      setMessage(`Could not load club coaches: ${error.message}`);
-      return;
-    }
-    setClubCoaches(data || []);
-  };
-
-  const loadPosts = async () => {
-    const { data, error } = await supabase.from("information_posts").select("*");
-    if (error) {
-      setMessage(`Could not load information posts: ${error.message}`);
-      return;
-    }
-    setPosts(data || []);
-  };
-
-  const handleLogin = () => {
-    if (pin === CLUB_PIN) {
-      setLoggedIn(true);
-      setMessage("");
-    } else {
-      alert("Wrong PIN");
-    }
-  };
-
-  const handleAdminLogin = () => {
-    if (adminPin === ADMIN_PIN) {
-      setAdminUnlocked(true);
-      setMessage("");
-    } else {
-      alert("Wrong admin PIN");
-    }
-  };
-
-  const clearEntryForm = () => {
-    setEditingEntryId(null);
-    setTitle("");
-    setDate("");
-  };
-
-  const clearMemberForm = () => {
-    setEditingMemberId(null);
-    setNewMemberName("");
-    setNewMemberSection("Gents");
-    setNewMemberPhone("");
-  };
-
-  const clearOfficerForm = () => {
-    setEditingOfficerId(null);
-    setNewRole("");
-    setNewOfficerName("");
-    setNewOfficerPhone("");
-    setNewOfficerPosition("");
-  };
-
-  const clearCoachForm = () => {
-    setEditingCoachId(null);
-    setNewCoachName("");
-    setNewCoachPhone("");
-    setNewCoachPosition("");
-  };
-
-  const clearPostForm = () => {
-    setEditingPostId(null);
-    setPostTitle("");
-    setPostMessage("");
-    setPostDate("");
-    setPostLink("");
-    setPostButtonText("");
-    setPostPinned(false);
-    setPostFile(null);
-  };
-
-  const saveEntry = async () => {
-    if (!title || !date) {
-      setMessage("Enter event title and date.");
-      return;
-    }
-
-    if (editingEntryId) {
-      const { data, error } = await supabase
-        .from("events")
-        .update({ title, date_text: date })
-        .eq("id", editingEntryId)
-        .select()
-        .single();
-
-      if (error) {
-        setMessage(`Could not update diary entry: ${error.message}`);
-        return;
-      }
-
-      setEntries((prev) => prev.map((x) => (x.id === editingEntryId ? data : x)));
-      setMessage("Diary entry updated.");
-    } else {
-      const { data, error } = await supabase
-        .from("events")
-        .insert([{ title, date_text: date, note: "" }])
-        .select()
-        .single();
-
-      if (error) {
-        setMessage(`Could not save diary entry: ${error.message}`);
-        return;
-      }
-
-      setEntries((prev) => [...prev, data]);
-      setMessage("Diary entry added.");
-    }
-
-    clearEntryForm();
-  };
-
-  const editEntry = (entry) => {
-    setEditingEntryId(entry.id);
-    setTitle(entry.title || "");
-    setDate(entry.date_text || "");
-    setTab("admin");
-  };
-
-  const deleteEntry = async (id) => {
-    const { error } = await supabase.from("events").delete().eq("id", id);
-    if (error) {
-      setMessage(`Could not delete diary entry: ${error.message}`);
-      return;
-    }
-    setEntries((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Diary entry deleted.");
-  };
-
-  const saveMember = async () => {
-    if (!newMemberName) {
-      setMessage("Enter member name.");
-      return;
-    }
-
-    const payload = {
-      name: newMemberName,
-      section: newMemberSection,
-      phone: newMemberPhone,
-    };
-
-    if (editingMemberId) {
-      const { data, error } = await supabase
-        .from("members")
-        .update(payload)
-        .eq("id", editingMemberId)
-        .select()
-        .single();
-
-      if (error) {
-        setMessage(`Could not update member: ${error.message}`);
-        return;
-      }
-
-      setMembers((prev) => prev.map((x) => (x.id === editingMemberId ? data : x)));
-      setMessage("Member updated.");
-    } else {
-      const { data, error } = await supabase
-        .from("members")
-        .insert([payload])
-        .select()
-        .single();
-
-      if (error) {
-        setMessage(`Could not save member: ${error.message}`);
-        return;
-      }
-
-      setMembers((prev) => [...prev, data]);
-      setMessage("Member added.");
-    }
-
-    clearMemberForm();
-  };
-
-  const editMember = (member) => {
-    setEditingMemberId(member.id);
-    setNewMemberName(member.name || "");
-    setNewMemberSection(member.section || "Gents");
-    setNewMemberPhone(member.phone || "");
-    setTab("admin");
-  };
-
-  const deleteMember = async (id) => {
-    const { error } = await supabase.from("members").delete().eq("id", id);
-    if (error) {
-      setMessage(`Could not delete member: ${error.message}`);
-      return;
-    }
-    setMembers((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Member deleted.");
-  };
-
-  const saveOfficeBearer = async () => {
-    if (!newRole || !newOfficerName) {
-      setMessage("Enter role and name.");
-      return;
-    }
-
-    const payload = {
-      role: newRole,
-      name: newOfficerName,
-      phone: newOfficerPhone,
-      position: newOfficerPosition === "" ? null : Number(newOfficerPosition),
-    };
-
-    if (editingOfficerId) {
-      const { data, error } = await supabase
-        .from("office_bearers")
-        .update(payload)
-        .eq("id", editingOfficerId)
-        .select()
-        .single();
-
-      if (error) {
-        setMessage(`Could not update office bearer: ${error.message}`);
-        return;
-      }
-
-      setOfficeBearers((prev) =>
-        prev.map((x) => (x.id === editingOfficerId ? data : x))
-      );
-      setMessage("Office bearer updated.");
-    } else {
-      const { data, error } = await supabase
-        .from("office_bearers")
-        .insert([payload])
-        .select()
-        .single();
-
-      if (error) {
-        setMessage(`Could not save office bearer: ${error.message}`);
-        return;
-      }
-
-      setOfficeBearers((prev) => [...prev, data]);
-      setMessage("Office bearer added.");
-    }
-
-    clearOfficerForm();
-  };
-
-  const editOfficeBearer = (person) => {
-    setEditingOfficerId(person.id);
-    setNewRole(person.role || "");
-    setNewOfficerName(person.name || "");
-    setNewOfficerPhone(person.phone || "");
-    setNewOfficerPosition(
-      person.position === null || person.position === undefined ? "" : String(person.position)
-    );
-    setTab("admin");
-  };
-
-  const deleteOfficeBearer = async (id) => {
-    const { error } = await supabase.from("office_bearers").delete().eq("id", id);
-    if (error) {
-      setMessage(`Could not delete office bearer: ${error.message}`);
-      return;
-    }
-    setOfficeBearers((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Office bearer deleted.");
-  };
-
-  const saveCoach = async () => {
-    if (!newCoachName) {
-      setMessage("Enter coach name.");
-      return;
-    }
-
-    const payload = {
-      name: newCoachName,
-      phone: newCoachPhone,
-      position: newCoachPosition === "" ? null : Number(newCoachPosition),
-    };
-
-    if (editingCoachId) {
-      const { data, error } = await supabase
-        .from("club_coaches")
-        .update(payload)
-        .eq("id", editingCoachId)
-        .select()
-        .single();
-
-      if (error) {
-        setMessage(`Could not update club coach: ${error.message}`);
-        return;
-      }
-
-      setClubCoaches((prev) => prev.map((x) => (x.id === editingCoachId ? data : x)));
-      setMessage("Club coach updated.");
-    } else {
-      const { data, error } = await supabase
-        .from("club_coaches")
-        .insert([payload])
-        .select()
-        .single();
-
-      if (error) {
-        setMessage(`Could not save club coach: ${error.message}`);
-        return;
-      }
-
-      setClubCoaches((prev) => [...prev, data]);
-      setMessage("Club coach added.");
-    }
-
-    clearCoachForm();
-  };
-
-  const editCoach = (coach) => {
-    setEditingCoachId(coach.id);
-    setNewCoachName(coach.name || "");
-    setNewCoachPhone(coach.phone || "");
-    setNewCoachPosition(
-      coach.position === null || coach.position === undefined ? "" : String(coach.position)
-    );
-    setTab("admin");
-  };
-
-  const deleteCoach = async (id) => {
-    const { error } = await supabase.from("club_coaches").delete().eq("id", id);
-    if (error) {
-      setMessage(`Could not delete club coach: ${error.message}`);
-      return;
-    }
-    setClubCoaches((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Club coach deleted.");
-  };
-
-  const moveItem = async (table, items, setItems, id, direction, label) => {
-    const currentList = sortByPositionThenName(items);
-    const currentIndex = currentList.findIndex((item) => item.id === id);
-    if (currentIndex === -1) return;
-
-    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
-    if (targetIndex < 0 || targetIndex >= currentList.length) return;
-
-    const currentItem = currentList[currentIndex];
-    const targetItem = currentList[targetIndex];
-
-    const currentPos =
-      Number.isFinite(Number(currentItem.position)) ? Number(currentItem.position) : currentIndex + 1;
-    const targetPos =
-      Number.isFinite(Number(targetItem.position)) ? Number(targetItem.position) : targetIndex + 1;
-
-    const { error: error1 } = await supabase
-      .from(table)
-      .update({ position: targetPos })
-      .eq("id", currentItem.id);
-
-    if (error1) {
-      setMessage(`Could not move ${label}: ${error1.message}`);
-      return;
-    }
-
-    const { error: error2 } = await supabase
-      .from(table)
-      .update({ position: currentPos })
-      .eq("id", targetItem.id);
-
-    if (error2) {
-      setMessage(`Could not move ${label}: ${error2.message}`);
-      return;
-    }
-
-    setItems((prev) =>
-      prev.map((item) => {
-        if (item.id === currentItem.id) return { ...item, position: targetPos };
-        if (item.id === targetItem.id) return { ...item, position: currentPos };
-        return item;
-      })
-    );
-
-    setMessage(`${label} order updated.`);
-  };
-
-  const uploadPostFile = async () => {
-    if (!postFile) return postLink || null;
-
-    const fileExt = postFile.name.split(".").pop();
-    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
-    const filePath = `information/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET)
-      .upload(filePath, postFile);
-
-    if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-    return data.publicUrl;
-  };
-
-  const savePost = async () => {
-    if (!postTitle || !postMessage || !postDate) {
-      setMessage("Enter post title, message and date.");
-      return;
-    }
-
-    try {
-      const finalLink = await uploadPostFile();
-
-      const payload = {
-        title: postTitle,
-        message: postMessage,
-        date_posted: postDate,
-        attachment_link: finalLink,
-        button_text: postButtonText || null,
-        pinned: postPinned,
-      };
-
-      if (editingPostId) {
-        const { data, error } = await supabase
-          .from("information_posts")
-          .update(payload)
-          .eq("id", editingPostId)
-          .select()
-          .single();
-
-        if (error) {
-          setMessage(`Could not update information post: ${error.message}`);
-          return;
-        }
-
-        setPosts((prev) => prev.map((x) => (x.id === editingPostId ? data : x)));
-        setMessage("Information post updated.");
+      if (membersRes.error || eventsRes.error || pointsRes.error) {
+        setMessage("Some live data could not be loaded. Check Supabase tables and policies.");
       } else {
-        const { data, error } = await supabase
-          .from("information_posts")
-          .insert([payload])
-          .select()
-          .single();
-
-        if (error) {
-          setMessage(`Could not save information post: ${error.message}`);
-          return;
-        }
-
-        setPosts((prev) => [...prev, data]);
-        setMessage("Information post added.");
+        setMessage("");
       }
 
-      clearPostForm();
-    } catch (err) {
-      setMessage(`Could not save information post: ${err.message}`);
-    }
-  };
-
-  const editPost = (post) => {
-    setEditingPostId(post.id);
-    setPostTitle(post.title || "");
-    setPostMessage(post.message || "");
-    setPostDate(post.date_posted || "");
-    setPostLink(post.attachment_link || "");
-    setPostButtonText(post.button_text || "");
-    setPostPinned(!!post.pinned);
-    setPostFile(null);
-    setTab("admin");
-  };
-
-  const deletePost = async (id) => {
-    const { error } = await supabase.from("information_posts").delete().eq("id", id);
-    if (error) {
-      setMessage(`Could not delete information post: ${error.message}`);
-      return;
-    }
-    setPosts((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Information post deleted.");
-  };
-
-  const renderMemberCards = (list) => {
-    if (list.length === 0) {
-      return <div style={{ color: "#777", marginBottom: 12 }}>No members in this section.</div>;
+      setLoading(false);
     }
 
-    return list.map((m) => (
-      <div key={m.id} style={styles.card}>
-        <div style={{ fontWeight: 700, fontSize: 18 }}>{m.name}</div>
-        <div style={{ color: "#92400e", marginTop: 4 }}>{m.section}</div>
-        <div style={{ marginTop: 10 }}>
-          {m.phone ? (
-            <>
-              <a href={`tel:${m.phone}`} style={styles.callBtn}>
-                📞 {m.phone}
-              </a>
-              <a
-                href={`https://wa.me/${normaliseUkPhoneForWhatsApp(m.phone)}`}
-                target="_blank"
-                rel="noreferrer"
-                style={styles.whatsappBtn}
-              >
-                WhatsApp
-              </a>
-            </>
-          ) : (
-            <span style={{ color: "#888" }}>No phone</span>
-          )}
-        </div>
-      </div>
-    ));
-  };
+    loadAll();
 
-  const renderCoachCards = (list) => {
-    if (list.length === 0) {
-      return <div style={{ color: "#777" }}>No club coach listed yet.</div>;
-    }
+    const channel = supabase
+      .channel("woodilee-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "members" }, loadAll)
+      .on("postgres_changes", { event: "*", schema: "public", table: "events" }, loadAll)
+      .on("postgres_changes", { event: "*", schema: "public", table: "monday_points" }, loadAll)
+      .subscribe();
 
+    return () => {
+      dead = true;
+      supabase.removeChannel(channel);
+    };
+  }, [clubUnlocked]);
+
+  const memberCounts = useMemo(() => ({
+    All: members.length,
+    Gents: members.filter((m) => m.section === "Gents").length,
+    Ladies: members.filter((m) => m.section === "Ladies").length,
+    Associate: members.filter((m) => m.section === "Associate").length,
+  }), [members]);
+
+  const filteredMembers = useMemo(() => {
+    const q = memberSearch.trim().toLowerCase();
+    return members.filter((m) => {
+      const sectionOk = memberSection === "All" || m.section === memberSection;
+      const hay = [m.name, m.section, m.phone, m.email].filter(Boolean).join(" ").toLowerCase();
+      return sectionOk && (!q || hay.includes(q));
+    });
+  }, [members, memberSearch, memberSection]);
+
+  const groupedMembers = useMemo(() => {
+    return filteredMembers.reduce((acc, member) => {
+      const key = member.section || "Other";
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(member);
+      return acc;
+    }, {});
+  }, [filteredMembers]);
+
+  const groupedEvents = useMemo(() => {
+    return events.reduce((acc, event) => {
+      const key = monthLabel(event.date_text);
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(event);
+      return acc;
+    }, {});
+  }, [events]);
+
+  const leaderboard = useMemo(() => {
+    const totals = {};
+    points.forEach((row) => {
+      const name = String(row.member_name || "").trim();
+      if (!name) return;
+      totals[name] = (totals[name] || 0) + Number(row.points || 0);
+    });
+    return Object.entries(totals)
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name))
+      .map((row, i) => ({ ...row, position: i + 1 }));
+  }, [points]);
+
+  const weeklyWinners = useMemo(() => {
+    const byWeek = {};
+    points.forEach((row) => {
+      const week = row.week_date;
+      if (!week) return;
+      if (!byWeek[week]) byWeek[week] = [];
+      byWeek[week].push({ member_name: row.member_name, points: Number(row.points || 0) });
+    });
+
+    return Object.entries(byWeek)
+      .map(([week, rows]) => {
+        const sorted = [...rows].sort((a, b) => b.points - a.points || String(a.member_name || "").localeCompare(String(b.member_name || "")));
+        return {
+          week,
+          winner: sorted[0]?.member_name || "",
+          topScore: sorted[0]?.points || 0,
+        };
+      })
+      .sort((a, b) => new Date(a.week) - new Date(b.week));
+  }, [points]);
+
+  async function addMember() {
+    if (!supabase) return setMessage("Supabase not connected.");
+    if (!newMember.name) return setMessage("Enter member name.");
+    const { error } = await supabase.from("members").insert([newMember]);
+    if (error) return setMessage("Could not save member.");
+    setNewMember({ name: "", section: "Gents", phone: "", email: "" });
+    setMessage("Member added.");
+  }
+
+  async function addEvent() {
+    if (!supabase) return setMessage("Supabase not connected.");
+    if (!newEvent.date_text || !newEvent.title) return setMessage("Enter event date and title.");
+    const { error } = await supabase.from("events").insert([newEvent]);
+    if (error) return setMessage("Could not save event.");
+    setNewEvent({ date_text: "", title: "", note: "" });
+    setMessage("Event added.");
+  }
+
+  async function addPoint() {
+    if (!supabase) return setMessage("Supabase not connected.");
+    if (!newPoint.member_name || !newPoint.week_date) return setMessage("Enter member and week date.");
+    const { error } = await supabase.from("monday_points").insert([
+      { ...newPoint, points: Number(newPoint.points || 0) },
+    ]);
+    if (error) return setMessage("Could not save Monday points.");
+    setNewPoint({ member_name: "", week_date: "", points: "" });
+    setMessage("Monday points added.");
+  }
+
+  function saveOfficeBearers() {
+    setOfficeBearers(officeDraft);
+    setMessage("Office bearers updated in app.");
+  }
+
+  if (!clubUnlocked) {
     return (
-      <div style={styles.grid}>
-        {list.map((coach) => (
-          <div key={coach.id} style={styles.card}>
-            <span style={styles.badge}>Club Coach</span>
-            <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
-              {coach.name}
-            </div>
-            <div style={{ marginBottom: 10, color: "#444" }}>
-              {coach.phone || "No phone listed"}
-            </div>
-
-            {coach.phone ? (
-              <div>
-                <a href={`tel:${coach.phone}`} style={styles.callBtn}>
-                  📞 Call
-                </a>
-                <a
-                  href={`https://wa.me/${normaliseUkPhoneForWhatsApp(coach.phone)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={styles.whatsappBtn}
-                >
-                  WhatsApp
-                </a>
-              </div>
-            ) : null}
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  if (!loggedIn) {
-    return (
-      <div style={styles.page}>
-        <div style={styles.loginPanel}>
-          <img
-            src={logo}
-            alt="Woodilee Bowling Club"
-            style={{ ...styles.logo, margin: "0 auto 12px auto" }}
-          />
-          <h1 style={{ ...styles.title, marginBottom: 14 }}>Woodilee Bowling Club</h1>
-          <input
-            type="password"
-            placeholder="Enter PIN"
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            style={styles.input}
-          />
-          <button onClick={handleLogin} style={styles.button}>
-            Enter
+      <div style={{ minHeight: "100vh", background: "#f5efe1", padding: 24, fontFamily: "Arial, sans-serif" }}>
+        <div style={{ maxWidth: 480, margin: "60px auto", ...panel() }}>
+          <div style={{ textAlign: "center", fontSize: 38, fontWeight: 800 }}>Woodilee Bowling Club</div>
+          <div style={{ textAlign: "center", fontSize: 22, fontWeight: 700, color: "#8b1e1e", marginTop: 8 }}>Members’ Diary</div>
+          <div style={{ textAlign: "center", marginTop: 20 }}>Enter club PIN</div>
+          <input type="password" value={clubPin} onChange={(e) => setClubPin(e.target.value)} style={{ ...inputStyle(), marginTop: 14 }} />
+          <button
+            style={{ ...navButton(true), width: "100%", marginTop: 14 }}
+            onClick={() => {
+              if (clubPin === CLUB_PIN) {
+                setClubUnlocked(true);
+                setMessage("");
+              } else {
+                setMessage("Incorrect club PIN.");
+              }
+            }}
+          >
+            Open Diary
           </button>
+          {message ? <div style={{ marginTop: 14, color: "#b42318", fontWeight: 700, textAlign: "center" }}>{message}</div> : null}
         </div>
       </div>
     );
   }
 
   return (
-    <div style={styles.page}>
-      <div style={styles.wrap}>
-        <div style={styles.header}>
-          <img src={logo} alt="Woodilee Bowling Club" style={styles.logo} />
-          <div style={styles.titleWrap}>
-            <h1 style={styles.title}>Woodilee Bowling Club</h1>
-            <p style={styles.subtitle}>Members diary, notices and contact details</p>
+    <div style={{ minHeight: "100vh", background: "#f5efe1", padding: 18, fontFamily: "Arial, sans-serif" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+        <div style={{ border: "4px solid #111", background: "#d98f4e", padding: 8, borderRadius: 14 }}>
+          <div style={{ border: "2px solid #111", background: "#efdfc7", padding: 10, borderRadius: 10 }}>
+            <div style={{ ...panel(), boxShadow: "none" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 40, fontWeight: 800 }}>Woodilee Bowling Club</div>
+                  <div style={{ marginTop: 6, fontSize: 24, color: "#8b1e1e", fontWeight: 700 }}>Members’ Diary</div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button style={navButton(page === "home")} onClick={() => setPage("home")}>Home</button>
+                  <button style={navButton(page === "diary")} onClick={() => setPage("diary")}>Diary</button>
+                  <button style={navButton(page === "members")} onClick={() => setPage("members")}>Members</button>
+                  <button style={navButton(page === "office")} onClick={() => setPage("office")}>Office Bearers</button>
+                  <button style={navButton(page === "points")} onClick={() => setPage("points")}>Monday Points</button>
+                  <button style={navButton(page === "admin")} onClick={() => setPage("admin")}>Admin</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {message && <div style={styles.message}>{message}</div>}
+        {message ? <div style={{ ...panel("#fff8e8"), marginTop: 16 }}>{message}</div> : null}
+        {!supabase ? <div style={{ ...panel("#fff5f5", "#d33"), marginTop: 16 }}>Supabase keys are missing in Vercel environment variables.</div> : null}
+        {loading ? <div style={{ marginTop: 16, fontWeight: 700, color: "#666" }}>Loading…</div> : null}
 
-        <div style={styles.tabs}>
-          <button style={styles.tab(tab === "diary")} onClick={() => setTab("diary")}>
-            Diary
-          </button>
-          <button style={styles.tab(tab === "members")} onClick={() => setTab("members")}>
-            Members
-          </button>
-          <button style={styles.tab(tab === "information")} onClick={() => setTab("information")}>
-            Information
-          </button>
-          <button style={styles.tab(tab === "admin")} onClick={() => setTab("admin")}>
-            Admin
-          </button>
-        </div>
+        {page === "home" ? (
+          <div style={{ ...panel("#fffaf2"), marginTop: 20 }}>
+            <div style={{ fontSize: 30, fontWeight: 800, marginBottom: 12 }}>Club Dashboard</div>
+            <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+              <div style={panel("#fff")}><div style={{ fontSize: 14, color: "#8f5a2a", fontWeight: 700 }}>Members</div><div style={{ fontSize: 32, fontWeight: 800, marginTop: 8 }}>{members.length}</div></div>
+              <div style={panel("#fff")}><div style={{ fontSize: 14, color: "#8f5a2a", fontWeight: 700 }}>Diary Events</div><div style={{ fontSize: 32, fontWeight: 800, marginTop: 8 }}>{events.length}</div></div>
+              <div style={panel("#fff")}><div style={{ fontSize: 14, color: "#8f5a2a", fontWeight: 700 }}>Monday Players</div><div style={{ fontSize: 32, fontWeight: 800, marginTop: 8 }}>{leaderboard.length}</div></div>
+              <div style={panel("#fff1b8")}><div style={{ fontSize: 14, color: "#8f5a2a", fontWeight: 700 }}>Current Leader</div><div style={{ fontSize: 24, fontWeight: 800, marginTop: 8 }}>{leaderboard[0]?.name || "None yet"}</div></div>
+            </div>
+          </div>
+        ) : null}
 
-        {tab === "diary" && (
-          <>
-            <div style={styles.panel}>
-              <h3 style={styles.sectionTitle}>Office Bearers</h3>
-              <div style={styles.grid}>
-                {sortedOfficeBearers.map((person) => (
-                  <div key={person.id} style={styles.card}>
-                    <span style={styles.badge}>{person.role}</span>
-                    <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
-                      {person.name}
-                    </div>
-                    <div style={{ marginBottom: 10, color: "#444" }}>
-                      {person.phone || "No phone listed"}
-                    </div>
-
-                    {person.phone ? (
-                      <div>
-                        <a href={`tel:${person.phone}`} style={styles.callBtn}>
-                          📞 Call
-                        </a>
-                        <a
-                          href={`https://wa.me/${normaliseUkPhoneForWhatsApp(person.phone)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={styles.whatsappBtn}
-                        >
-                          WhatsApp
-                        </a>
+        {page === "diary" ? (
+          <div style={{ ...panel("#fffaf2"), marginTop: 20 }}>
+            <div style={{ fontSize: 28, fontWeight: 800, marginBottom: 12 }}>Diary</div>
+            {Object.keys(groupedEvents).length === 0 ? <div>No diary events yet.</div> : null}
+            <div style={{ display: "grid", gap: 18 }}>
+              {Object.entries(groupedEvents).map(([month, items]) => (
+                <div key={month}>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "#8f5a2a", marginBottom: 10 }}>{month}</div>
+                  <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+                    {items.map((ev, i) => (
+                      <div key={ev.id || i} style={panel("#fffdf8")}>
+                        <div style={{ color: "#8f5a2a", fontWeight: 700 }}>{ev.date_text}</div>
+                        <div style={{ fontSize: 20, fontWeight: 700, marginTop: 4 }}>{ev.title}</div>
+                        {ev.note ? <div style={{ marginTop: 6 }}>{ev.note}</div> : null}
                       </div>
-                    ) : null}
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {page === "members" ? (
+          <div style={{ marginTop: 20, display: "grid", gap: 16 }}>
+            <div style={panel("#fffaf2")}>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ fontSize: 28, fontWeight: 800 }}>Members Directory</div>
+                <input value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)} placeholder="Search member, phone or email" style={{ ...inputStyle(), minWidth: 260, width: 320 }} />
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
+                {Object.entries(memberCounts).map(([section, count]) => (
+                  <button key={section} onClick={() => setMemberSection(section)} style={navButton(memberSection === section)}>{section} ({count})</button>
+                ))}
+              </div>
+            </div>
+            {Object.entries(groupedMembers).map(([section, items]) => (
+              <div key={section}>
+                <div style={{ fontSize: 24, fontWeight: 800, color: "#8f5a2a", marginBottom: 10 }}>{section}</div>
+                <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+                  {items.map((m, i) => (
+                    <div key={m.id || i} style={panel("#fff")}>
+                      <div style={{ fontSize: 20, fontWeight: 700 }}>{m.name}</div>
+                      <div style={{ color: "#8f5a2a", fontWeight: 700, marginTop: 4 }}>{m.section}</div>
+                      {m.phone ? <a href={`tel:${cleanPhone(m.phone)}`} style={{ display: "block", marginTop: 8 }}>{m.phone}</a> : null}
+                      {m.email ? <div style={{ marginTop: 6 }}>{m.email}</div> : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {page === "office" ? (
+          <div style={{ ...panel("#fffaf2"), marginTop: 20 }}>
+            <div style={{ fontSize: 28, fontWeight: 800, marginBottom: 12 }}>Office Bearers</div>
+            <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+              {officeBearers.map((p, i) => (
+                <div key={i} style={panel("#fff")}>
+                  <div style={{ color: "#8f5a2a", fontWeight: 700 }}>{p.role}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, marginTop: 4 }}>{p.name}</div>
+                  <div style={{ marginTop: 8 }}>{p.phone}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {page === "points" ? (
+          <div style={{ marginTop: 20, display: "grid", gap: 18 }}>
+            <div style={panel("#fffaf2")}>
+              <div style={{ fontSize: 28, fontWeight: 800, marginBottom: 12 }}>Monday Points Leaderboard</div>
+              {leaderboard.length === 0 ? <div>No Monday points yet.</div> : leaderboard.map((row) => (
+                <div key={row.name} style={{ ...panel(row.position === 1 ? "#fff1b8" : "#fff"), marginTop: 10, display: "grid", gridTemplateColumns: "70px 1fr 100px", alignItems: "center" }}>
+                  <div style={{ fontWeight: 800 }}>{row.position}</div>
+                  <div style={{ fontWeight: 700 }}>{row.name}</div>
+                  <div style={{ textAlign: "right", fontWeight: 800 }}>{row.total}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={panel("#fffaf2")}>
+              <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>Weekly Winners</div>
+              <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                {weeklyWinners.map((item, i) => (
+                  <div key={i} style={panel("#fff")}>
+                    <div style={{ color: "#8f5a2a", fontWeight: 700 }}>{formatDate(item.week)}</div>
+                    <div style={{ marginTop: 6, fontSize: 18, fontWeight: 700 }}>{item.winner || "No winner"}</div>
+                    <div style={{ marginTop: 4 }}>Top score: {item.topScore}</div>
                   </div>
                 ))}
               </div>
             </div>
-
-            <div style={styles.panel}>
-              <h3 style={styles.sectionTitle}>Club Coach</h3>
-              {renderCoachCards(sortedClubCoaches)}
-            </div>
-
-            <div style={styles.panel}>
-              <h3 style={styles.sectionTitle}>Diary Events</h3>
-              {sortedEntries.map((e) => (
-                <div key={e.id} style={styles.card}>
-                  <strong style={{ color: "#92400e" }}>{e.date_text}</strong> — {e.title}
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {tab === "members" && (
-          <div style={styles.panel}>
-            <h3 style={styles.sectionTitle}>Members</h3>
-
-            <input
-              placeholder="Search members..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={styles.input}
-            />
-
-            <h4 style={styles.memberSectionTitle}>Gents</h4>
-            {renderMemberCards(gentsMembers)}
-
-            <h4 style={styles.memberSectionTitle}>Ladies</h4>
-            {renderMemberCards(ladiesMembers)}
-
-            <h4 style={styles.memberSectionTitle}>Associate</h4>
-            {renderMemberCards(associateMembers)}
           </div>
-        )}
+        ) : null}
 
-        {tab === "information" && (
-          <div style={styles.panel}>
-            <h3 style={styles.sectionTitle}>General Information</h3>
-            {sortedPosts.map((post) => (
-              <div
-                key={post.id}
-                style={{
-                  ...styles.card,
-                  ...(post.pinned ? styles.pinnedCard : {}),
-                }}
-              >
-                {post.pinned ? <div style={styles.badge}>📌 Pinned Notice</div> : null}
-                <div style={{ color: "#92400e", fontWeight: 700 }}>{post.date_posted}</div>
-                <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>
-                  {post.title}
-                </div>
-                <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{post.message}</div>
-                {post.attachment_link ? (
-                  <a
-                    href={post.attachment_link}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={styles.linkBtn}
-                  >
-                    {post.button_text || "Open Attachment"}
-                  </a>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {tab === "admin" && (
-          <div>
+        {page === "admin" ? (
+          <div style={{ marginTop: 20 }}>
             {!adminUnlocked ? (
-              <div style={{ ...styles.panel, maxWidth: 420 }}>
-                <h3 style={styles.sectionTitle}>Admin Login</h3>
-                <input
-                  type="password"
-                  value={adminPin}
-                  onChange={(e) => setAdminPin(e.target.value)}
-                  style={styles.input}
-                />
-                <button onClick={handleAdminLogin} style={styles.button}>
-                  Enter
+              <div style={{ maxWidth: 480, ...panel("#fffaf2") }}>
+                <div style={{ fontSize: 26, fontWeight: 800 }}>Admin Access</div>
+                <div style={{ marginTop: 8 }}>Enter admin PIN</div>
+                <input type="password" value={adminPin} onChange={(e) => setAdminPin(e.target.value)} style={{ ...inputStyle(), marginTop: 14 }} />
+                <button
+                  style={{ ...navButton(true), width: "100%", marginTop: 14 }}
+                  onClick={() => {
+                    if (adminPin === ADMIN_PIN) {
+                      setAdminUnlocked(true);
+                      setMessage("Admin unlocked.");
+                    } else {
+                      setMessage("Incorrect admin PIN.");
+                    }
+                  }}
+                >
+                  Unlock Admin
                 </button>
               </div>
             ) : (
-              <>
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>
-                    {editingEntryId ? "Edit Diary Entry" : "Add Diary Entry"}
-                  </h3>
-                  <input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Event title"
-                    style={styles.input}
-                  />
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    style={styles.input}
-                  />
-                  <button onClick={saveEntry} style={styles.button}>
-                    {editingEntryId ? "Update Diary Entry" : "Save Diary Entry"}
-                  </button>
-                  {(editingEntryId || title || date) && (
-                    <button onClick={clearEntryForm} style={styles.secondaryButton}>
-                      Clear
-                    </button>
-                  )}
+              <div style={{ display: "grid", gap: 18, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
+                <div style={panel("#fffaf2")}>
+                  <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Add Event</div>
+                  <input value={newEvent.date_text} onChange={(e) => setNewEvent((p) => ({ ...p, date_text: e.target.value }))} placeholder="Date" style={inputStyle()} />
+                  <div style={{ height: 8 }} />
+                  <input value={newEvent.title} onChange={(e) => setNewEvent((p) => ({ ...p, title: e.target.value }))} placeholder="Title" style={inputStyle()} />
+                  <div style={{ height: 8 }} />
+                  <textarea value={newEvent.note} onChange={(e) => setNewEvent((p) => ({ ...p, note: e.target.value }))} placeholder="Note" rows={4} style={{ ...inputStyle(), resize: "vertical" }} />
+                  <div style={{ height: 8 }} />
+                  <button style={navButton(true)} onClick={addEvent}>Save Event</button>
                 </div>
 
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>Manage Diary Entries</h3>
-                  {sortedEntries.map((e) => (
-                    <div key={e.id} style={styles.card}>
-                      <strong>{e.date_text}</strong> — {e.title}
-                      <div style={{ marginTop: 8 }}>
-                        <button onClick={() => editEntry(e)} style={styles.smallBtn}>
-                          Edit
-                        </button>
-                        <button onClick={() => deleteEntry(e.id)} style={styles.smallBtn}>
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>
-                    {editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}
-                  </h3>
-                  <input
-                    value={newRole}
-                    onChange={(e) => setNewRole(e.target.value)}
-                    placeholder="Role"
-                    style={styles.input}
-                  />
-                  <input
-                    value={newOfficerName}
-                    onChange={(e) => setNewOfficerName(e.target.value)}
-                    placeholder="Name"
-                    style={styles.input}
-                  />
-                  <input
-                    value={newOfficerPhone}
-                    onChange={(e) => setNewOfficerPhone(e.target.value)}
-                    placeholder="Phone"
-                    style={styles.input}
-                  />
-                  <input
-                    type="number"
-                    value={newOfficerPosition}
-                    onChange={(e) => setNewOfficerPosition(e.target.value)}
-                    placeholder="Position order e.g. 1, 2, 3"
-                    style={styles.input}
-                  />
-                  <button onClick={saveOfficeBearer} style={styles.button}>
-                    {editingOfficerId ? "Update Office Bearer" : "Save Office Bearer"}
-                  </button>
-                  {(editingOfficerId || newRole || newOfficerName || newOfficerPhone || newOfficerPosition) && (
-                    <button onClick={clearOfficerForm} style={styles.secondaryButton}>
-                      Clear
-                    </button>
-                  )}
-                </div>
-
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>Manage Office Bearers</h3>
-                  {sortedOfficeBearers.map((person, index) => {
-                    const canMoveUp = index > 0;
-                    const canMoveDown = index < sortedOfficeBearers.length - 1;
-
-                    return (
-                      <div key={person.id} style={styles.card}>
-                        <strong>{person.role}</strong> — {person.name}
-                        <div style={{ marginTop: 8 }}>
-                          <button onClick={() => editOfficeBearer(person)} style={styles.smallBtn}>
-                            Edit
-                          </button>
-                          <button onClick={() => deleteOfficeBearer(person.id)} style={styles.smallBtn}>
-                            Delete
-                          </button>
-                          <button
-                            onClick={() =>
-                              canMoveUp &&
-                              moveItem("office_bearers", officeBearers, setOfficeBearers, person.id, "up", "Office bearer")
-                            }
-                            style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
-                            type="button"
-                          >
-                            ↑ Up
-                          </button>
-                          <button
-                            onClick={() =>
-                              canMoveDown &&
-                              moveItem("office_bearers", officeBearers, setOfficeBearers, person.id, "down", "Office bearer")
-                            }
-                            style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
-                            type="button"
-                          >
-                            ↓ Down
-                          </button>
-                        </div>
-                        <div style={{ marginTop: 8, color: "#666", fontSize: 13 }}>
-                          Position: {person.position ?? "not set"}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>
-                    {editingCoachId ? "Edit Club Coach" : "Add Club Coach"}
-                  </h3>
-                  <input
-                    value={newCoachName}
-                    onChange={(e) => setNewCoachName(e.target.value)}
-                    placeholder="Name"
-                    style={styles.input}
-                  />
-                  <input
-                    value={newCoachPhone}
-                    onChange={(e) => setNewCoachPhone(e.target.value)}
-                    placeholder="Phone"
-                    style={styles.input}
-                  />
-                  <input
-                    type="number"
-                    value={newCoachPosition}
-                    onChange={(e) => setNewCoachPosition(e.target.value)}
-                    placeholder="Position order e.g. 1, 2, 3"
-                    style={styles.input}
-                  />
-                  <button onClick={saveCoach} style={styles.button}>
-                    {editingCoachId ? "Update Club Coach" : "Save Club Coach"}
-                  </button>
-                  {(editingCoachId || newCoachName || newCoachPhone || newCoachPosition) && (
-                    <button onClick={clearCoachForm} style={styles.secondaryButton}>
-                      Clear
-                    </button>
-                  )}
-                </div>
-
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>Manage Club Coaches</h3>
-                  {sortedClubCoaches.map((coach, index) => {
-                    const canMoveUp = index > 0;
-                    const canMoveDown = index < sortedClubCoaches.length - 1;
-
-                    return (
-                      <div key={coach.id} style={styles.card}>
-                        <strong>{coach.name}</strong> — {coach.phone || "no phone"}
-                        <div style={{ marginTop: 8 }}>
-                          <button onClick={() => editCoach(coach)} style={styles.smallBtn}>
-                            Edit
-                          </button>
-                          <button onClick={() => deleteCoach(coach.id)} style={styles.smallBtn}>
-                            Delete
-                          </button>
-                          <button
-                            onClick={() =>
-                              canMoveUp &&
-                              moveItem("club_coaches", clubCoaches, setClubCoaches, coach.id, "up", "Club coach")
-                            }
-                            style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
-                            type="button"
-                          >
-                            ↑ Up
-                          </button>
-                          <button
-                            onClick={() =>
-                              canMoveDown &&
-                              moveItem("club_coaches", clubCoaches, setClubCoaches, coach.id, "down", "Club coach")
-                            }
-                            style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
-                            type="button"
-                          >
-                            ↓ Down
-                          </button>
-                        </div>
-                        <div style={{ marginTop: 8, color: "#666", fontSize: 13 }}>
-                          Position: {coach.position ?? "not set"}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>
-                    {editingMemberId ? "Edit Member" : "Add Member"}
-                  </h3>
-                  <input
-                    value={newMemberName}
-                    onChange={(e) => setNewMemberName(e.target.value)}
-                    placeholder="Name"
-                    style={styles.input}
-                  />
-                  <select
-                    value={newMemberSection}
-                    onChange={(e) => setNewMemberSection(e.target.value)}
-                    style={styles.input}
-                  >
+                <div style={panel("#fffaf2")}>
+                  <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Add Member</div>
+                  <input value={newMember.name} onChange={(e) => setNewMember((p) => ({ ...p, name: e.target.value }))} placeholder="Member name" style={inputStyle()} />
+                  <div style={{ height: 8 }} />
+                  <select value={newMember.section} onChange={(e) => setNewMember((p) => ({ ...p, section: e.target.value }))} style={inputStyle()}>
                     <option>Gents</option>
                     <option>Ladies</option>
                     <option>Associate</option>
                   </select>
-                  <input
-                    value={newMemberPhone}
-                    onChange={(e) => setNewMemberPhone(e.target.value)}
-                    placeholder="Phone"
-                    style={styles.input}
-                  />
-                  <button onClick={saveMember} style={styles.button}>
-                    {editingMemberId ? "Update Member" : "Save Member"}
-                  </button>
-                  {(editingMemberId || newMemberName || newMemberPhone) && (
-                    <button onClick={clearMemberForm} style={styles.secondaryButton}>
-                      Clear
-                    </button>
-                  )}
+                  <div style={{ height: 8 }} />
+                  <input value={newMember.phone} onChange={(e) => setNewMember((p) => ({ ...p, phone: e.target.value }))} placeholder="Phone" style={inputStyle()} />
+                  <div style={{ height: 8 }} />
+                  <input value={newMember.email} onChange={(e) => setNewMember((p) => ({ ...p, email: e.target.value }))} placeholder="Email" style={inputStyle()} />
+                  <div style={{ height: 8 }} />
+                  <button style={navButton(true)} onClick={addMember}>Save Member</button>
                 </div>
 
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>Manage Members</h3>
-                  {members
-                    .slice()
-                    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
-                    .map((m) => (
-                      <div key={m.id} style={styles.card}>
-                        <strong>{m.name}</strong> — {m.section} — {m.phone || "no phone"}
-                        <div style={{ marginTop: 8 }}>
-                          <button onClick={() => editMember(m)} style={styles.smallBtn}>
-                            Edit
-                          </button>
-                          <button onClick={() => deleteMember(m.id)} style={styles.smallBtn}>
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                <div style={panel("#fffaf2")}>
+                  <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Add Monday Points</div>
+                  <input value={newPoint.member_name} onChange={(e) => setNewPoint((p) => ({ ...p, member_name: e.target.value }))} placeholder="Member name" style={inputStyle()} />
+                  <div style={{ height: 8 }} />
+                  <input value={newPoint.week_date} onChange={(e) => setNewPoint((p) => ({ ...p, week_date: e.target.value }))} type="date" style={inputStyle()} />
+                  <div style={{ height: 8 }} />
+                  <input value={newPoint.points} onChange={(e) => setNewPoint((p) => ({ ...p, points: e.target.value }))} placeholder="Points" type="number" style={inputStyle()} />
+                  <div style={{ height: 8 }} />
+                  <button style={navButton(true)} onClick={addPoint}>Save Points</button>
                 </div>
 
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>
-                    {editingPostId ? "Edit Information Post" : "Add Information Post"}
-                  </h3>
-                  <input
-                    value={postTitle}
-                    onChange={(e) => setPostTitle(e.target.value)}
-                    placeholder="Title"
-                    style={styles.input}
-                  />
-                  <textarea
-                    value={postMessage}
-                    onChange={(e) => setPostMessage(e.target.value)}
-                    placeholder="Message"
-                    style={styles.textarea}
-                  />
-                  <input
-                    type="date"
-                    value={postDate}
-                    onChange={(e) => setPostDate(e.target.value)}
-                    style={styles.input}
-                  />
-                  <input
-                    value={postLink}
-                    onChange={(e) => setPostLink(e.target.value)}
-                    placeholder="Attachment link"
-                    style={styles.input}
-                  />
-                  <input
-                    value={postButtonText}
-                    onChange={(e) => setPostButtonText(e.target.value)}
-                    placeholder="Button text e.g. Download Form"
-                    style={styles.input}
-                  />
-                  <div style={{ marginBottom: 10 }}>
-                    <label style={{ display: "block", marginBottom: 6, fontWeight: 700 }}>
-                      Upload file
-                    </label>
-                    <input
-                      type="file"
-                      onChange={(e) => setPostFile(e.target.files?.[0] || null)}
-                    />
-                  </div>
-                  <label style={{ display: "block", marginBottom: 10 }}>
-                    <input
-                      type="checkbox"
-                      checked={postPinned}
-                      onChange={(e) => setPostPinned(e.target.checked)}
-                      style={{ marginRight: 8 }}
-                    />
-                    Pin this post to the top
-                  </label>
-                  <button onClick={savePost} style={styles.button}>
-                    {editingPostId ? "Update Information Post" : "Save Information Post"}
-                  </button>
-                  {(editingPostId ||
-                    postTitle ||
-                    postMessage ||
-                    postDate ||
-                    postLink ||
-                    postButtonText ||
-                    postPinned ||
-                    postFile) && (
-                    <button onClick={clearPostForm} style={styles.secondaryButton}>
-                      Clear
-                    </button>
-                  )}
-                </div>
-
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>Manage Information Posts</h3>
-                  {sortedPosts.map((post) => (
-                    <div key={post.id} style={styles.card}>
-                      <strong>{post.date_posted}</strong> — {post.title} {post.pinned ? "• PINNED" : ""}
-                      <div style={{ marginTop: 8 }}>
-                        <button onClick={() => editPost(post)} style={styles.smallBtn}>
-                          Edit
-                        </button>
-                        <button onClick={() => deletePost(post.id)} style={styles.smallBtn}>
-                          Delete
-                        </button>
-                      </div>
+                <div style={panel("#fffaf2")}>
+                  <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Office Bearers</div>
+                  {officeDraft.map((item, i) => (
+                    <div key={i} style={{ ...panel("#fff"), marginBottom: 8 }}>
+                      <input value={item.role} onChange={(e) => setOfficeDraft((prev) => prev.map((x, idx) => idx === i ? { ...x, role: e.target.value } : x))} placeholder="Role" style={inputStyle()} />
+                      <div style={{ height: 8 }} />
+                      <input value={item.name} onChange={(e) => setOfficeDraft((prev) => prev.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))} placeholder="Name" style={inputStyle()} />
+                      <div style={{ height: 8 }} />
+                      <input value={item.phone} onChange={(e) => setOfficeDraft((prev) => prev.map((x, idx) => idx === i ? { ...x, phone: e.target.value } : x))} placeholder="Phone" style={inputStyle()} />
                     </div>
                   ))}
+                  <button style={navButton(true)} onClick={saveOfficeBearers}>Save Office Bearers</button>
                 </div>
-              </>
+              </div>
             )}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
