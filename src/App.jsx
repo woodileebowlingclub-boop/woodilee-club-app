@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "./lib/supabase";
+import logo from "./assets/logo.png";
 
 const CLUB_PIN = "1911";
 const ADMIN_PIN = "1954";
@@ -14,34 +15,29 @@ const styles = {
     color: "#222",
   },
   wrap: {
-    maxWidth: 1050,
+    maxWidth: 1100,
     margin: "0 auto",
   },
   header: {
     background: "linear-gradient(135deg, #7c2d12 0%, #b45309 100%)",
     color: "#fff",
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 18,
     marginBottom: 18,
-    boxShadow: "0 4px 14px rgba(0,0,0,0.12)",
+    boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
     display: "flex",
     alignItems: "center",
     gap: 16,
     flexWrap: "wrap",
   },
   logo: {
-    width: 68,
-    height: 68,
+    width: 78,
+    height: 78,
     borderRadius: "50%",
+    objectFit: "cover",
     background: "#fff",
-    color: "#7c2d12",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: 30,
-    fontWeight: 700,
     border: "3px solid #fbbf24",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+    boxShadow: "0 3px 10px rgba(0,0,0,0.2)",
     flexShrink: 0,
   },
   titleWrap: {
@@ -61,10 +57,20 @@ const styles = {
   panel: {
     background: "#fff",
     border: "1px solid #ead7c4",
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 18,
-    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+    boxShadow: "0 3px 10px rgba(0,0,0,0.06)",
+  },
+  loginPanel: {
+    background: "#fff",
+    border: "1px solid #ead7c4",
+    borderRadius: 18,
+    padding: 20,
+    maxWidth: 420,
+    margin: "80px auto",
+    boxShadow: "0 6px 18px rgba(0,0,0,0.1)",
+    textAlign: "center",
   },
   tabs: {
     display: "flex",
@@ -89,6 +95,7 @@ const styles = {
     border: "1px solid #cbd5e1",
     boxSizing: "border-box",
     background: "#fffdfb",
+    fontSize: 15,
   },
   textarea: {
     width: "100%",
@@ -100,12 +107,24 @@ const styles = {
     minHeight: 100,
     resize: "vertical",
     background: "#fffdfb",
+    fontSize: 15,
   },
   button: {
     padding: "12px 16px",
     background: "#b45309",
     color: "#fff",
     border: "none",
+    borderRadius: 12,
+    fontWeight: 700,
+    cursor: "pointer",
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  secondaryButton: {
+    padding: "12px 16px",
+    background: "#f3e8dc",
+    color: "#5c2c0c",
+    border: "1px solid #e3d2c1",
     borderRadius: 12,
     fontWeight: 700,
     cursor: "pointer",
@@ -131,8 +150,12 @@ const styles = {
   },
   grid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
     gap: 14,
+  },
+  sectionTitle: {
+    marginTop: 0,
+    color: "#7c2d12",
   },
   message: {
     marginBottom: 15,
@@ -184,6 +207,10 @@ const styles = {
     marginBottom: 8,
     border: "1px solid #fed7aa",
   },
+  pinnedCard: {
+    border: "2px solid #f59e0b",
+    background: "#fff7ed",
+  },
 };
 
 function sortEventsChronologically(list) {
@@ -213,13 +240,10 @@ function sortOfficeBearers(list) {
   return [...list].sort((a, b) => {
     const aRole = String(a.role || "");
     const bRole = String(b.role || "");
-
     const aMatch = Object.keys(order).find((x) => aRole.includes(x));
     const bMatch = Object.keys(order).find((x) => bRole.includes(x));
-
     const aRank = aMatch ? order[aMatch] : 99;
     const bRank = bMatch ? order[bMatch] : 99;
-
     if (aRank !== bRank) return aRank - bRank;
     return aRole.localeCompare(bRole);
   });
@@ -353,6 +377,37 @@ export default function App() {
     }
   };
 
+  const clearEntryForm = () => {
+    setEditingEntryId(null);
+    setTitle("");
+    setDate("");
+  };
+
+  const clearMemberForm = () => {
+    setEditingMemberId(null);
+    setNewMemberName("");
+    setNewMemberSection("Gents");
+    setNewMemberPhone("");
+  };
+
+  const clearOfficerForm = () => {
+    setEditingOfficerId(null);
+    setNewRole("");
+    setNewOfficerName("");
+    setNewOfficerPhone("");
+  };
+
+  const clearPostForm = () => {
+    setEditingPostId(null);
+    setPostTitle("");
+    setPostMessage("");
+    setPostDate("");
+    setPostLink("");
+    setPostButtonText("");
+    setPostPinned(false);
+    setPostFile(null);
+  };
+
   const saveEntry = async () => {
     if (!title || !date) {
       setMessage("Enter event title and date.");
@@ -373,7 +428,6 @@ export default function App() {
       }
 
       setEntries((prev) => prev.map((x) => (x.id === editingEntryId ? data : x)));
-      setEditingEntryId(null);
       setMessage("Diary entry updated.");
     } else {
       const { data, error } = await supabase
@@ -391,8 +445,7 @@ export default function App() {
       setMessage("Diary entry added.");
     }
 
-    setTitle("");
-    setDate("");
+    clearEntryForm();
   };
 
   const editEntry = (entry) => {
@@ -438,7 +491,6 @@ export default function App() {
       }
 
       setMembers((prev) => prev.map((x) => (x.id === editingMemberId ? data : x)));
-      setEditingMemberId(null);
       setMessage("Member updated.");
     } else {
       const { data, error } = await supabase
@@ -456,9 +508,7 @@ export default function App() {
       setMessage("Member added.");
     }
 
-    setNewMemberName("");
-    setNewMemberSection("Gents");
-    setNewMemberPhone("");
+    clearMemberForm();
   };
 
   const editMember = (member) => {
@@ -507,7 +557,6 @@ export default function App() {
       setOfficeBearers((prev) =>
         prev.map((x) => (x.id === editingOfficerId ? data : x))
       );
-      setEditingOfficerId(null);
       setMessage("Office bearer updated.");
     } else {
       const { data, error } = await supabase
@@ -525,9 +574,7 @@ export default function App() {
       setMessage("Office bearer added.");
     }
 
-    setNewRole("");
-    setNewOfficerName("");
-    setNewOfficerPhone("");
+    clearOfficerForm();
   };
 
   const editOfficeBearer = (person) => {
@@ -597,7 +644,6 @@ export default function App() {
         }
 
         setPosts((prev) => prev.map((x) => (x.id === editingPostId ? data : x)));
-        setEditingPostId(null);
         setMessage("Information post updated.");
       } else {
         const { data, error } = await supabase
@@ -615,13 +661,7 @@ export default function App() {
         setMessage("Information post added.");
       }
 
-      setPostTitle("");
-      setPostMessage("");
-      setPostDate("");
-      setPostLink("");
-      setPostButtonText("");
-      setPostPinned(false);
-      setPostFile(null);
+      clearPostForm();
     } catch (err) {
       setMessage(`Could not save information post: ${err.message}`);
     }
@@ -652,11 +692,9 @@ export default function App() {
   if (!loggedIn) {
     return (
       <div style={styles.page}>
-        <div style={{ ...styles.panel, maxWidth: 420, margin: "80px auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 12 }}>
-            <div style={{ ...styles.logo, margin: "0 auto 12px auto" }}>♣</div>
-            <h1 style={{ ...styles.title, marginBottom: 8 }}>Woodilee Bowling Club</h1>
-          </div>
+        <div style={styles.loginPanel}>
+          <img src={logo} alt="Woodilee Bowling Club" style={{ ...styles.logo, margin: "0 auto 12px auto" }} />
+          <h1 style={{ ...styles.title, marginBottom: 14 }}>Woodilee Bowling Club</h1>
           <input
             type="password"
             placeholder="Enter PIN"
@@ -676,7 +714,7 @@ export default function App() {
     <div style={styles.page}>
       <div style={styles.wrap}>
         <div style={styles.header}>
-          <div style={styles.logo}>♣</div>
+          <img src={logo} alt="Woodilee Bowling Club" style={styles.logo} />
           <div style={styles.titleWrap}>
             <h1 style={styles.title}>Woodilee Bowling Club</h1>
             <p style={styles.subtitle}>Members diary, notices and contact details</p>
@@ -692,10 +730,7 @@ export default function App() {
           <button style={styles.tab(tab === "members")} onClick={() => setTab("members")}>
             Members
           </button>
-          <button
-            style={styles.tab(tab === "information")}
-            onClick={() => setTab("information")}
-          >
+          <button style={styles.tab(tab === "information")} onClick={() => setTab("information")}>
             Information
           </button>
           <button style={styles.tab(tab === "admin")} onClick={() => setTab("admin")}>
@@ -706,7 +741,7 @@ export default function App() {
         {tab === "diary" && (
           <>
             <div style={styles.panel}>
-              <h3 style={{ marginTop: 0, color: "#7c2d12" }}>Office Bearers</h3>
+              <h3 style={styles.sectionTitle}>Office Bearers</h3>
               <div style={styles.grid}>
                 {sortedOfficeBearers.map((person) => (
                   <div key={person.id} style={styles.card}>
@@ -739,7 +774,7 @@ export default function App() {
             </div>
 
             <div style={styles.panel}>
-              <h3 style={{ marginTop: 0, color: "#7c2d12" }}>Diary Events</h3>
+              <h3 style={styles.sectionTitle}>Diary Events</h3>
               {sortedEntries.map((e) => (
                 <div key={e.id} style={styles.card}>
                   <strong style={{ color: "#92400e" }}>{e.date_text}</strong> — {e.title}
@@ -751,7 +786,7 @@ export default function App() {
 
         {tab === "members" && (
           <div style={styles.panel}>
-            <h3 style={{ marginTop: 0, color: "#7c2d12" }}>Members</h3>
+            <h3 style={styles.sectionTitle}>Members</h3>
 
             <input
               placeholder="Search members..."
@@ -762,9 +797,7 @@ export default function App() {
 
             {filteredMembers.map((m) => (
               <div key={m.id} style={styles.card}>
-                <div style={{ fontWeight: 700, fontSize: 18 }}>
-                  {m.name}
-                </div>
+                <div style={{ fontWeight: 700, fontSize: 18 }}>{m.name}</div>
                 <div style={{ color: "#92400e", marginTop: 4 }}>{m.section}</div>
                 <div style={{ marginTop: 10 }}>
                   {m.phone ? (
@@ -792,9 +825,15 @@ export default function App() {
 
         {tab === "information" && (
           <div style={styles.panel}>
-            <h3 style={{ marginTop: 0, color: "#7c2d12" }}>General Information</h3>
+            <h3 style={styles.sectionTitle}>General Information</h3>
             {sortedPosts.map((post) => (
-              <div key={post.id} style={styles.card}>
+              <div
+                key={post.id}
+                style={{
+                  ...styles.card,
+                  ...(post.pinned ? styles.pinnedCard : {}),
+                }}
+              >
                 {post.pinned ? <div style={styles.badge}>📌 Pinned Notice</div> : null}
                 <div style={{ color: "#92400e", fontWeight: 700 }}>{post.date_posted}</div>
                 <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>
@@ -820,7 +859,7 @@ export default function App() {
           <div>
             {!adminUnlocked ? (
               <div style={{ ...styles.panel, maxWidth: 420 }}>
-                <h3 style={{ marginTop: 0, color: "#7c2d12" }}>Admin Login</h3>
+                <h3 style={styles.sectionTitle}>Admin Login</h3>
                 <input
                   type="password"
                   value={adminPin}
@@ -834,7 +873,7 @@ export default function App() {
             ) : (
               <>
                 <div style={styles.panel}>
-                  <h3 style={{ marginTop: 0 }}>
+                  <h3 style={styles.sectionTitle}>
                     {editingEntryId ? "Edit Diary Entry" : "Add Diary Entry"}
                   </h3>
                   <input
@@ -852,10 +891,15 @@ export default function App() {
                   <button onClick={saveEntry} style={styles.button}>
                     {editingEntryId ? "Update Diary Entry" : "Save Diary Entry"}
                   </button>
+                  {(editingEntryId || title || date) && (
+                    <button onClick={clearEntryForm} style={styles.secondaryButton}>
+                      Clear
+                    </button>
+                  )}
                 </div>
 
                 <div style={styles.panel}>
-                  <h3 style={{ marginTop: 0 }}>Manage Diary Entries</h3>
+                  <h3 style={styles.sectionTitle}>Manage Diary Entries</h3>
                   {sortedEntries.map((e) => (
                     <div key={e.id} style={styles.card}>
                       <strong>{e.date_text}</strong> — {e.title}
@@ -872,7 +916,7 @@ export default function App() {
                 </div>
 
                 <div style={styles.panel}>
-                  <h3 style={{ marginTop: 0 }}>
+                  <h3 style={styles.sectionTitle}>
                     {editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}
                   </h3>
                   <input
@@ -896,18 +940,20 @@ export default function App() {
                   <button onClick={saveOfficeBearer} style={styles.button}>
                     {editingOfficerId ? "Update Office Bearer" : "Save Office Bearer"}
                   </button>
+                  {(editingOfficerId || newRole || newOfficerName || newOfficerPhone) && (
+                    <button onClick={clearOfficerForm} style={styles.secondaryButton}>
+                      Clear
+                    </button>
+                  )}
                 </div>
 
                 <div style={styles.panel}>
-                  <h3 style={{ marginTop: 0 }}>Manage Office Bearers</h3>
+                  <h3 style={styles.sectionTitle}>Manage Office Bearers</h3>
                   {sortedOfficeBearers.map((person) => (
                     <div key={person.id} style={styles.card}>
                       <strong>{person.role}</strong> — {person.name}
                       <div style={{ marginTop: 8 }}>
-                        <button
-                          onClick={() => editOfficeBearer(person)}
-                          style={styles.smallBtn}
-                        >
+                        <button onClick={() => editOfficeBearer(person)} style={styles.smallBtn}>
                           Edit
                         </button>
                         <button
@@ -922,7 +968,7 @@ export default function App() {
                 </div>
 
                 <div style={styles.panel}>
-                  <h3 style={{ marginTop: 0 }}>
+                  <h3 style={styles.sectionTitle}>
                     {editingMemberId ? "Edit Member" : "Add Member"}
                   </h3>
                   <input
@@ -949,27 +995,35 @@ export default function App() {
                   <button onClick={saveMember} style={styles.button}>
                     {editingMemberId ? "Update Member" : "Save Member"}
                   </button>
+                  {(editingMemberId || newMemberName || newMemberPhone) && (
+                    <button onClick={clearMemberForm} style={styles.secondaryButton}>
+                      Clear
+                    </button>
+                  )}
                 </div>
 
                 <div style={styles.panel}>
-                  <h3 style={{ marginTop: 0 }}>Manage Members</h3>
-                  {members.map((m) => (
-                    <div key={m.id} style={styles.card}>
-                      <strong>{m.name}</strong> — {m.section} — {m.phone || "no phone"}
-                      <div style={{ marginTop: 8 }}>
-                        <button onClick={() => editMember(m)} style={styles.smallBtn}>
-                          Edit
-                        </button>
-                        <button onClick={() => deleteMember(m.id)} style={styles.smallBtn}>
-                          Delete
-                        </button>
+                  <h3 style={styles.sectionTitle}>Manage Members</h3>
+                  {members
+                    .slice()
+                    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
+                    .map((m) => (
+                      <div key={m.id} style={styles.card}>
+                        <strong>{m.name}</strong> — {m.section} — {m.phone || "no phone"}
+                        <div style={{ marginTop: 8 }}>
+                          <button onClick={() => editMember(m)} style={styles.smallBtn}>
+                            Edit
+                          </button>
+                          <button onClick={() => deleteMember(m.id)} style={styles.smallBtn}>
+                            Delete
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
 
                 <div style={styles.panel}>
-                  <h3 style={{ marginTop: 0 }}>
+                  <h3 style={styles.sectionTitle}>
                     {editingPostId ? "Edit Information Post" : "Add Information Post"}
                   </h3>
                   <input
@@ -1023,14 +1077,18 @@ export default function App() {
                   <button onClick={savePost} style={styles.button}>
                     {editingPostId ? "Update Information Post" : "Save Information Post"}
                   </button>
+                  {(editingPostId || postTitle || postMessage || postDate || postLink || postButtonText || postPinned || postFile) && (
+                    <button onClick={clearPostForm} style={styles.secondaryButton}>
+                      Clear
+                    </button>
+                  )}
                 </div>
 
                 <div style={styles.panel}>
-                  <h3 style={{ marginTop: 0 }}>Manage Information Posts</h3>
+                  <h3 style={styles.sectionTitle}>Manage Information Posts</h3>
                   {sortedPosts.map((post) => (
                     <div key={post.id} style={styles.card}>
-                      <strong>{post.date_posted}</strong> — {post.title}{" "}
-                      {post.pinned ? "• PINNED" : ""}
+                      <strong>{post.date_posted}</strong> — {post.title} {post.pinned ? "• PINNED" : ""}
                       <div style={{ marginTop: 8 }}>
                         <button onClick={() => editPost(post)} style={styles.smallBtn}>
                           Edit
