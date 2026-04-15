@@ -282,6 +282,7 @@ export default function App() {
   const [mondayPoints, setMondayPoints] = useState([]);
 
   const [search, setSearch] = useState("");
+  const [eventSearch, setEventSearch] = useState("");
 
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
@@ -334,6 +335,17 @@ export default function App() {
     [clubCoaches]
   );
 
+  const filteredEvents = useMemo(() => {
+    return sortedEntries.filter((e) => {
+      const q = eventSearch.toLowerCase();
+      return (
+        String(e.title || "").toLowerCase().includes(q) ||
+        String(e.note || "").toLowerCase().includes(q) ||
+        String(formatDiaryDate(e.date_text) || "").toLowerCase().includes(q)
+      );
+    });
+  }, [sortedEntries, eventSearch]);
+
   const filteredMembers = useMemo(() => {
     return members.filter((m) =>
       String(m.name || "").toLowerCase().includes(search.toLowerCase())
@@ -382,7 +394,7 @@ export default function App() {
 
   const loadEntries = async () => {
     const { data, error } = await supabase.from("events").select("*");
-    if (error) return setMessage(`Could not load diary entries: ${error.message}`);
+    if (error) return setMessage(`Could not load events: ${error.message}`);
     setEntries(data || []);
   };
 
@@ -503,9 +515,9 @@ export default function App() {
         .select()
         .single();
 
-      if (error) return setMessage(`Could not update diary entry: ${error.message}`);
+      if (error) return setMessage(`Could not update event: ${error.message}`);
       setEntries((prev) => prev.map((x) => (x.id === editingEntryId ? data : x)));
-      setMessage("Diary entry updated.");
+      setMessage("Event updated.");
     } else {
       const { data, error } = await supabase
         .from("events")
@@ -513,9 +525,9 @@ export default function App() {
         .select()
         .single();
 
-      if (error) return setMessage(`Could not save diary entry: ${error.message}`);
+      if (error) return setMessage(`Could not save event: ${error.message}`);
       setEntries((prev) => [...prev, data]);
-      setMessage("Diary entry added.");
+      setMessage("Event added.");
     }
 
     clearEntryForm();
@@ -531,9 +543,9 @@ export default function App() {
 
   const deleteEntry = async (id) => {
     const { error } = await supabase.from("events").delete().eq("id", id);
-    if (error) return setMessage(`Could not delete diary entry: ${error.message}`);
+    if (error) return setMessage(`Could not delete event: ${error.message}`);
     setEntries((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Diary entry deleted.");
+    setMessage("Event deleted.");
   };
 
   const saveMember = async () => {
@@ -1053,11 +1065,20 @@ export default function App() {
 
         {tab === "events" && (
           <div style={styles.panel}>
-            <h3 style={styles.sectionTitle}>Diary Events</h3>
-            {sortedEntries.length === 0 ? (
-              <div style={{ color: "#777" }}>No events added yet.</div>
+            <h3 style={styles.sectionTitle}>Events</h3>
+
+            <input
+              type="text"
+              placeholder="Search events..."
+              value={eventSearch}
+              onChange={(e) => setEventSearch(e.target.value)}
+              style={styles.input}
+            />
+
+            {filteredEvents.length === 0 ? (
+              <div style={{ color: "#777" }}>No matching events found.</div>
             ) : (
-              sortedEntries.map((e) => (
+              filteredEvents.map((e) => (
                 <div key={e.id} style={styles.card}>
                   <strong style={{ color: "#92400e" }}>{formatDiaryDate(e.date_text)}</strong> — {e.title}
                   {e.note ? (
