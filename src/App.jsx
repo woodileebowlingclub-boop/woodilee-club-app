@@ -3,6 +3,7 @@ import { supabase } from "./lib/supabase";
 
 const CLUB_PIN = "1911";
 const ADMIN_PIN = "1954";
+const BUCKET = "club-files";
 const SECTION_KEYS = ["section1", "section2", "section3"];
 
 const DEFAULT_SECTIONS = [
@@ -203,6 +204,11 @@ const styles = {
     border: "2px solid #f59e0b",
     background: "#fff7ed",
   },
+  fileInfo: {
+    fontSize: 13,
+    color: "#666",
+    marginBottom: 10,
+  },
 };
 
 function sortEventsChronologically(list) {
@@ -239,7 +245,6 @@ function normaliseUkPhoneForWhatsApp(phone) {
 
 function formatDiaryDate(dateValue) {
   if (!dateValue) return "";
-
   const date = new Date(dateValue);
   if (Number.isNaN(date.getTime())) return dateValue;
 
@@ -249,6 +254,14 @@ function formatDiaryDate(dateValue) {
     month: "short",
     year: "numeric",
   });
+}
+
+function getFileTypeLabel(url) {
+  const lower = String(url || "").toLowerCase();
+  if (lower.endsWith(".pdf")) return "PDF";
+  if (lower.endsWith(".png")) return "PNG image";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "JPEG image";
+  return "Attachment";
 }
 
 export default function App() {
@@ -301,6 +314,7 @@ export default function App() {
   const [postLink, setPostLink] = useState("");
   const [postButtonText, setPostButtonText] = useState("");
   const [postPinned, setPostPinned] = useState(false);
+  const [postFile, setPostFile] = useState(null);
 
   const [editingEntryId, setEditingEntryId] = useState(null);
   const [editingMemberId, setEditingMemberId] = useState(null);
@@ -523,6 +537,7 @@ export default function App() {
     setPostLink("");
     setPostButtonText("");
     setPostPinned(false);
+    setPostFile(null);
   };
 
   const saveEntry = async () => {
@@ -803,44 +818,68 @@ export default function App() {
     setMessage("Section item deleted.");
   };
 
+  const uploadPostFile = async () => {
+    if (!postFile) return postLink || null;
+
+    const fileName = `${Date.now()}-${postFile.name.replace(/\s+/g, "-")}`;
+    const filePath = `information/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(filePath, postFile, { upsert: false });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
   const savePost = async () => {
     if (!postTitle || !postMessage || !postDate) {
       return setMessage("Enter post title, message and date.");
     }
 
-    const payload = {
-      title: postTitle,
-      message: postMessage,
-      date_posted: postDate,
-      attachment_link: postLink || null,
-      button_text: postButtonText || null,
-      pinned: postPinned,
-    };
+    try {
+      const finalLink = await uploadPostFile();
 
-    if (editingPostId) {
-      const { data, error } = await supabase
-        .from("information_posts")
-        .update(payload)
-        .eq("id", editingPostId)
-        .select()
-        .single();
+      const payload = {
+        title: postTitle,
+        message: postMessage,
+        date_posted: postDate,
+        attachment_link: finalLink,
+        button_text: postButtonText || null,
+        pinned: postPinned,
+      };
 
-      if (error) return setMessage(`Could not update information post: ${error.message}`);
-      setPosts((prev) => prev.map((x) => (x.id === editingPostId ? data : x)));
-      setMessage("Information post updated.");
-    } else {
-      const { data, error } = await supabase
-        .from("information_posts")
-        .insert([payload])
-        .select()
-        .single();
+      if (editingPostId) {
+        const { data, error } = await supabase
+          .from("information_posts")
+          .update(payload)
+          .eq("id", editingPostId)
+          .select()
+          .single();
 
-      if (error) return setMessage(`Could not save information post: ${error.message}`);
-      setPosts((prev) => [...prev, data]);
-      setMessage("Information post added.");
+        if (error) return setMessage(`Could not update information post: ${error.message}`);
+        setPosts((prev) => prev.map((x) => (x.id === editingPostId ? data : x)));
+        setMessage("Information post updated.");
+      } else {
+        const { data, error } = await supabase
+          .from("information_posts")
+          .insert([payload])
+          .select()
+          .single();
+
+        if (error) return setMessage(`Could not save information post: ${error.message}`);
+        setPosts((prev) => [...prev, data]);
+        setMessage("Information post added.");
+      }
+
+      clearPostForm();
+    } catch (err) {
+      setMessage(`Could not upload file: ${err.message}`);
     }
-
-    clearPostForm();
   };
 
   const editPost = (post) => {
@@ -851,6 +890,7 @@ export default function App() {
     setPostLink(post.attachment_link || "");
     setPostButtonText(post.button_text || "");
     setPostPinned(!!post.pinned);
+    setPostFile(null);
     setTab("admin");
   };
 
@@ -978,7 +1018,11 @@ export default function App() {
             style={styles.input}
           />
           <button onClick={handleLogin} style={styles.button}>Enter</button>
-          {message ? <div style={{ marginTop: 8, color: "#8b1e3f", fontWeight: 700 }}>{message}</div> : null}
+          {message ? (
+            <div style={{ marginTop: 8, color: "#8b1e3f", fontWeight: 700 }}>
+              {message}
+            </div>
+          ) : null}
         </div>
       </div>
     );
@@ -1009,8 +1053,12 @@ export default function App() {
                 {sortedOfficeBearers.map((person) => (
                   <div key={person.id} style={styles.card}>
                     <span style={styles.badge}>{person.role}</span>
-                    <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{person.name}</div>
-                    <div style={{ marginBottom: 10, color: "#444" }}>{person.phone || "No phone listed"}</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
+                      {person.name}
+                    </div>
+                    <div style={{ marginBottom: 10, color: "#444" }}>
+                      {person.phone || "No phone listed"}
+                    </div>
                     {person.phone ? (
                       <div>
                         <a href={`tel:${person.phone}`} style={styles.linkBtn}>Call</a>
@@ -1090,10 +1138,19 @@ export default function App() {
                 <div style={{ color: "#92400e", fontWeight: 700 }}>{post.date_posted}</div>
                 <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>{post.title}</div>
                 <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{post.message}</div>
+
                 {post.attachment_link ? (
-                  <a href={post.attachment_link} target="_blank" rel="noreferrer" style={styles.linkBtn}>
-                    {post.button_text || "Open Attachment"}
-                  </a>
+                  <div style={{ marginTop: 10 }}>
+                    <div style={styles.fileInfo}>{getFileTypeLabel(post.attachment_link)}</div>
+                    <a
+                      href={post.attachment_link}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={styles.linkBtn}
+                    >
+                      {post.button_text || "Open Attachment"}
+                    </a>
+                  </div>
                 ) : null}
               </div>
             ))}
@@ -1171,7 +1228,9 @@ export default function App() {
                 </div>
 
                 <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>{editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}</h3>
+                  <h3 style={styles.sectionTitle}>
+                    {editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}
+                  </h3>
                   <input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Role" style={styles.input} />
                   <input value={newOfficerName} onChange={(e) => setNewOfficerName(e.target.value)} placeholder="Name" style={styles.input} />
                   <input value={newOfficerPhone} onChange={(e) => setNewOfficerPhone(e.target.value)} placeholder="Phone" style={styles.input} />
@@ -1243,7 +1302,9 @@ export default function App() {
                 </div>
 
                 <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>{editingCoachId ? "Edit Club Coach" : "Add Club Coach"}</h3>
+                  <h3 style={styles.sectionTitle}>
+                    {editingCoachId ? "Edit Club Coach" : "Add Club Coach"}
+                  </h3>
                   <input value={newCoachName} onChange={(e) => setNewCoachName(e.target.value)} placeholder="Name" style={styles.input} />
                   <input value={newCoachPhone} onChange={(e) => setNewCoachPhone(e.target.value)} placeholder="Phone" style={styles.input} />
                   <input
@@ -1334,7 +1395,9 @@ export default function App() {
                 </div>
 
                 <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>{editingSectionItemId ? "Edit Extra Section Item" : "Add Extra Section Item"}</h3>
+                  <h3 style={styles.sectionTitle}>
+                    {editingSectionItemId ? "Edit Extra Section Item" : "Add Extra Section Item"}
+                  </h3>
                   <select
                     value={currentSectionKey}
                     onChange={(e) => setCurrentSectionKey(e.target.value)}
@@ -1478,12 +1541,26 @@ export default function App() {
                 </div>
 
                 <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>{editingPostId ? "Edit Information Post" : "Add Information Post"}</h3>
+                  <h3 style={styles.sectionTitle}>
+                    {editingPostId ? "Edit Information Post" : "Add Information Post"}
+                  </h3>
                   <input value={postTitle} onChange={(e) => setPostTitle(e.target.value)} placeholder="Title" style={styles.input} />
                   <textarea value={postMessage} onChange={(e) => setPostMessage(e.target.value)} placeholder="Message" style={styles.textarea} />
                   <input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} style={styles.input} />
-                  <input value={postLink} onChange={(e) => setPostLink(e.target.value)} placeholder="Attachment link" style={styles.input} />
+                  <input value={postLink} onChange={(e) => setPostLink(e.target.value)} placeholder="Attachment link (optional if uploading file)" style={styles.input} />
                   <input value={postButtonText} onChange={(e) => setPostButtonText(e.target.value)} placeholder="Button text" style={styles.input} />
+
+                  <div style={{ marginBottom: 10 }}>
+                    <input
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                      onChange={(e) => setPostFile(e.target.files?.[0] || null)}
+                    />
+                    {postFile ? (
+                      <div style={styles.fileInfo}>Selected file: {postFile.name}</div>
+                    ) : null}
+                  </div>
+
                   <label style={{ display: "block", marginBottom: 10 }}>
                     <input
                       type="checkbox"
@@ -1493,10 +1570,12 @@ export default function App() {
                     />
                     Pin this post to the top
                   </label>
+
                   <button onClick={savePost} style={styles.button}>
                     {editingPostId ? "Update Information Post" : "Save Information Post"}
                   </button>
-                  {(editingPostId || postTitle || postMessage || postDate || postLink || postButtonText || postPinned) && (
+
+                  {(editingPostId || postTitle || postMessage || postDate || postLink || postButtonText || postPinned || postFile) && (
                     <button onClick={clearPostForm} style={styles.secondaryButton}>Clear</button>
                   )}
                 </div>
@@ -1506,6 +1585,11 @@ export default function App() {
                   {sortedPosts.map((post) => (
                     <div key={post.id} style={styles.card}>
                       <strong>{post.date_posted}</strong> — {post.title} {post.pinned ? "• PINNED" : ""}
+                      {post.attachment_link ? (
+                        <div style={{ marginTop: 6, color: "#666" }}>
+                          {getFileTypeLabel(post.attachment_link)}
+                        </div>
+                      ) : null}
                       <div style={{ marginTop: 8 }}>
                         <button onClick={() => editPost(post)} style={styles.smallBtn}>Edit</button>
                         <button onClick={() => deletePost(post.id)} style={styles.smallBtn}>Delete</button>
