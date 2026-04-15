@@ -1,138 +1,1476 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "./lib/supabase";
-import logo from "./assets/logo.png";
 
 const CLUB_PIN = "1911";
 const ADMIN_PIN = "1954";
-
 const SECTION_KEYS = ["section1", "section2", "section3"];
 
-function sortByPosition(list) {
-  return [...list].sort((a, b) => (a.position || 999) - (b.position || 999));
+const DEFAULT_SECTIONS = [
+  { section_key: "section1", title: "Section 1" },
+  { section_key: "section2", title: "Section 2" },
+  { section_key: "section3", title: "Section 3" },
+];
+
+const styles = {
+  page: {
+    padding: 16,
+    fontFamily: "Arial, sans-serif",
+    background: "linear-gradient(180deg, #5b1d2a 0%, #7a2638 45%, #a33a4d 100%)",
+    minHeight: "100vh",
+    color: "#222",
+  },
+  wrap: {
+    maxWidth: 1150,
+    margin: "0 auto",
+  },
+  header: {
+    background: "linear-gradient(135deg, #5a1323 0%, #7b1e32 55%, #a12f45 100%)",
+    color: "#fff",
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 18,
+    boxShadow: "0 8px 20px rgba(0,0,0,0.22)",
+  },
+  title: {
+    margin: 0,
+    fontSize: 30,
+    lineHeight: 1.1,
+  },
+  subtitle: {
+    margin: "6px 0 0 0",
+    opacity: 0.95,
+    fontSize: 15,
+  },
+  panel: {
+    background: "#fffaf8",
+    border: "1px solid #e5c8cf",
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 18,
+    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+  },
+  loginPanel: {
+    background: "#fffaf8",
+    border: "1px solid #e5c8cf",
+    borderRadius: 18,
+    padding: 20,
+    maxWidth: 420,
+    margin: "80px auto",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.18)",
+    textAlign: "center",
+  },
+  tabs: {
+    display: "flex",
+    gap: 10,
+    marginBottom: 16,
+    flexWrap: "wrap",
+  },
+  tab: (active) => ({
+    padding: "12px 16px",
+    background: active ? "#8b1e3f" : "#f3d9df",
+    color: active ? "#fff" : "#5b1d2a",
+    border: active ? "1px solid #8b1e3f" : "1px solid #e5c8cf",
+    borderRadius: 12,
+    fontWeight: 700,
+    cursor: "pointer",
+  }),
+  input: {
+    width: "100%",
+    padding: 12,
+    marginBottom: 10,
+    borderRadius: 12,
+    border: "1px solid #d7b7be",
+    boxSizing: "border-box",
+    background: "#fffefe",
+    fontSize: 15,
+  },
+  textarea: {
+    width: "100%",
+    padding: 12,
+    marginBottom: 10,
+    borderRadius: 12,
+    border: "1px solid #d7b7be",
+    boxSizing: "border-box",
+    minHeight: 100,
+    resize: "vertical",
+    background: "#fffefe",
+    fontSize: 15,
+  },
+  button: {
+    padding: "12px 16px",
+    background: "#8b1e3f",
+    color: "#fff",
+    border: "none",
+    borderRadius: 12,
+    fontWeight: 700,
+    cursor: "pointer",
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  secondaryButton: {
+    padding: "12px 16px",
+    background: "#f3d9df",
+    color: "#5b1d2a",
+    border: "1px solid #e5c8cf",
+    borderRadius: 12,
+    fontWeight: 700,
+    cursor: "pointer",
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  smallBtn: {
+    padding: "8px 10px",
+    background: "#f2e4e7",
+    border: "1px solid #e0c5cb",
+    borderRadius: 10,
+    cursor: "pointer",
+    marginLeft: 8,
+    color: "#5b1d2a",
+    fontWeight: 700,
+  },
+  reorderBtn: {
+    padding: "8px 10px",
+    background: "#dbeafe",
+    border: "1px solid #93c5fd",
+    borderRadius: 10,
+    cursor: "pointer",
+    marginLeft: 8,
+    color: "#1d4ed8",
+    fontWeight: 700,
+  },
+  disabledReorderBtn: {
+    padding: "8px 10px",
+    background: "#e5e7eb",
+    border: "1px solid #d1d5db",
+    borderRadius: 10,
+    cursor: "not-allowed",
+    marginLeft: 8,
+    color: "#9ca3af",
+    fontWeight: 700,
+  },
+  card: {
+    border: "1px solid #ead7dc",
+    borderRadius: 14,
+    padding: 14,
+    background: "#fffdfd",
+    marginBottom: 10,
+  },
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+    gap: 14,
+  },
+  sectionTitle: {
+    marginTop: 0,
+    color: "#7a2138",
+  },
+  memberSectionTitle: {
+    color: "#7a2138",
+    borderBottom: "2px solid #efd6dc",
+    paddingBottom: 6,
+    marginTop: 22,
+    marginBottom: 12,
+  },
+  message: {
+    marginBottom: 15,
+    padding: 12,
+    background: "#fff1c7",
+    border: "1px solid #e6c768",
+    borderRadius: 10,
+  },
+  linkBtn: {
+    display: "inline-block",
+    padding: "10px 14px",
+    background: "#2563eb",
+    color: "#fff",
+    borderRadius: 10,
+    textDecoration: "none",
+    fontWeight: 700,
+    marginTop: 10,
+  },
+  badge: {
+    display: "inline-block",
+    padding: "4px 8px",
+    borderRadius: 999,
+    background: "#fff1e8",
+    color: "#9a3412",
+    fontWeight: 700,
+    fontSize: 12,
+    marginBottom: 8,
+    border: "1px solid #fdba74",
+  },
+  pinnedCard: {
+    border: "2px solid #f59e0b",
+    background: "#fff7ed",
+  },
+};
+
+function sortEventsChronologically(list) {
+  return [...list].sort(
+    (a, b) => new Date(a.date_text).getTime() - new Date(b.date_text).getTime()
+  );
+}
+
+function sortPosts(list) {
+  return [...list].sort((a, b) => {
+    const aPinned = a.pinned ? 1 : 0;
+    const bPinned = b.pinned ? 1 : 0;
+    if (aPinned !== bPinned) return bPinned - aPinned;
+    return new Date(b.date_posted).getTime() - new Date(a.date_posted).getTime();
+  });
+}
+
+function sortByPositionThenName(list) {
+  return [...list].sort((a, b) => {
+    const aPos = Number.isFinite(Number(a.position)) ? Number(a.position) : 999;
+    const bPos = Number.isFinite(Number(b.position)) ? Number(b.position) : 999;
+    if (aPos !== bPos) return aPos - bPos;
+    return String(a.name || "").localeCompare(String(b.name || ""));
+  });
+}
+
+function normaliseUkPhoneForWhatsApp(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("44")) return digits;
+  if (digits.startsWith("0")) return `44${digits.slice(1)}`;
+  return digits;
 }
 
 export default function App() {
   const [pin, setPin] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
-  const [admin, setAdmin] = useState(false);
+  const [tab, setTab] = useState("diary");
 
+  const [adminPin, setAdminPin] = useState("");
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const [entries, setEntries] = useState([]);
+  const [members, setMembers] = useState([]);
   const [officeBearers, setOfficeBearers] = useState([]);
-  const [coaches, setCoaches] = useState([]);
-  const [sections, setSections] = useState([]);
-  const [sectionItems, setSectionItems] = useState([]);
+  const [clubCoaches, setClubCoaches] = useState([]);
+  const [diarySections, setDiarySections] = useState([]);
+  const [diarySectionItems, setDiarySectionItems] = useState([]);
+  const [posts, setPosts] = useState([]);
 
-  const loadData = async () => {
-    const ob = await supabase.from("office_bearers").select("*");
-    setOfficeBearers(ob.data || []);
+  const [search, setSearch] = useState("");
 
-    const cc = await supabase.from("club_coaches").select("*");
-    setCoaches(cc.data || []);
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState("");
 
-    const ds = await supabase.from("diary_sections").select("*");
-    setSections(ds.data || []);
+  const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberSection, setNewMemberSection] = useState("Gents");
+  const [newMemberPhone, setNewMemberPhone] = useState("");
 
-    const si = await supabase.from("diary_section_items").select("*");
-    setSectionItems(si.data || []);
-  };
+  const [newRole, setNewRole] = useState("");
+  const [newOfficerName, setNewOfficerName] = useState("");
+  const [newOfficerPhone, setNewOfficerPhone] = useState("");
+  const [newOfficerPosition, setNewOfficerPosition] = useState("");
+
+  const [newCoachName, setNewCoachName] = useState("");
+  const [newCoachPhone, setNewCoachPhone] = useState("");
+  const [newCoachPosition, setNewCoachPosition] = useState("");
+
+  const [sectionEditKey, setSectionEditKey] = useState("section1");
+  const [sectionEditTitle, setSectionEditTitle] = useState("");
+
+  const [currentSectionKey, setCurrentSectionKey] = useState("section1");
+  const [newSectionItemName, setNewSectionItemName] = useState("");
+  const [newSectionItemPhone, setNewSectionItemPhone] = useState("");
+  const [newSectionItemPosition, setNewSectionItemPosition] = useState("");
+
+  const [postTitle, setPostTitle] = useState("");
+  const [postMessage, setPostMessage] = useState("");
+  const [postDate, setPostDate] = useState("");
+  const [postLink, setPostLink] = useState("");
+  const [postButtonText, setPostButtonText] = useState("");
+  const [postPinned, setPostPinned] = useState(false);
+
+  const [editingEntryId, setEditingEntryId] = useState(null);
+  const [editingMemberId, setEditingMemberId] = useState(null);
+  const [editingOfficerId, setEditingOfficerId] = useState(null);
+  const [editingCoachId, setEditingCoachId] = useState(null);
+  const [editingSectionItemId, setEditingSectionItemId] = useState(null);
+  const [editingPostId, setEditingPostId] = useState(null);
+
+  const sortedEntries = useMemo(() => sortEventsChronologically(entries), [entries]);
+  const sortedPosts = useMemo(() => sortPosts(posts), [posts]);
+  const sortedOfficeBearers = useMemo(
+    () => sortByPositionThenName(officeBearers),
+    [officeBearers]
+  );
+  const sortedClubCoaches = useMemo(
+    () => sortByPositionThenName(clubCoaches),
+    [clubCoaches]
+  );
+
+  const filteredMembers = useMemo(() => {
+    return members.filter((m) =>
+      String(m.name || "").toLowerCase().includes(search.toLowerCase())
+    );
+  }, [members, search]);
+
+  const gentsMembers = useMemo(
+    () =>
+      filteredMembers
+        .filter((m) => String(m.section || "").trim().toLowerCase() === "gents")
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
+    [filteredMembers]
+  );
+
+  const ladiesMembers = useMemo(
+    () =>
+      filteredMembers
+        .filter((m) => String(m.section || "").trim().toLowerCase() === "ladies")
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
+    [filteredMembers]
+  );
+
+  const associateMembers = useMemo(
+    () =>
+      filteredMembers
+        .filter((m) => String(m.section || "").trim().toLowerCase() === "associate")
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
+    [filteredMembers]
+  );
+
+  const sortedSectionItems = useMemo(() => {
+    const groups = {};
+    SECTION_KEYS.forEach((key) => {
+      groups[key] = sortByPositionThenName(
+        diarySectionItems.filter((item) => item.section_key === key)
+      );
+    });
+    return groups;
+  }, [diarySectionItems]);
 
   useEffect(() => {
-    if (loggedIn) loadData();
+    if (!loggedIn) return;
+    loadAll();
   }, [loggedIn]);
 
+  useEffect(() => {
+    const current = diarySections.find((x) => x.section_key === sectionEditKey);
+    setSectionEditTitle(current?.title || "");
+  }, [sectionEditKey, diarySections]);
+
+  const loadAll = async () => {
+    await Promise.all([
+      loadEntries(),
+      loadMembers(),
+      loadOfficeBearers(),
+      loadClubCoaches(),
+      loadDiarySections(),
+      loadDiarySectionItems(),
+      loadPosts(),
+    ]);
+  };
+
+  const loadEntries = async () => {
+    const { data, error } = await supabase.from("events").select("*");
+    if (error) return setMessage(`Could not load diary entries: ${error.message}`);
+    setEntries(data || []);
+  };
+
+  const loadMembers = async () => {
+    const { data, error } = await supabase.from("members").select("*");
+    if (error) return setMessage(`Could not load members: ${error.message}`);
+    setMembers(data || []);
+  };
+
+  const loadOfficeBearers = async () => {
+    const { data, error } = await supabase
+      .from("office_bearers")
+      .select("*")
+      .order("position", { ascending: true });
+
+    if (error) return setMessage(`Could not load office bearers: ${error.message}`);
+    setOfficeBearers(data || []);
+  };
+
+  const loadClubCoaches = async () => {
+    const { data, error } = await supabase
+      .from("club_coaches")
+      .select("*")
+      .order("position", { ascending: true });
+
+    if (error) return setMessage(`Could not load club coaches: ${error.message}`);
+    setClubCoaches(data || []);
+  };
+
+  const ensureDiarySectionsExist = async () => {
+    const { error } = await supabase
+      .from("diary_sections")
+      .upsert(DEFAULT_SECTIONS, { onConflict: "section_key" });
+
+    if (error) {
+      setMessage(`Could not prepare diary sections: ${error.message}`);
+      return false;
+    }
+
+    return true;
+  };
+
+  const loadDiarySections = async () => {
+    const ok = await ensureDiarySectionsExist();
+    if (!ok) return;
+
+    const { data, error } = await supabase
+      .from("diary_sections")
+      .select("*")
+      .order("section_key", { ascending: true });
+
+    if (error) return setMessage(`Could not load diary sections: ${error.message}`);
+    setDiarySections(data || []);
+  };
+
+  const loadDiarySectionItems = async () => {
+    const { data, error } = await supabase
+      .from("diary_section_items")
+      .select("*")
+      .order("position", { ascending: true });
+
+    if (error) return setMessage(`Could not load diary section items: ${error.message}`);
+    setDiarySectionItems(data || []);
+  };
+
+  const loadPosts = async () => {
+    const { data, error } = await supabase.from("information_posts").select("*");
+    if (error) return setMessage(`Could not load information posts: ${error.message}`);
+    setPosts(data || []);
+  };
+
   const getSectionTitle = (key) => {
-    return sections.find((s) => s.section_key === key)?.title || key;
+    const found = diarySections.find((x) => x.section_key === key);
+    return found?.title || key;
   };
 
-  const getItems = (key) => {
-    return sortByPosition(sectionItems.filter((i) => i.section_key === key));
+  const handleLogin = () => {
+    if (pin === CLUB_PIN) {
+      setLoggedIn(true);
+      setMessage("");
+    } else {
+      setMessage("Incorrect club PIN.");
+    }
   };
 
-  const move = async (table, items, setFn, id, dir) => {
-    const list = sortByPosition(items);
-    const index = list.findIndex((i) => i.id === id);
-    const swap = dir === "up" ? index - 1 : index + 1;
+  const handleAdminLogin = () => {
+    if (adminPin === ADMIN_PIN) {
+      setAdminUnlocked(true);
+      setMessage("");
+    } else {
+      setMessage("Incorrect admin PIN.");
+    }
+  };
 
-    if (swap < 0 || swap >= list.length) return;
+  const clearEntryForm = () => {
+    setEditingEntryId(null);
+    setTitle("");
+    setDate("");
+  };
 
-    const a = list[index];
-    const b = list[swap];
+  const clearMemberForm = () => {
+    setEditingMemberId(null);
+    setNewMemberName("");
+    setNewMemberSection("Gents");
+    setNewMemberPhone("");
+  };
 
-    await supabase.from(table).update({ position: b.position }).eq("id", a.id);
-    await supabase.from(table).update({ position: a.position }).eq("id", b.id);
+  const clearOfficerForm = () => {
+    setEditingOfficerId(null);
+    setNewRole("");
+    setNewOfficerName("");
+    setNewOfficerPhone("");
+    setNewOfficerPosition("");
+  };
 
-    loadData();
+  const clearCoachForm = () => {
+    setEditingCoachId(null);
+    setNewCoachName("");
+    setNewCoachPhone("");
+    setNewCoachPosition("");
+  };
+
+  const clearSectionItemForm = () => {
+    setEditingSectionItemId(null);
+    setNewSectionItemName("");
+    setNewSectionItemPhone("");
+    setNewSectionItemPosition("");
+  };
+
+  const clearPostForm = () => {
+    setEditingPostId(null);
+    setPostTitle("");
+    setPostMessage("");
+    setPostDate("");
+    setPostLink("");
+    setPostButtonText("");
+    setPostPinned(false);
+  };
+
+  const saveEntry = async () => {
+    if (!title || !date) return setMessage("Enter event title and date.");
+
+    if (editingEntryId) {
+      const { data, error } = await supabase
+        .from("events")
+        .update({ title, date_text: date })
+        .eq("id", editingEntryId)
+        .select()
+        .single();
+
+      if (error) return setMessage(`Could not update diary entry: ${error.message}`);
+      setEntries((prev) => prev.map((x) => (x.id === editingEntryId ? data : x)));
+      setMessage("Diary entry updated.");
+    } else {
+      const { data, error } = await supabase
+        .from("events")
+        .insert([{ title, date_text: date, note: "" }])
+        .select()
+        .single();
+
+      if (error) return setMessage(`Could not save diary entry: ${error.message}`);
+      setEntries((prev) => [...prev, data]);
+      setMessage("Diary entry added.");
+    }
+
+    clearEntryForm();
+  };
+
+  const editEntry = (entry) => {
+    setEditingEntryId(entry.id);
+    setTitle(entry.title || "");
+    setDate(entry.date_text || "");
+    setTab("admin");
+  };
+
+  const deleteEntry = async (id) => {
+    const { error } = await supabase.from("events").delete().eq("id", id);
+    if (error) return setMessage(`Could not delete diary entry: ${error.message}`);
+    setEntries((prev) => prev.filter((x) => x.id !== id));
+    setMessage("Diary entry deleted.");
+  };
+
+  const saveMember = async () => {
+    if (!newMemberName) return setMessage("Enter member name.");
+
+    const payload = {
+      name: newMemberName,
+      section: newMemberSection,
+      phone: newMemberPhone,
+    };
+
+    if (editingMemberId) {
+      const { data, error } = await supabase
+        .from("members")
+        .update(payload)
+        .eq("id", editingMemberId)
+        .select()
+        .single();
+
+      if (error) return setMessage(`Could not update member: ${error.message}`);
+      setMembers((prev) => prev.map((x) => (x.id === editingMemberId ? data : x)));
+      setMessage("Member updated.");
+    } else {
+      const { data, error } = await supabase
+        .from("members")
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) return setMessage(`Could not save member: ${error.message}`);
+      setMembers((prev) => [...prev, data]);
+      setMessage("Member added.");
+    }
+
+    clearMemberForm();
+  };
+
+  const editMember = (member) => {
+    setEditingMemberId(member.id);
+    setNewMemberName(member.name || "");
+    setNewMemberSection(member.section || "Gents");
+    setNewMemberPhone(member.phone || "");
+    setTab("admin");
+  };
+
+  const deleteMember = async (id) => {
+    const { error } = await supabase.from("members").delete().eq("id", id);
+    if (error) return setMessage(`Could not delete member: ${error.message}`);
+    setMembers((prev) => prev.filter((x) => x.id !== id));
+    setMessage("Member deleted.");
+  };
+
+  const saveOfficeBearer = async () => {
+    if (!newRole || !newOfficerName) return setMessage("Enter role and name.");
+
+    const payload = {
+      role: newRole,
+      name: newOfficerName,
+      phone: newOfficerPhone,
+      position: newOfficerPosition === "" ? null : Number(newOfficerPosition),
+    };
+
+    if (editingOfficerId) {
+      const { data, error } = await supabase
+        .from("office_bearers")
+        .update(payload)
+        .eq("id", editingOfficerId)
+        .select()
+        .single();
+
+      if (error) return setMessage(`Could not update office bearer: ${error.message}`);
+      setOfficeBearers((prev) => prev.map((x) => (x.id === editingOfficerId ? data : x)));
+      setMessage("Office bearer updated.");
+    } else {
+      const { data, error } = await supabase
+        .from("office_bearers")
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) return setMessage(`Could not save office bearer: ${error.message}`);
+      setOfficeBearers((prev) => [...prev, data]);
+      setMessage("Office bearer added.");
+    }
+
+    clearOfficerForm();
+  };
+
+  const editOfficeBearer = (person) => {
+    setEditingOfficerId(person.id);
+    setNewRole(person.role || "");
+    setNewOfficerName(person.name || "");
+    setNewOfficerPhone(person.phone || "");
+    setNewOfficerPosition(person.position == null ? "" : String(person.position));
+    setTab("admin");
+  };
+
+  const deleteOfficeBearer = async (id) => {
+    const { error } = await supabase.from("office_bearers").delete().eq("id", id);
+    if (error) return setMessage(`Could not delete office bearer: ${error.message}`);
+    setOfficeBearers((prev) => prev.filter((x) => x.id !== id));
+    setMessage("Office bearer deleted.");
+  };
+
+  const saveCoach = async () => {
+    if (!newCoachName) return setMessage("Enter coach name.");
+
+    const payload = {
+      name: newCoachName,
+      phone: newCoachPhone,
+      position: newCoachPosition === "" ? null : Number(newCoachPosition),
+    };
+
+    if (editingCoachId) {
+      const { data, error } = await supabase
+        .from("club_coaches")
+        .update(payload)
+        .eq("id", editingCoachId)
+        .select()
+        .single();
+
+      if (error) return setMessage(`Could not update club coach: ${error.message}`);
+      setClubCoaches((prev) => prev.map((x) => (x.id === editingCoachId ? data : x)));
+      setMessage("Club coach updated.");
+    } else {
+      const { data, error } = await supabase
+        .from("club_coaches")
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) return setMessage(`Could not save club coach: ${error.message}`);
+      setClubCoaches((prev) => [...prev, data]);
+      setMessage("Club coach added.");
+    }
+
+    clearCoachForm();
+  };
+
+  const editCoach = (coach) => {
+    setEditingCoachId(coach.id);
+    setNewCoachName(coach.name || "");
+    setNewCoachPhone(coach.phone || "");
+    setNewCoachPosition(coach.position == null ? "" : String(coach.position));
+    setTab("admin");
+  };
+
+  const deleteCoach = async (id) => {
+    const { error } = await supabase.from("club_coaches").delete().eq("id", id);
+    if (error) return setMessage(`Could not delete club coach: ${error.message}`);
+    setClubCoaches((prev) => prev.filter((x) => x.id !== id));
+    setMessage("Club coach deleted.");
+  };
+
+  const saveSectionTitle = async () => {
+    if (!sectionEditKey || !sectionEditTitle) {
+      return setMessage("Choose a section and title.");
+    }
+
+    const { data, error } = await supabase
+      .from("diary_sections")
+      .upsert([{ section_key: sectionEditKey, title: sectionEditTitle }], {
+        onConflict: "section_key",
+      })
+      .select()
+      .single();
+
+    if (error) return setMessage(`Could not update section title: ${error.message}`);
+
+    setDiarySections((prev) => {
+      const exists = prev.some((x) => x.section_key === sectionEditKey);
+      if (exists) {
+        return prev.map((x) => (x.section_key === sectionEditKey ? data : x));
+      }
+      return [...prev, data];
+    });
+
+    setMessage("Section title updated.");
+  };
+
+  const saveSectionItem = async () => {
+    if (!currentSectionKey || !newSectionItemName) {
+      return setMessage("Enter section item name.");
+    }
+
+    const payload = {
+      section_key: currentSectionKey,
+      name: newSectionItemName,
+      phone: newSectionItemPhone,
+      position: newSectionItemPosition === "" ? null : Number(newSectionItemPosition),
+    };
+
+    if (editingSectionItemId) {
+      const { data, error } = await supabase
+        .from("diary_section_items")
+        .update(payload)
+        .eq("id", editingSectionItemId)
+        .select()
+        .single();
+
+      if (error) return setMessage(`Could not update section item: ${error.message}`);
+      setDiarySectionItems((prev) =>
+        prev.map((x) => (x.id === editingSectionItemId ? data : x))
+      );
+      setMessage("Section item updated.");
+    } else {
+      const { data, error } = await supabase
+        .from("diary_section_items")
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) return setMessage(`Could not save section item: ${error.message}`);
+      setDiarySectionItems((prev) => [...prev, data]);
+      setMessage("Section item added.");
+    }
+
+    clearSectionItemForm();
+  };
+
+  const editSectionItem = (item) => {
+    setEditingSectionItemId(item.id);
+    setCurrentSectionKey(item.section_key || "section1");
+    setNewSectionItemName(item.name || "");
+    setNewSectionItemPhone(item.phone || "");
+    setNewSectionItemPosition(item.position == null ? "" : String(item.position));
+    setTab("admin");
+  };
+
+  const deleteSectionItem = async (id) => {
+    const { error } = await supabase.from("diary_section_items").delete().eq("id", id);
+    if (error) return setMessage(`Could not delete section item: ${error.message}`);
+    setDiarySectionItems((prev) => prev.filter((x) => x.id !== id));
+    setMessage("Section item deleted.");
+  };
+
+  const savePost = async () => {
+    if (!postTitle || !postMessage || !postDate) {
+      return setMessage("Enter post title, message and date.");
+    }
+
+    const payload = {
+      title: postTitle,
+      message: postMessage,
+      date_posted: postDate,
+      attachment_link: postLink || null,
+      button_text: postButtonText || null,
+      pinned: postPinned,
+    };
+
+    if (editingPostId) {
+      const { data, error } = await supabase
+        .from("information_posts")
+        .update(payload)
+        .eq("id", editingPostId)
+        .select()
+        .single();
+
+      if (error) return setMessage(`Could not update information post: ${error.message}`);
+      setPosts((prev) => prev.map((x) => (x.id === editingPostId ? data : x)));
+      setMessage("Information post updated.");
+    } else {
+      const { data, error } = await supabase
+        .from("information_posts")
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) return setMessage(`Could not save information post: ${error.message}`);
+      setPosts((prev) => [...prev, data]);
+      setMessage("Information post added.");
+    }
+
+    clearPostForm();
+  };
+
+  const editPost = (post) => {
+    setEditingPostId(post.id);
+    setPostTitle(post.title || "");
+    setPostMessage(post.message || "");
+    setPostDate(post.date_posted || "");
+    setPostLink(post.attachment_link || "");
+    setPostButtonText(post.button_text || "");
+    setPostPinned(!!post.pinned);
+    setTab("admin");
+  };
+
+  const deletePost = async (id) => {
+    const { error } = await supabase.from("information_posts").delete().eq("id", id);
+    if (error) return setMessage(`Could not delete information post: ${error.message}`);
+    setPosts((prev) => prev.filter((x) => x.id !== id));
+    setMessage("Information post deleted.");
+  };
+
+  const moveItem = async (table, items, onItemsUpdated, id, direction, label) => {
+    const currentList = sortByPositionThenName(items);
+    const currentIndex = currentList.findIndex((item) => item.id === id);
+    if (currentIndex === -1) return;
+
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= currentList.length) return;
+
+    const currentItem = currentList[currentIndex];
+    const targetItem = currentList[targetIndex];
+
+    const currentPos = Number.isFinite(Number(currentItem.position))
+      ? Number(currentItem.position)
+      : currentIndex + 1;
+
+    const targetPos = Number.isFinite(Number(targetItem.position))
+      ? Number(targetItem.position)
+      : targetIndex + 1;
+
+    const { error: error1 } = await supabase
+      .from(table)
+      .update({ position: targetPos })
+      .eq("id", currentItem.id);
+
+    if (error1) return setMessage(`Could not move ${label}: ${error1.message}`);
+
+    const { error: error2 } = await supabase
+      .from(table)
+      .update({ position: currentPos })
+      .eq("id", targetItem.id);
+
+    if (error2) return setMessage(`Could not move ${label}: ${error2.message}`);
+
+    const updatedList = items.map((item) => {
+      if (item.id === currentItem.id) return { ...item, position: targetPos };
+      if (item.id === targetItem.id) return { ...item, position: currentPos };
+      return item;
+    });
+
+    onItemsUpdated(updatedList);
+    setMessage(`${label} order updated.`);
+  };
+
+  const renderMemberCards = (list) => {
+    if (list.length === 0) {
+      return <div style={{ color: "#777", marginBottom: 12 }}>No members in this section.</div>;
+    }
+
+    return list.map((m) => (
+      <div key={m.id} style={styles.card}>
+        <div style={{ fontWeight: 700, fontSize: 18 }}>{m.name}</div>
+        <div style={{ color: "#92400e", marginTop: 4 }}>{m.section}</div>
+        <div style={{ marginTop: 10 }}>
+          {m.phone ? (
+            <>
+              <a href={`tel:${m.phone}`} style={styles.linkBtn}>Call</a>
+              <a
+                href={`https://wa.me/${normaliseUkPhoneForWhatsApp(m.phone)}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ ...styles.linkBtn, background: "#25D366", marginLeft: 8 }}
+              >
+                WhatsApp
+              </a>
+            </>
+          ) : (
+            <span style={{ color: "#888" }}>No phone</span>
+          )}
+        </div>
+      </div>
+    ));
+  };
+
+  const renderPersonCards = (list, badgeText) => {
+    if (list.length === 0) return <div style={{ color: "#777" }}>No entries yet.</div>;
+
+    return (
+      <div style={styles.grid}>
+        {list.map((person) => (
+          <div key={person.id} style={styles.card}>
+            <span style={styles.badge}>{badgeText}</span>
+            <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{person.name}</div>
+            <div style={{ marginBottom: 10, color: "#444" }}>
+              {person.phone || "No phone listed"}
+            </div>
+            {person.phone ? (
+              <div>
+                <a href={`tel:${person.phone}`} style={styles.linkBtn}>Call</a>
+                <a
+                  href={`https://wa.me/${normaliseUkPhoneForWhatsApp(person.phone)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ ...styles.linkBtn, background: "#25D366", marginLeft: 8 }}
+                >
+                  WhatsApp
+                </a>
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    );
   };
 
   if (!loggedIn) {
     return (
-      <div style={{ textAlign: "center", marginTop: 100 }}>
-        <img src={logo} style={{ width: 100 }} />
-        <h1>Woodilee Bowling Club</h1>
-        <input
-          type="password"
-          placeholder="PIN"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-        />
-        <br />
-        <button onClick={() => setLoggedIn(pin === CLUB_PIN)}>Enter</button>
+      <div style={styles.page}>
+        <div style={styles.loginPanel}>
+          <h1 style={{ ...styles.title, marginBottom: 14 }}>Woodilee Bowling Club</h1>
+          <input
+            type="password"
+            placeholder="Enter PIN"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            style={styles.input}
+          />
+          <button onClick={handleLogin} style={styles.button}>Enter</button>
+          {message ? <div style={{ marginTop: 8, color: "#8b1e3f", fontWeight: 700 }}>{message}</div> : null}
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 20 }}>
-      <img src={logo} style={{ width: 80 }} />
-      <h1>Woodilee Bowling Club</h1>
-
-      {!admin && (
-        <button onClick={() => setAdmin(prompt("Admin PIN") === ADMIN_PIN)}>
-          Admin Login
-        </button>
-      )}
-
-      <h2>Office Bearers</h2>
-      {sortByPosition(officeBearers).map((p, i) => (
-        <div key={p.id}>
-          {p.role} — {p.name}
-          {admin && (
-            <>
-              <button onClick={() => move("office_bearers", officeBearers, setOfficeBearers, p.id, "up")}>↑</button>
-              <button onClick={() => move("office_bearers", officeBearers, setOfficeBearers, p.id, "down")}>↓</button>
-            </>
-          )}
+    <div style={styles.page}>
+      <div style={styles.wrap}>
+        <div style={styles.header}>
+          <h1 style={styles.title}>Woodilee Bowling Club</h1>
+          <p style={styles.subtitle}>Members diary, notices and contact details</p>
         </div>
-      ))}
 
-      <h2>Club Coaches</h2>
-      {sortByPosition(coaches).map((c) => (
-        <div key={c.id}>
-          {c.name}
-          {admin && (
-            <>
-              <button onClick={() => move("club_coaches", coaches, setCoaches, c.id, "up")}>↑</button>
-              <button onClick={() => move("club_coaches", coaches, setCoaches, c.id, "down")}>↓</button>
-            </>
-          )}
+        {message && <div style={styles.message}>{message}</div>}
+
+        <div style={styles.tabs}>
+          <button style={styles.tab(tab === "diary")} onClick={() => setTab("diary")}>Diary</button>
+          <button style={styles.tab(tab === "members")} onClick={() => setTab("members")}>Members</button>
+          <button style={styles.tab(tab === "information")} onClick={() => setTab("information")}>Information</button>
+          <button style={styles.tab(tab === "admin")} onClick={() => setTab("admin")}>Admin</button>
         </div>
-      ))}
 
-      {SECTION_KEYS.map((key) => (
-        <div key={key}>
-          <h2>{getSectionTitle(key)}</h2>
-          {getItems(key).map((item) => (
-            <div key={item.id}>
-              {item.name}
-              {admin && (
-                <>
-                  <button onClick={() => move("diary_section_items", getItems(key), setSectionItems, item.id, "up")}>↑</button>
-                  <button onClick={() => move("diary_section_items", getItems(key), setSectionItems, item.id, "down")}>↓</button>
-                </>
-              )}
+        {tab === "diary" && (
+          <>
+            <div style={styles.panel}>
+              <h3 style={styles.sectionTitle}>Office Bearers</h3>
+              <div style={styles.grid}>
+                {sortedOfficeBearers.map((person) => (
+                  <div key={person.id} style={styles.card}>
+                    <span style={styles.badge}>{person.role}</span>
+                    <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{person.name}</div>
+                    <div style={{ marginBottom: 10, color: "#444" }}>{person.phone || "No phone listed"}</div>
+                    {person.phone ? (
+                      <div>
+                        <a href={`tel:${person.phone}`} style={styles.linkBtn}>Call</a>
+                        <a
+                          href={`https://wa.me/${normaliseUkPhoneForWhatsApp(person.phone)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ ...styles.linkBtn, background: "#25D366", marginLeft: 8 }}
+                        >
+                          WhatsApp
+                        </a>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
-      ))}
+
+            <div style={styles.panel}>
+              <h3 style={styles.sectionTitle}>Club Coaches</h3>
+              {renderPersonCards(sortedClubCoaches, "Club Coach")}
+            </div>
+
+            {SECTION_KEYS.map((key) => (
+              <div key={key} style={styles.panel}>
+                <h3 style={styles.sectionTitle}>{getSectionTitle(key)}</h3>
+                {renderPersonCards(sortedSectionItems[key] || [], getSectionTitle(key))}
+              </div>
+            ))}
+
+            <div style={styles.panel}>
+              <h3 style={styles.sectionTitle}>Diary Events</h3>
+              {sortedEntries.map((e) => (
+                <div key={e.id} style={styles.card}>
+                  <strong style={{ color: "#92400e" }}>{e.date_text}</strong> — {e.title}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {tab === "members" && (
+          <div style={styles.panel}>
+            <h3 style={styles.sectionTitle}>Members</h3>
+            <input
+              placeholder="Search members..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={styles.input}
+            />
+
+            <h4 style={styles.memberSectionTitle}>Gents</h4>
+            {renderMemberCards(gentsMembers)}
+
+            <h4 style={styles.memberSectionTitle}>Ladies</h4>
+            {renderMemberCards(ladiesMembers)}
+
+            <h4 style={styles.memberSectionTitle}>Associate</h4>
+            {renderMemberCards(associateMembers)}
+          </div>
+        )}
+
+        {tab === "information" && (
+          <div style={styles.panel}>
+            <h3 style={styles.sectionTitle}>General Information</h3>
+            {sortedPosts.map((post) => (
+              <div
+                key={post.id}
+                style={{ ...styles.card, ...(post.pinned ? styles.pinnedCard : {}) }}
+              >
+                {post.pinned ? <div style={styles.badge}>📌 Pinned Notice</div> : null}
+                <div style={{ color: "#92400e", fontWeight: 700 }}>{post.date_posted}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>{post.title}</div>
+                <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{post.message}</div>
+                {post.attachment_link ? (
+                  <a href={post.attachment_link} target="_blank" rel="noreferrer" style={styles.linkBtn}>
+                    {post.button_text || "Open Attachment"}
+                  </a>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab === "admin" && (
+          <div>
+            {!adminUnlocked ? (
+              <div style={{ ...styles.panel, maxWidth: 420 }}>
+                <h3 style={styles.sectionTitle}>Admin Login</h3>
+                <input
+                  type="password"
+                  value={adminPin}
+                  onChange={(e) => setAdminPin(e.target.value)}
+                  style={styles.input}
+                />
+                <button onClick={handleAdminLogin} style={styles.button}>Enter</button>
+              </div>
+            ) : (
+              <>
+                <div style={styles.panel}>
+                  <h3 style={styles.sectionTitle}>{editingEntryId ? "Edit Diary Entry" : "Add Diary Entry"}</h3>
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Event title"
+                    style={styles.input}
+                  />
+                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={styles.input} />
+                  <button onClick={saveEntry} style={styles.button}>
+                    {editingEntryId ? "Update Diary Entry" : "Save Diary Entry"}
+                  </button>
+                  {(editingEntryId || title || date) && (
+                    <button onClick={clearEntryForm} style={styles.secondaryButton}>Clear</button>
+                  )}
+                </div>
+
+                <div style={styles.panel}>
+                  <h3 style={styles.sectionTitle}>Manage Diary Entries</h3>
+                  {sortedEntries.map((e) => (
+                    <div key={e.id} style={styles.card}>
+                      <strong>{e.date_text}</strong> — {e.title}
+                      <div style={{ marginTop: 8 }}>
+                        <button onClick={() => editEntry(e)} style={styles.smallBtn}>Edit</button>
+                        <button onClick={() => deleteEntry(e.id)} style={styles.smallBtn}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={styles.panel}>
+                  <h3 style={styles.sectionTitle}>{editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}</h3>
+                  <input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Role" style={styles.input} />
+                  <input value={newOfficerName} onChange={(e) => setNewOfficerName(e.target.value)} placeholder="Name" style={styles.input} />
+                  <input value={newOfficerPhone} onChange={(e) => setNewOfficerPhone(e.target.value)} placeholder="Phone" style={styles.input} />
+                  <input
+                    type="number"
+                    value={newOfficerPosition}
+                    onChange={(e) => setNewOfficerPosition(e.target.value)}
+                    placeholder="Position order"
+                    style={styles.input}
+                  />
+                  <button onClick={saveOfficeBearer} style={styles.button}>
+                    {editingOfficerId ? "Update Office Bearer" : "Save Office Bearer"}
+                  </button>
+                  {(editingOfficerId || newRole || newOfficerName || newOfficerPhone || newOfficerPosition) && (
+                    <button onClick={clearOfficerForm} style={styles.secondaryButton}>Clear</button>
+                  )}
+                </div>
+
+                <div style={styles.panel}>
+                  <h3 style={styles.sectionTitle}>Manage Office Bearers</h3>
+                  {sortedOfficeBearers.map((person, index) => {
+                    const canMoveUp = index > 0;
+                    const canMoveDown = index < sortedOfficeBearers.length - 1;
+
+                    return (
+                      <div key={person.id} style={styles.card}>
+                        <strong>{person.role}</strong> — {person.name}
+                        <div style={{ marginTop: 8 }}>
+                          <button onClick={() => editOfficeBearer(person)} style={styles.smallBtn}>Edit</button>
+                          <button onClick={() => deleteOfficeBearer(person.id)} style={styles.smallBtn}>Delete</button>
+                          <button
+                            onClick={() =>
+                              canMoveUp &&
+                              moveItem(
+                                "office_bearers",
+                                officeBearers,
+                                (updated) => setOfficeBearers(updated),
+                                person.id,
+                                "up",
+                                "Office bearer"
+                              )
+                            }
+                            style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
+                            type="button"
+                          >
+                            ↑ Up
+                          </button>
+                          <button
+                            onClick={() =>
+                              canMoveDown &&
+                              moveItem(
+                                "office_bearers",
+                                officeBearers,
+                                (updated) => setOfficeBearers(updated),
+                                person.id,
+                                "down",
+                                "Office bearer"
+                              )
+                            }
+                            style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
+                            type="button"
+                          >
+                            ↓ Down
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div style={styles.panel}>
+                  <h3 style={styles.sectionTitle}>{editingCoachId ? "Edit Club Coach" : "Add Club Coach"}</h3>
+                  <input value={newCoachName} onChange={(e) => setNewCoachName(e.target.value)} placeholder="Name" style={styles.input} />
+                  <input value={newCoachPhone} onChange={(e) => setNewCoachPhone(e.target.value)} placeholder="Phone" style={styles.input} />
+                  <input
+                    type="number"
+                    value={newCoachPosition}
+                    onChange={(e) => setNewCoachPosition(e.target.value)}
+                    placeholder="Position order"
+                    style={styles.input}
+                  />
+                  <button onClick={saveCoach} style={styles.button}>
+                    {editingCoachId ? "Update Club Coach" : "Save Club Coach"}
+                  </button>
+                  {(editingCoachId || newCoachName || newCoachPhone || newCoachPosition) && (
+                    <button onClick={clearCoachForm} style={styles.secondaryButton}>Clear</button>
+                  )}
+                </div>
+
+                <div style={styles.panel}>
+                  <h3 style={styles.sectionTitle}>Manage Club Coaches</h3>
+                  {sortedClubCoaches.map((coach, index) => {
+                    const canMoveUp = index > 0;
+                    const canMoveDown = index < sortedClubCoaches.length - 1;
+
+                    return (
+                      <div key={coach.id} style={styles.card}>
+                        <strong>{coach.name}</strong> — {coach.phone || "no phone"}
+                        <div style={{ marginTop: 8 }}>
+                          <button onClick={() => editCoach(coach)} style={styles.smallBtn}>Edit</button>
+                          <button onClick={() => deleteCoach(coach.id)} style={styles.smallBtn}>Delete</button>
+                          <button
+                            onClick={() =>
+                              canMoveUp &&
+                              moveItem(
+                                "club_coaches",
+                                clubCoaches,
+                                (updated) => setClubCoaches(updated),
+                                coach.id,
+                                "up",
+                                "Club coach"
+                              )
+                            }
+                            style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
+                            type="button"
+                          >
+                            ↑ Up
+                          </button>
+                          <button
+                            onClick={() =>
+                              canMoveDown &&
+                              moveItem(
+                                "club_coaches",
+                                clubCoaches,
+                                (updated) => setClubCoaches(updated),
+                                coach.id,
+                                "down",
+                                "Club coach"
+                              )
+                            }
+                            style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
+                            type="button"
+                          >
+                            ↓ Down
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div style={styles.panel}>
+                  <h3 style={styles.sectionTitle}>Rename Extra Sections</h3>
+                  <select
+                    value={sectionEditKey}
+                    onChange={(e) => setSectionEditKey(e.target.value)}
+                    style={styles.input}
+                  >
+                    <option value="section1">Section 1</option>
+                    <option value="section2">Section 2</option>
+                    <option value="section3">Section 3</option>
+                  </select>
+                  <input
+                    value={sectionEditTitle}
+                    onChange={(e) => setSectionEditTitle(e.target.value)}
+                    placeholder="Section title"
+                    style={styles.input}
+                  />
+                  <button onClick={saveSectionTitle} style={styles.button}>Save Section Title</button>
+                </div>
+
+                <div style={styles.panel}>
+                  <h3 style={styles.sectionTitle}>{editingSectionItemId ? "Edit Extra Section Item" : "Add Extra Section Item"}</h3>
+                  <select
+                    value={currentSectionKey}
+                    onChange={(e) => setCurrentSectionKey(e.target.value)}
+                    style={styles.input}
+                  >
+                    {SECTION_KEYS.map((key) => (
+                      <option key={key} value={key}>{getSectionTitle(key)}</option>
+                    ))}
+                  </select>
+                  <input
+                    value={newSectionItemName}
+                    onChange={(e) => setNewSectionItemName(e.target.value)}
+                    placeholder="Name"
+                    style={styles.input}
+                  />
+                  <input
+                    value={newSectionItemPhone}
+                    onChange={(e) => setNewSectionItemPhone(e.target.value)}
+                    placeholder="Phone"
+                    style={styles.input}
+                  />
+                  <input
+                    type="number"
+                    value={newSectionItemPosition}
+                    onChange={(e) => setNewSectionItemPosition(e.target.value)}
+                    placeholder="Position order"
+                    style={styles.input}
+                  />
+                  <button onClick={saveSectionItem} style={styles.button}>
+                    {editingSectionItemId ? "Update Section Item" : "Save Section Item"}
+                  </button>
+                  {(editingSectionItemId || newSectionItemName || newSectionItemPhone || newSectionItemPosition) && (
+                    <button onClick={clearSectionItemForm} style={styles.secondaryButton}>Clear</button>
+                  )}
+                </div>
+
+                {SECTION_KEYS.map((key) => {
+                  const list = sortedSectionItems[key] || [];
+
+                  return (
+                    <div key={key} style={styles.panel}>
+                      <h3 style={styles.sectionTitle}>Manage {getSectionTitle(key)}</h3>
+
+                      {list.length === 0 ? (
+                        <div style={{ color: "#777" }}>No items yet.</div>
+                      ) : (
+                        list.map((item, index) => {
+                          const canMoveUp = index > 0;
+                          const canMoveDown = index < list.length - 1;
+
+                          return (
+                            <div key={item.id} style={styles.card}>
+                              <strong>{item.name}</strong> — {item.phone || "no phone"}
+                              <div style={{ marginTop: 8 }}>
+                                <button onClick={() => editSectionItem(item)} style={styles.smallBtn}>Edit</button>
+                                <button onClick={() => deleteSectionItem(item.id)} style={styles.smallBtn}>Delete</button>
+                                <button
+                                  onClick={() =>
+                                    canMoveUp &&
+                                    moveItem(
+                                      "diary_section_items",
+                                      list,
+                                      (updatedList) => {
+                                        setDiarySectionItems((prev) => {
+                                          const others = prev.filter((x) => x.section_key !== key);
+                                          return [...others, ...updatedList];
+                                        });
+                                      },
+                                      item.id,
+                                      "up",
+                                      getSectionTitle(key)
+                                    )
+                                  }
+                                  style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
+                                  type="button"
+                                >
+                                  ↑ Up
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    canMoveDown &&
+                                    moveItem(
+                                      "diary_section_items",
+                                      list,
+                                      (updatedList) => {
+                                        setDiarySectionItems((prev) => {
+                                          const others = prev.filter((x) => x.section_key !== key);
+                                          return [...others, ...updatedList];
+                                        });
+                                      },
+                                      item.id,
+                                      "down",
+                                      getSectionTitle(key)
+                                    )
+                                  }
+                                  style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
+                                  type="button"
+                                >
+                                  ↓ Down
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  );
+                })}
+
+                <div style={styles.panel}>
+                  <h3 style={styles.sectionTitle}>{editingMemberId ? "Edit Member" : "Add Member"}</h3>
+                  <input value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="Name" style={styles.input} />
+                  <select value={newMemberSection} onChange={(e) => setNewMemberSection(e.target.value)} style={styles.input}>
+                    <option>Gents</option>
+                    <option>Ladies</option>
+                    <option>Associate</option>
+                  </select>
+                  <input value={newMemberPhone} onChange={(e) => setNewMemberPhone(e.target.value)} placeholder="Phone" style={styles.input} />
+                  <button onClick={saveMember} style={styles.button}>
+                    {editingMemberId ? "Update Member" : "Save Member"}
+                  </button>
+                  {(editingMemberId || newMemberName || newMemberPhone) && (
+                    <button onClick={clearMemberForm} style={styles.secondaryButton}>Clear</button>
+                  )}
+                </div>
+
+                <div style={styles.panel}>
+                  <h3 style={styles.sectionTitle}>Manage Members</h3>
+                  {members
+                    .slice()
+                    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
+                    .map((m) => (
+                      <div key={m.id} style={styles.card}>
+                        <strong>{m.name}</strong> — {m.section} — {m.phone || "no phone"}
+                        <div style={{ marginTop: 8 }}>
+                          <button onClick={() => editMember(m)} style={styles.smallBtn}>Edit</button>
+                          <button onClick={() => deleteMember(m.id)} style={styles.smallBtn}>Delete</button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+
+                <div style={styles.panel}>
+                  <h3 style={styles.sectionTitle}>{editingPostId ? "Edit Information Post" : "Add Information Post"}</h3>
+                  <input value={postTitle} onChange={(e) => setPostTitle(e.target.value)} placeholder="Title" style={styles.input} />
+                  <textarea value={postMessage} onChange={(e) => setPostMessage(e.target.value)} placeholder="Message" style={styles.textarea} />
+                  <input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} style={styles.input} />
+                  <input value={postLink} onChange={(e) => setPostLink(e.target.value)} placeholder="Attachment link" style={styles.input} />
+                  <input value={postButtonText} onChange={(e) => setPostButtonText(e.target.value)} placeholder="Button text" style={styles.input} />
+                  <label style={{ display: "block", marginBottom: 10 }}>
+                    <input
+                      type="checkbox"
+                      checked={postPinned}
+                      onChange={(e) => setPostPinned(e.target.checked)}
+                      style={{ marginRight: 8 }}
+                    />
+                    Pin this post to the top
+                  </label>
+                  <button onClick={savePost} style={styles.button}>
+                    {editingPostId ? "Update Information Post" : "Save Information Post"}
+                  </button>
+                  {(editingPostId || postTitle || postMessage || postDate || postLink || postButtonText || postPinned) && (
+                    <button onClick={clearPostForm} style={styles.secondaryButton}>Clear</button>
+                  )}
+                </div>
+
+                <div style={styles.panel}>
+                  <h3 style={styles.sectionTitle}>Manage Information Posts</h3>
+                  {sortedPosts.map((post) => (
+                    <div key={post.id} style={styles.card}>
+                      <strong>{post.date_posted}</strong> — {post.title} {post.pinned ? "• PINNED" : ""}
+                      <div style={{ marginTop: 8 }}>
+                        <button onClick={() => editPost(post)} style={styles.smallBtn}>Edit</button>
+                        <button onClick={() => deletePost(post.id)} style={styles.smallBtn}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
