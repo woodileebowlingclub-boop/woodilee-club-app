@@ -229,23 +229,13 @@ function sortPosts(list) {
 }
 
 function sortOfficeBearers(list) {
-  const order = {
-    President: 1,
-    Secretary: 2,
-    Treasurer: 3,
-    "Vice President": 4,
-    "Bar Convenor": 5,
-  };
-
   return [...list].sort((a, b) => {
-    const aRole = String(a.role || "");
-    const bRole = String(b.role || "");
-    const aMatch = Object.keys(order).find((x) => aRole.includes(x));
-    const bMatch = Object.keys(order).find((x) => bRole.includes(x));
-    const aRank = aMatch ? order[aMatch] : 99;
-    const bRank = bMatch ? order[bMatch] : 99;
-    if (aRank !== bRank) return aRank - bRank;
-    return aRole.localeCompare(bRole);
+    const aPos = Number.isFinite(Number(a.position)) ? Number(a.position) : 999;
+    const bPos = Number.isFinite(Number(b.position)) ? Number(b.position) : 999;
+
+    if (aPos !== bPos) return aPos - bPos;
+
+    return String(a.name || "").localeCompare(String(b.name || ""));
   });
 }
 
@@ -283,6 +273,7 @@ export default function App() {
   const [newRole, setNewRole] = useState("");
   const [newOfficerName, setNewOfficerName] = useState("");
   const [newOfficerPhone, setNewOfficerPhone] = useState("");
+  const [newOfficerPosition, setNewOfficerPosition] = useState("");
 
   const [postTitle, setPostTitle] = useState("");
   const [postMessage, setPostMessage] = useState("");
@@ -342,7 +333,10 @@ export default function App() {
   };
 
   const loadOfficeBearers = async () => {
-    const { data, error } = await supabase.from("office_bearers").select("*");
+    const { data, error } = await supabase
+      .from("office_bearers")
+      .select("*")
+      .order("position", { ascending: true });
     if (error) {
       setMessage(`Could not load office bearers: ${error.message}`);
       return;
@@ -395,6 +389,7 @@ export default function App() {
     setNewRole("");
     setNewOfficerName("");
     setNewOfficerPhone("");
+    setNewOfficerPosition("");
   };
 
   const clearPostForm = () => {
@@ -539,6 +534,7 @@ export default function App() {
       role: newRole,
       name: newOfficerName,
       phone: newOfficerPhone,
+      position: newOfficerPosition === "" ? null : Number(newOfficerPosition),
     };
 
     if (editingOfficerId) {
@@ -582,6 +578,11 @@ export default function App() {
     setNewRole(person.role || "");
     setNewOfficerName(person.name || "");
     setNewOfficerPhone(person.phone || "");
+    setNewOfficerPosition(
+      person.position === null || person.position === undefined
+        ? ""
+        : String(person.position)
+    );
     setTab("admin");
   };
 
@@ -693,7 +694,11 @@ export default function App() {
     return (
       <div style={styles.page}>
         <div style={styles.loginPanel}>
-          <img src={logo} alt="Woodilee Bowling Club" style={{ ...styles.logo, margin: "0 auto 12px auto" }} />
+          <img
+            src={logo}
+            alt="Woodilee Bowling Club"
+            style={{ ...styles.logo, margin: "0 auto 12px auto" }}
+          />
           <h1 style={{ ...styles.title, marginBottom: 14 }}>Woodilee Bowling Club</h1>
           <input
             type="password"
@@ -730,7 +735,10 @@ export default function App() {
           <button style={styles.tab(tab === "members")} onClick={() => setTab("members")}>
             Members
           </button>
-          <button style={styles.tab(tab === "information")} onClick={() => setTab("information")}>
+          <button
+            style={styles.tab(tab === "information")}
+            onClick={() => setTab("information")}
+          >
             Information
           </button>
           <button style={styles.tab(tab === "admin")} onClick={() => setTab("admin")}>
@@ -745,7 +753,10 @@ export default function App() {
               <div style={styles.grid}>
                 {sortedOfficeBearers.map((person) => (
                   <div key={person.id} style={styles.card}>
-                    <span style={styles.badge}>{person.role}</span>
+                    <span style={styles.badge}>
+                      {person.position ? `${person.position}. ` : ""}
+                      {person.role}
+                    </span>
                     <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
                       {person.name}
                     </div>
@@ -937,10 +948,21 @@ export default function App() {
                     placeholder="Phone"
                     style={styles.input}
                   />
+                  <input
+                    type="number"
+                    value={newOfficerPosition}
+                    onChange={(e) => setNewOfficerPosition(e.target.value)}
+                    placeholder="Position order e.g. 1, 2, 3"
+                    style={styles.input}
+                  />
                   <button onClick={saveOfficeBearer} style={styles.button}>
                     {editingOfficerId ? "Update Office Bearer" : "Save Office Bearer"}
                   </button>
-                  {(editingOfficerId || newRole || newOfficerName || newOfficerPhone) && (
+                  {(editingOfficerId ||
+                    newRole ||
+                    newOfficerName ||
+                    newOfficerPhone ||
+                    newOfficerPosition) && (
                     <button onClick={clearOfficerForm} style={styles.secondaryButton}>
                       Clear
                     </button>
@@ -951,7 +973,11 @@ export default function App() {
                   <h3 style={styles.sectionTitle}>Manage Office Bearers</h3>
                   {sortedOfficeBearers.map((person) => (
                     <div key={person.id} style={styles.card}>
-                      <strong>{person.role}</strong> — {person.name}
+                      <strong>
+                        {person.position ? `${person.position}. ` : ""}
+                        {person.role}
+                      </strong>{" "}
+                      — {person.name}
                       <div style={{ marginTop: 8 }}>
                         <button onClick={() => editOfficeBearer(person)} style={styles.smallBtn}>
                           Edit
@@ -1077,7 +1103,14 @@ export default function App() {
                   <button onClick={savePost} style={styles.button}>
                     {editingPostId ? "Update Information Post" : "Save Information Post"}
                   </button>
-                  {(editingPostId || postTitle || postMessage || postDate || postLink || postButtonText || postPinned || postFile) && (
+                  {(editingPostId ||
+                    postTitle ||
+                    postMessage ||
+                    postDate ||
+                    postLink ||
+                    postButtonText ||
+                    postPinned ||
+                    postFile) && (
                     <button onClick={clearPostForm} style={styles.secondaryButton}>
                       Clear
                     </button>
