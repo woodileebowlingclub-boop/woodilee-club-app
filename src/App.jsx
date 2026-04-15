@@ -141,6 +141,16 @@ const styles = {
     color: "#5c2c0c",
     fontWeight: 700,
   },
+  reorderBtn: {
+    padding: "8px 10px",
+    background: "#dbeafe",
+    border: "1px solid #93c5fd",
+    borderRadius: 10,
+    cursor: "pointer",
+    marginLeft: 8,
+    color: "#1d4ed8",
+    fontWeight: 700,
+  },
   card: {
     border: "1px solid #e9dfd3",
     borderRadius: 14,
@@ -596,6 +606,55 @@ export default function App() {
     setMessage("Office bearer deleted.");
   };
 
+  const moveOfficeBearer = async (id, direction) => {
+    const currentList = sortOfficeBearers(officeBearers);
+    const currentIndex = currentList.findIndex((person) => person.id === id);
+
+    if (currentIndex === -1) return;
+
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+
+    if (targetIndex < 0 || targetIndex >= currentList.length) return;
+
+    const currentItem = currentList[currentIndex];
+    const targetItem = currentList[targetIndex];
+
+    const currentPos =
+      Number.isFinite(Number(currentItem.position)) ? Number(currentItem.position) : currentIndex + 1;
+    const targetPos =
+      Number.isFinite(Number(targetItem.position)) ? Number(targetItem.position) : targetIndex + 1;
+
+    const { error: error1 } = await supabase
+      .from("office_bearers")
+      .update({ position: targetPos })
+      .eq("id", currentItem.id);
+
+    if (error1) {
+      setMessage(`Could not move office bearer: ${error1.message}`);
+      return;
+    }
+
+    const { error: error2 } = await supabase
+      .from("office_bearers")
+      .update({ position: currentPos })
+      .eq("id", targetItem.id);
+
+    if (error2) {
+      setMessage(`Could not move office bearer: ${error2.message}`);
+      return;
+    }
+
+    setOfficeBearers((prev) =>
+      prev.map((item) => {
+        if (item.id === currentItem.id) return { ...item, position: targetPos };
+        if (item.id === targetItem.id) return { ...item, position: currentPos };
+        return item;
+      })
+    );
+
+    setMessage("Office bearer order updated.");
+  };
+
   const uploadPostFile = async () => {
     if (!postFile) return postLink || null;
 
@@ -754,7 +813,6 @@ export default function App() {
                 {sortedOfficeBearers.map((person) => (
                   <div key={person.id} style={styles.card}>
                     <span style={styles.badge}>
-                      {person.position ? `${person.position}. ` : ""}
                       {person.role}
                     </span>
                     <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
@@ -971,13 +1029,9 @@ export default function App() {
 
                 <div style={styles.panel}>
                   <h3 style={styles.sectionTitle}>Manage Office Bearers</h3>
-                  {sortedOfficeBearers.map((person) => (
+                  {sortedOfficeBearers.map((person, index) => (
                     <div key={person.id} style={styles.card}>
-                      <strong>
-                        {person.position ? `${person.position}. ` : ""}
-                        {person.role}
-                      </strong>{" "}
-                      — {person.name}
+                      <strong>{person.role}</strong> — {person.name}
                       <div style={{ marginTop: 8 }}>
                         <button onClick={() => editOfficeBearer(person)} style={styles.smallBtn}>
                           Edit
@@ -988,6 +1042,23 @@ export default function App() {
                         >
                           Delete
                         </button>
+                        <button
+                          onClick={() => moveOfficeBearer(person.id, "up")}
+                          style={styles.reorderBtn}
+                          disabled={index === 0}
+                        >
+                          ↑ Up
+                        </button>
+                        <button
+                          onClick={() => moveOfficeBearer(person.id, "down")}
+                          style={styles.reorderBtn}
+                          disabled={index === sortedOfficeBearers.length - 1}
+                        >
+                          ↓ Down
+                        </button>
+                      </div>
+                      <div style={{ marginTop: 8, color: "#666", fontSize: 13 }}>
+                        Position: {person.position ?? "not set"}
                       </div>
                     </div>
                   ))}
