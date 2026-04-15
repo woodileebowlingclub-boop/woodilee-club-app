@@ -283,6 +283,7 @@ export default function App() {
 
   const [search, setSearch] = useState("");
   const [eventSearch, setEventSearch] = useState("");
+  const [infoSearch, setInfoSearch] = useState("");
 
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
@@ -345,6 +346,17 @@ export default function App() {
       );
     });
   }, [sortedEntries, eventSearch]);
+
+  const filteredPosts = useMemo(() => {
+    return sortedPosts.filter((post) => {
+      const q = infoSearch.toLowerCase();
+      return (
+        String(post.title || "").toLowerCase().includes(q) ||
+        String(post.message || "").toLowerCase().includes(q) ||
+        String(post.date_posted || "").toLowerCase().includes(q)
+      );
+    });
+  }, [sortedPosts, infoSearch]);
 
   const filteredMembers = useMemo(() => {
     return members.filter((m) =>
@@ -1116,31 +1128,44 @@ export default function App() {
         {tab === "information" && (
           <div style={styles.panel}>
             <h3 style={styles.sectionTitle}>General Information</h3>
-            {sortedPosts.map((post) => (
-              <div
-                key={post.id}
-                style={{ ...styles.card, ...(post.pinned ? styles.pinnedCard : {}) }}
-              >
-                {post.pinned ? <div style={styles.badge}>📌 Pinned Notice</div> : null}
-                <div style={{ color: "#92400e", fontWeight: 700 }}>{post.date_posted}</div>
-                <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>{post.title}</div>
-                <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{post.message}</div>
 
-                {post.attachment_link ? (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={styles.fileInfo}>{getFileTypeLabel(post.attachment_link)}</div>
-                    <a
-                      href={post.attachment_link}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={styles.linkBtn}
-                    >
-                      {post.button_text || "Open Attachment"}
-                    </a>
-                  </div>
-                ) : null}
-              </div>
-            ))}
+            <input
+              type="text"
+              placeholder="Search information..."
+              value={infoSearch}
+              onChange={(e) => setInfoSearch(e.target.value)}
+              style={styles.input}
+            />
+
+            {filteredPosts.length === 0 ? (
+              <div style={{ color: "#777" }}>No matching information found.</div>
+            ) : (
+              filteredPosts.map((post) => (
+                <div
+                  key={post.id}
+                  style={{ ...styles.card, ...(post.pinned ? styles.pinnedCard : {}) }}
+                >
+                  {post.pinned ? <div style={styles.badge}>📌 Pinned Notice</div> : null}
+                  <div style={{ color: "#92400e", fontWeight: 700 }}>{post.date_posted}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>{post.title}</div>
+                  <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{post.message}</div>
+
+                  {post.attachment_link ? (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={styles.fileInfo}>{getFileTypeLabel(post.attachment_link)}</div>
+                      <a
+                        href={post.attachment_link}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={styles.linkBtn}
+                      >
+                        {post.button_text || "Open Attachment"}
+                      </a>
+                    </div>
+                  ) : null}
+                </div>
+              ))
+            )}
           </div>
         )}
 
