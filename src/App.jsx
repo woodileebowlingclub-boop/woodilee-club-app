@@ -4,13 +4,6 @@ import { supabase } from "./lib/supabase";
 const CLUB_PIN = "1911";
 const ADMIN_PIN = "1954";
 const BUCKET = "club-files";
-const SECTION_KEYS = ["section1", "section2", "section3"];
-
-const DEFAULT_SECTIONS = [
-  { section_key: "section1", title: "Section 1" },
-  { section_key: "section2", title: "Section 2" },
-  { section_key: "section3", title: "Section 3" },
-];
 
 const styles = {
   page: {
@@ -226,6 +219,12 @@ function sortPosts(list) {
   });
 }
 
+function sortMondayPoints(list) {
+  return [...list].sort(
+    (a, b) => new Date(b.week_date).getTime() - new Date(a.week_date).getTime()
+  );
+}
+
 function sortByPositionThenName(list) {
   return [...list].sort((a, b) => {
     const aPos = Number.isFinite(Number(a.position)) ? Number(a.position) : 999;
@@ -261,6 +260,8 @@ function getFileTypeLabel(url) {
   if (lower.endsWith(".pdf")) return "PDF";
   if (lower.endsWith(".png")) return "PNG image";
   if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "JPEG image";
+  if (lower.endsWith(".xls") || lower.endsWith(".xlsx")) return "Excel file";
+  if (lower.endsWith(".doc") || lower.endsWith(".docx")) return "Word document";
   return "Attachment";
 }
 
@@ -277,9 +278,8 @@ export default function App() {
   const [members, setMembers] = useState([]);
   const [officeBearers, setOfficeBearers] = useState([]);
   const [clubCoaches, setClubCoaches] = useState([]);
-  const [diarySections, setDiarySections] = useState([]);
-  const [diarySectionItems, setDiarySectionItems] = useState([]);
   const [posts, setPosts] = useState([]);
+  const [mondayPoints, setMondayPoints] = useState([]);
 
   const [search, setSearch] = useState("");
 
@@ -300,14 +300,6 @@ export default function App() {
   const [newCoachPhone, setNewCoachPhone] = useState("");
   const [newCoachPosition, setNewCoachPosition] = useState("");
 
-  const [sectionEditKey, setSectionEditKey] = useState("section1");
-  const [sectionEditTitle, setSectionEditTitle] = useState("");
-
-  const [currentSectionKey, setCurrentSectionKey] = useState("section1");
-  const [newSectionItemName, setNewSectionItemName] = useState("");
-  const [newSectionItemPhone, setNewSectionItemPhone] = useState("");
-  const [newSectionItemPosition, setNewSectionItemPosition] = useState("");
-
   const [postTitle, setPostTitle] = useState("");
   const [postMessage, setPostMessage] = useState("");
   const [postDate, setPostDate] = useState("");
@@ -316,15 +308,23 @@ export default function App() {
   const [postPinned, setPostPinned] = useState(false);
   const [postFile, setPostFile] = useState(null);
 
+  const [mondayTitle, setMondayTitle] = useState("");
+  const [mondayDate, setMondayDate] = useState("");
+  const [mondayNote, setMondayNote] = useState("");
+  const [mondayButtonText, setMondayButtonText] = useState("");
+  const [mondayLink, setMondayLink] = useState("");
+  const [mondayFile, setMondayFile] = useState(null);
+
   const [editingEntryId, setEditingEntryId] = useState(null);
   const [editingMemberId, setEditingMemberId] = useState(null);
   const [editingOfficerId, setEditingOfficerId] = useState(null);
   const [editingCoachId, setEditingCoachId] = useState(null);
-  const [editingSectionItemId, setEditingSectionItemId] = useState(null);
   const [editingPostId, setEditingPostId] = useState(null);
+  const [editingMondayId, setEditingMondayId] = useState(null);
 
   const sortedEntries = useMemo(() => sortEventsChronologically(entries), [entries]);
   const sortedPosts = useMemo(() => sortPosts(posts), [posts]);
+  const sortedMondayPoints = useMemo(() => sortMondayPoints(mondayPoints), [mondayPoints]);
   const sortedOfficeBearers = useMemo(
     () => sortByPositionThenName(officeBearers),
     [officeBearers]
@@ -364,25 +364,10 @@ export default function App() {
     [filteredMembers]
   );
 
-  const sortedSectionItems = useMemo(() => {
-    const groups = {};
-    SECTION_KEYS.forEach((key) => {
-      groups[key] = sortByPositionThenName(
-        diarySectionItems.filter((item) => item.section_key === key)
-      );
-    });
-    return groups;
-  }, [diarySectionItems]);
-
   useEffect(() => {
     if (!loggedIn) return;
     loadAll();
   }, [loggedIn]);
-
-  useEffect(() => {
-    const current = diarySections.find((x) => x.section_key === sectionEditKey);
-    setSectionEditTitle(current?.title || "");
-  }, [sectionEditKey, diarySections]);
 
   const loadAll = async () => {
     await Promise.all([
@@ -390,9 +375,8 @@ export default function App() {
       loadMembers(),
       loadOfficeBearers(),
       loadClubCoaches(),
-      loadDiarySections(),
-      loadDiarySectionItems(),
       loadPosts(),
+      loadMondayPoints(),
     ]);
   };
 
@@ -428,51 +412,16 @@ export default function App() {
     setClubCoaches(data || []);
   };
 
-  const ensureDiarySectionsExist = async () => {
-    const { error } = await supabase
-      .from("diary_sections")
-      .upsert(DEFAULT_SECTIONS, { onConflict: "section_key" });
-
-    if (error) {
-      setMessage(`Could not prepare diary sections: ${error.message}`);
-      return false;
-    }
-
-    return true;
-  };
-
-  const loadDiarySections = async () => {
-    const ok = await ensureDiarySectionsExist();
-    if (!ok) return;
-
-    const { data, error } = await supabase
-      .from("diary_sections")
-      .select("*")
-      .order("section_key", { ascending: true });
-
-    if (error) return setMessage(`Could not load diary sections: ${error.message}`);
-    setDiarySections(data || []);
-  };
-
-  const loadDiarySectionItems = async () => {
-    const { data, error } = await supabase
-      .from("diary_section_items")
-      .select("*")
-      .order("position", { ascending: true });
-
-    if (error) return setMessage(`Could not load diary section items: ${error.message}`);
-    setDiarySectionItems(data || []);
-  };
-
   const loadPosts = async () => {
     const { data, error } = await supabase.from("information_posts").select("*");
     if (error) return setMessage(`Could not load information posts: ${error.message}`);
     setPosts(data || []);
   };
 
-  const getSectionTitle = (key) => {
-    const found = diarySections.find((x) => x.section_key === key);
-    return found?.title || key;
+  const loadMondayPoints = async () => {
+    const { data, error } = await supabase.from("monday_points").select("*");
+    if (error) return setMessage(`Could not load Monday Points: ${error.message}`);
+    setMondayPoints(data || []);
   };
 
   const handleLogin = () => {
@@ -522,13 +471,6 @@ export default function App() {
     setNewCoachPosition("");
   };
 
-  const clearSectionItemForm = () => {
-    setEditingSectionItemId(null);
-    setNewSectionItemName("");
-    setNewSectionItemPhone("");
-    setNewSectionItemPosition("");
-  };
-
   const clearPostForm = () => {
     setEditingPostId(null);
     setPostTitle("");
@@ -538,6 +480,16 @@ export default function App() {
     setPostButtonText("");
     setPostPinned(false);
     setPostFile(null);
+  };
+
+  const clearMondayForm = () => {
+    setEditingMondayId(null);
+    setMondayTitle("");
+    setMondayDate("");
+    setMondayNote("");
+    setMondayButtonText("");
+    setMondayLink("");
+    setMondayFile(null);
   };
 
   const saveEntry = async () => {
@@ -736,101 +688,17 @@ export default function App() {
     setMessage("Club coach deleted.");
   };
 
-  const saveSectionTitle = async () => {
-    if (!sectionEditKey || !sectionEditTitle) {
-      return setMessage("Choose a section and title.");
-    }
+  const uploadFileToBucket = async (file, folder) => {
+    if (!file) return null;
 
-    const { data, error } = await supabase
-      .from("diary_sections")
-      .upsert([{ section_key: sectionEditKey, title: sectionEditTitle }], {
-        onConflict: "section_key",
-      })
-      .select()
-      .single();
-
-    if (error) return setMessage(`Could not update section title: ${error.message}`);
-
-    setDiarySections((prev) => {
-      const exists = prev.some((x) => x.section_key === sectionEditKey);
-      if (exists) {
-        return prev.map((x) => (x.section_key === sectionEditKey ? data : x));
-      }
-      return [...prev, data];
-    });
-
-    setMessage("Section title updated.");
-  };
-
-  const saveSectionItem = async () => {
-    if (!currentSectionKey || !newSectionItemName) {
-      return setMessage("Enter section item name.");
-    }
-
-    const payload = {
-      section_key: currentSectionKey,
-      name: newSectionItemName,
-      phone: newSectionItemPhone,
-      position: newSectionItemPosition === "" ? null : Number(newSectionItemPosition),
-    };
-
-    if (editingSectionItemId) {
-      const { data, error } = await supabase
-        .from("diary_section_items")
-        .update(payload)
-        .eq("id", editingSectionItemId)
-        .select()
-        .single();
-
-      if (error) return setMessage(`Could not update section item: ${error.message}`);
-      setDiarySectionItems((prev) =>
-        prev.map((x) => (x.id === editingSectionItemId ? data : x))
-      );
-      setMessage("Section item updated.");
-    } else {
-      const { data, error } = await supabase
-        .from("diary_section_items")
-        .insert([payload])
-        .select()
-        .single();
-
-      if (error) return setMessage(`Could not save section item: ${error.message}`);
-      setDiarySectionItems((prev) => [...prev, data]);
-      setMessage("Section item added.");
-    }
-
-    clearSectionItemForm();
-  };
-
-  const editSectionItem = (item) => {
-    setEditingSectionItemId(item.id);
-    setCurrentSectionKey(item.section_key || "section1");
-    setNewSectionItemName(item.name || "");
-    setNewSectionItemPhone(item.phone || "");
-    setNewSectionItemPosition(item.position == null ? "" : String(item.position));
-    setTab("admin");
-  };
-
-  const deleteSectionItem = async (id) => {
-    const { error } = await supabase.from("diary_section_items").delete().eq("id", id);
-    if (error) return setMessage(`Could not delete section item: ${error.message}`);
-    setDiarySectionItems((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Section item deleted.");
-  };
-
-  const uploadPostFile = async () => {
-    if (!postFile) return postLink || null;
-
-    const fileName = `${Date.now()}-${postFile.name.replace(/\s+/g, "-")}`;
-    const filePath = `information/${fileName}`;
+    const fileName = `${Date.now()}-${file.name.replace(/\s+/g, "-")}`;
+    const filePath = `${folder}/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from(BUCKET)
-      .upload(filePath, postFile, { upsert: false });
+      .upload(filePath, file, { upsert: false });
 
-    if (uploadError) {
-      throw uploadError;
-    }
+    if (uploadError) throw uploadError;
 
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
     return data.publicUrl;
@@ -842,7 +710,9 @@ export default function App() {
     }
 
     try {
-      const finalLink = await uploadPostFile();
+      const finalLink = postFile
+        ? await uploadFileToBucket(postFile, "information")
+        : postLink || null;
 
       const payload = {
         title: postTitle,
@@ -899,6 +769,71 @@ export default function App() {
     if (error) return setMessage(`Could not delete information post: ${error.message}`);
     setPosts((prev) => prev.filter((x) => x.id !== id));
     setMessage("Information post deleted.");
+  };
+
+  const saveMondayPoints = async () => {
+    if (!mondayTitle || !mondayDate) {
+      return setMessage("Enter Monday Points title and week date.");
+    }
+
+    try {
+      const finalLink = mondayFile
+        ? await uploadFileToBucket(mondayFile, "monday-points")
+        : mondayLink || null;
+
+      const payload = {
+        title: mondayTitle,
+        week_date: mondayDate,
+        note: mondayNote || null,
+        file_url: finalLink,
+        button_text: mondayButtonText || null,
+      };
+
+      if (editingMondayId) {
+        const { data, error } = await supabase
+          .from("monday_points")
+          .update(payload)
+          .eq("id", editingMondayId)
+          .select()
+          .single();
+
+        if (error) return setMessage(`Could not update Monday Points: ${error.message}`);
+        setMondayPoints((prev) => prev.map((x) => (x.id === editingMondayId ? data : x)));
+        setMessage("Monday Points updated.");
+      } else {
+        const { data, error } = await supabase
+          .from("monday_points")
+          .insert([payload])
+          .select()
+          .single();
+
+        if (error) return setMessage(`Could not save Monday Points: ${error.message}`);
+        setMondayPoints((prev) => [...prev, data]);
+        setMessage("Monday Points added.");
+      }
+
+      clearMondayForm();
+    } catch (err) {
+      setMessage(`Could not upload Monday Points file: ${err.message}`);
+    }
+  };
+
+  const editMondayPoints = (item) => {
+    setEditingMondayId(item.id);
+    setMondayTitle(item.title || "");
+    setMondayDate(item.week_date || "");
+    setMondayNote(item.note || "");
+    setMondayButtonText(item.button_text || "");
+    setMondayLink(item.file_url || "");
+    setMondayFile(null);
+    setTab("admin");
+  };
+
+  const deleteMondayPoints = async (id) => {
+    const { error } = await supabase.from("monday_points").delete().eq("id", id);
+    if (error) return setMessage(`Could not delete Monday Points: ${error.message}`);
+    setMondayPoints((prev) => prev.filter((x) => x.id !== id));
+    setMessage("Monday Points deleted.");
   };
 
   const moveItem = async (table, items, onItemsUpdated, id, direction, label) => {
@@ -1040,6 +975,7 @@ export default function App() {
 
         <div style={styles.tabs}>
           <button style={styles.tab(tab === "diary")} onClick={() => setTab("diary")}>Diary</button>
+          <button style={styles.tab(tab === "events")} onClick={() => setTab("events")}>Events</button>
           <button style={styles.tab(tab === "members")} onClick={() => setTab("members")}>Members</button>
           <button style={styles.tab(tab === "information")} onClick={() => setTab("information")}>Information</button>
           <button style={styles.tab(tab === "admin")} onClick={() => setTab("admin")}>Admin</button>
@@ -1082,16 +1018,46 @@ export default function App() {
               {renderPersonCards(sortedClubCoaches, "Club Coach")}
             </div>
 
-            {SECTION_KEYS.map((key) => (
-              <div key={key} style={styles.panel}>
-                <h3 style={styles.sectionTitle}>{getSectionTitle(key)}</h3>
-                {renderPersonCards(sortedSectionItems[key] || [], getSectionTitle(key))}
-              </div>
-            ))}
-
             <div style={styles.panel}>
-              <h3 style={styles.sectionTitle}>Diary Events</h3>
-              {sortedEntries.map((e) => (
+              <h3 style={styles.sectionTitle}>Monday Points</h3>
+              {sortedMondayPoints.length === 0 ? (
+                <div style={{ color: "#777" }}>No Monday Points uploaded yet.</div>
+              ) : (
+                sortedMondayPoints.map((item) => (
+                  <div key={item.id} style={styles.card}>
+                    <strong style={{ color: "#92400e" }}>{formatDiaryDate(item.week_date)}</strong> — {item.title}
+                    {item.note ? (
+                      <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>
+                        {item.note}
+                      </div>
+                    ) : null}
+                    {item.file_url ? (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={styles.fileInfo}>{getFileTypeLabel(item.file_url)}</div>
+                        <a
+                          href={item.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={styles.linkBtn}
+                        >
+                          {item.button_text || "Open Monday Points"}
+                        </a>
+                      </div>
+                    ) : null}
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        )}
+
+        {tab === "events" && (
+          <div style={styles.panel}>
+            <h3 style={styles.sectionTitle}>Diary Events</h3>
+            {sortedEntries.length === 0 ? (
+              <div style={{ color: "#777" }}>No events added yet.</div>
+            ) : (
+              sortedEntries.map((e) => (
                 <div key={e.id} style={styles.card}>
                   <strong style={{ color: "#92400e" }}>{formatDiaryDate(e.date_text)}</strong> — {e.title}
                   {e.note ? (
@@ -1100,9 +1066,9 @@ export default function App() {
                     </div>
                   ) : null}
                 </div>
-              ))}
-            </div>
-          </>
+              ))
+            )}
+          </div>
         )}
 
         {tab === "members" && (
@@ -1174,7 +1140,7 @@ export default function App() {
               <>
                 <div style={styles.panel}>
                   <h3 style={styles.sectionTitle}>
-                    {editingEntryId ? "Edit Diary Entry" : "Add Diary Entry"}
+                    {editingEntryId ? "Edit Event" : "Add Event"}
                   </h3>
 
                   <input
@@ -1199,7 +1165,7 @@ export default function App() {
                   />
 
                   <button onClick={saveEntry} style={styles.button}>
-                    {editingEntryId ? "Update Diary Entry" : "Save Diary Entry"}
+                    {editingEntryId ? "Update Event" : "Save Event"}
                   </button>
 
                   {(editingEntryId || title || date || note) && (
@@ -1210,7 +1176,7 @@ export default function App() {
                 </div>
 
                 <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>Manage Diary Entries</h3>
+                  <h3 style={styles.sectionTitle}>Manage Events</h3>
                   {sortedEntries.map((e) => (
                     <div key={e.id} style={styles.card}>
                       <strong>{formatDiaryDate(e.date_text)}</strong> — {e.title}
@@ -1375,137 +1341,88 @@ export default function App() {
                 </div>
 
                 <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>Rename Extra Sections</h3>
-                  <select
-                    value={sectionEditKey}
-                    onChange={(e) => setSectionEditKey(e.target.value)}
-                    style={styles.input}
-                  >
-                    <option value="section1">Section 1</option>
-                    <option value="section2">Section 2</option>
-                    <option value="section3">Section 3</option>
-                  </select>
-                  <input
-                    value={sectionEditTitle}
-                    onChange={(e) => setSectionEditTitle(e.target.value)}
-                    placeholder="Section title"
-                    style={styles.input}
-                  />
-                  <button onClick={saveSectionTitle} style={styles.button}>Save Section Title</button>
-                </div>
-
-                <div style={styles.panel}>
                   <h3 style={styles.sectionTitle}>
-                    {editingSectionItemId ? "Edit Extra Section Item" : "Add Extra Section Item"}
+                    {editingMondayId ? "Edit Monday Points" : "Add Monday Points"}
                   </h3>
-                  <select
-                    value={currentSectionKey}
-                    onChange={(e) => setCurrentSectionKey(e.target.value)}
-                    style={styles.input}
-                  >
-                    {SECTION_KEYS.map((key) => (
-                      <option key={key} value={key}>{getSectionTitle(key)}</option>
-                    ))}
-                  </select>
+
                   <input
-                    value={newSectionItemName}
-                    onChange={(e) => setNewSectionItemName(e.target.value)}
-                    placeholder="Name"
+                    value={mondayTitle}
+                    onChange={(e) => setMondayTitle(e.target.value)}
+                    placeholder="Title e.g. Monday Points Week 1"
                     style={styles.input}
                   />
+
                   <input
-                    value={newSectionItemPhone}
-                    onChange={(e) => setNewSectionItemPhone(e.target.value)}
-                    placeholder="Phone"
+                    type="date"
+                    value={mondayDate}
+                    onChange={(e) => setMondayDate(e.target.value)}
                     style={styles.input}
                   />
+
+                  <textarea
+                    value={mondayNote}
+                    onChange={(e) => setMondayNote(e.target.value)}
+                    placeholder="Optional note"
+                    style={styles.textarea}
+                  />
+
                   <input
-                    type="number"
-                    value={newSectionItemPosition}
-                    onChange={(e) => setNewSectionItemPosition(e.target.value)}
-                    placeholder="Position order"
+                    value={mondayLink}
+                    onChange={(e) => setMondayLink(e.target.value)}
+                    placeholder="Attachment link (optional if uploading file)"
                     style={styles.input}
                   />
-                  <button onClick={saveSectionItem} style={styles.button}>
-                    {editingSectionItemId ? "Update Section Item" : "Save Section Item"}
+
+                  <input
+                    value={mondayButtonText}
+                    onChange={(e) => setMondayButtonText(e.target.value)}
+                    placeholder="Button text"
+                    style={styles.input}
+                  />
+
+                  <div style={{ marginBottom: 10 }}>
+                    <input
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx,application/pdf,image/png,image/jpeg,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      onChange={(e) => setMondayFile(e.target.files?.[0] || null)}
+                    />
+                    {mondayFile ? (
+                      <div style={styles.fileInfo}>Selected file: {mondayFile.name}</div>
+                    ) : null}
+                  </div>
+
+                  <button onClick={saveMondayPoints} style={styles.button}>
+                    {editingMondayId ? "Update Monday Points" : "Save Monday Points"}
                   </button>
-                  {(editingSectionItemId || newSectionItemName || newSectionItemPhone || newSectionItemPosition) && (
-                    <button onClick={clearSectionItemForm} style={styles.secondaryButton}>Clear</button>
+
+                  {(editingMondayId || mondayTitle || mondayDate || mondayNote || mondayLink || mondayButtonText || mondayFile) && (
+                    <button onClick={clearMondayForm} style={styles.secondaryButton}>
+                      Clear
+                    </button>
                   )}
                 </div>
 
-                {SECTION_KEYS.map((key) => {
-                  const list = sortedSectionItems[key] || [];
-
-                  return (
-                    <div key={key} style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>Manage {getSectionTitle(key)}</h3>
-
-                      {list.length === 0 ? (
-                        <div style={{ color: "#777" }}>No items yet.</div>
-                      ) : (
-                        list.map((item, index) => {
-                          const canMoveUp = index > 0;
-                          const canMoveDown = index < list.length - 1;
-
-                          return (
-                            <div key={item.id} style={styles.card}>
-                              <strong>{item.name}</strong> — {item.phone || "no phone"}
-                              <div style={{ marginTop: 8 }}>
-                                <button onClick={() => editSectionItem(item)} style={styles.smallBtn}>Edit</button>
-                                <button onClick={() => deleteSectionItem(item.id)} style={styles.smallBtn}>Delete</button>
-                                <button
-                                  onClick={() =>
-                                    canMoveUp &&
-                                    moveItem(
-                                      "diary_section_items",
-                                      list,
-                                      (updatedList) => {
-                                        setDiarySectionItems((prev) => {
-                                          const others = prev.filter((x) => x.section_key !== key);
-                                          return [...others, ...updatedList];
-                                        });
-                                      },
-                                      item.id,
-                                      "up",
-                                      getSectionTitle(key)
-                                    )
-                                  }
-                                  style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
-                                  type="button"
-                                >
-                                  ↑ Up
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    canMoveDown &&
-                                    moveItem(
-                                      "diary_section_items",
-                                      list,
-                                      (updatedList) => {
-                                        setDiarySectionItems((prev) => {
-                                          const others = prev.filter((x) => x.section_key !== key);
-                                          return [...others, ...updatedList];
-                                        });
-                                      },
-                                      item.id,
-                                      "down",
-                                      getSectionTitle(key)
-                                    )
-                                  }
-                                  style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
-                                  type="button"
-                                >
-                                  ↓ Down
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  );
-                })}
+                <div style={styles.panel}>
+                  <h3 style={styles.sectionTitle}>Manage Monday Points</h3>
+                  {sortedMondayPoints.length === 0 ? (
+                    <div style={{ color: "#777" }}>No Monday Points yet.</div>
+                  ) : (
+                    sortedMondayPoints.map((item) => (
+                      <div key={item.id} style={styles.card}>
+                        <strong>{formatDiaryDate(item.week_date)}</strong> — {item.title}
+                        {item.file_url ? (
+                          <div style={{ marginTop: 6, color: "#666" }}>
+                            {getFileTypeLabel(item.file_url)}
+                          </div>
+                        ) : null}
+                        <div style={{ marginTop: 8 }}>
+                          <button onClick={() => editMondayPoints(item)} style={styles.smallBtn}>Edit</button>
+                          <button onClick={() => deleteMondayPoints(item.id)} style={styles.smallBtn}>Delete</button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
 
                 <div style={styles.panel}>
                   <h3 style={styles.sectionTitle}>{editingMemberId ? "Edit Member" : "Add Member"}</h3>
@@ -1553,7 +1470,7 @@ export default function App() {
                   <div style={{ marginBottom: 10 }}>
                     <input
                       type="file"
-                      accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                      accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx,application/pdf,image/png,image/jpeg,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                       onChange={(e) => setPostFile(e.target.files?.[0] || null)}
                     />
                     {postFile ? (
