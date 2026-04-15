@@ -10,7 +10,7 @@ const styles = {
   page: {
     padding: 16,
     fontFamily: "Arial, sans-serif",
-    background: "linear-gradient(180deg, #f5efe7 0%, #fffaf4 100%)",
+    background: "linear-gradient(180deg, #5b1d2a 0%, #7a2638 45%, #a33a4d 100%)",
     minHeight: "100vh",
     color: "#222",
   },
@@ -19,12 +19,12 @@ const styles = {
     margin: "0 auto",
   },
   header: {
-    background: "linear-gradient(135deg, #7c2d12 0%, #b45309 100%)",
+    background: "linear-gradient(135deg, #5a1323 0%, #7b1e32 55%, #a12f45 100%)",
     color: "#fff",
     borderRadius: 20,
     padding: 18,
     marginBottom: 18,
-    boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.22)",
     display: "flex",
     alignItems: "center",
     gap: 16,
@@ -36,8 +36,8 @@ const styles = {
     borderRadius: "50%",
     objectFit: "cover",
     background: "#fff",
-    border: "3px solid #fbbf24",
-    boxShadow: "0 3px 10px rgba(0,0,0,0.2)",
+    border: "3px solid #f3c76b",
+    boxShadow: "0 3px 10px rgba(0,0,0,0.25)",
     flexShrink: 0,
   },
   titleWrap: {
@@ -55,21 +55,21 @@ const styles = {
     fontSize: 15,
   },
   panel: {
-    background: "#fff",
-    border: "1px solid #ead7c4",
+    background: "#fffaf8",
+    border: "1px solid #e5c8cf",
     borderRadius: 18,
     padding: 16,
     marginBottom: 18,
-    boxShadow: "0 3px 10px rgba(0,0,0,0.06)",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
   },
   loginPanel: {
-    background: "#fff",
-    border: "1px solid #ead7c4",
+    background: "#fffaf8",
+    border: "1px solid #e5c8cf",
     borderRadius: 18,
     padding: 20,
     maxWidth: 420,
     margin: "80px auto",
-    boxShadow: "0 6px 18px rgba(0,0,0,0.1)",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.18)",
     textAlign: "center",
   },
   tabs: {
@@ -80,9 +80,9 @@ const styles = {
   },
   tab: (active) => ({
     padding: "12px 16px",
-    background: active ? "#b45309" : "#f3e8dc",
-    color: active ? "#fff" : "#5c2c0c",
-    border: active ? "1px solid #b45309" : "1px solid #e3d2c1",
+    background: active ? "#8b1e3f" : "#f3d9df",
+    color: active ? "#fff" : "#5b1d2a",
+    border: active ? "1px solid #8b1e3f" : "1px solid #e5c8cf",
     borderRadius: 12,
     fontWeight: 700,
     cursor: "pointer",
@@ -92,9 +92,9 @@ const styles = {
     padding: 12,
     marginBottom: 10,
     borderRadius: 12,
-    border: "1px solid #cbd5e1",
+    border: "1px solid #d7b7be",
     boxSizing: "border-box",
-    background: "#fffdfb",
+    background: "#fffefe",
     fontSize: 15,
   },
   textarea: {
@@ -102,16 +102,16 @@ const styles = {
     padding: 12,
     marginBottom: 10,
     borderRadius: 12,
-    border: "1px solid #cbd5e1",
+    border: "1px solid #d7b7be",
     boxSizing: "border-box",
     minHeight: 100,
     resize: "vertical",
-    background: "#fffdfb",
+    background: "#fffefe",
     fontSize: 15,
   },
   button: {
     padding: "12px 16px",
-    background: "#b45309",
+    background: "#8b1e3f",
     color: "#fff",
     border: "none",
     borderRadius: 12,
@@ -122,9 +122,9 @@ const styles = {
   },
   secondaryButton: {
     padding: "12px 16px",
-    background: "#f3e8dc",
-    color: "#5c2c0c",
-    border: "1px solid #e3d2c1",
+    background: "#f3d9df",
+    color: "#5b1d2a",
+    border: "1px solid #e5c8cf",
     borderRadius: 12,
     fontWeight: 700,
     cursor: "pointer",
@@ -133,12 +133,12 @@ const styles = {
   },
   smallBtn: {
     padding: "8px 10px",
-    background: "#eee7df",
-    border: "1px solid #e3d2c1",
+    background: "#f2e4e7",
+    border: "1px solid #e0c5cb",
     borderRadius: 10,
     cursor: "pointer",
     marginLeft: 8,
-    color: "#5c2c0c",
+    color: "#5b1d2a",
     fontWeight: 700,
   },
   reorderBtn: {
@@ -151,11 +151,21 @@ const styles = {
     color: "#1d4ed8",
     fontWeight: 700,
   },
+  disabledReorderBtn: {
+    padding: "8px 10px",
+    background: "#e5e7eb",
+    border: "1px solid #d1d5db",
+    borderRadius: 10,
+    cursor: "not-allowed",
+    marginLeft: 8,
+    color: "#9ca3af",
+    fontWeight: 700,
+  },
   card: {
-    border: "1px solid #e9dfd3",
+    border: "1px solid #ead7dc",
     borderRadius: 14,
     padding: 14,
-    background: "#fffdfa",
+    background: "#fffdfd",
     marginBottom: 10,
   },
   grid: {
@@ -165,11 +175,11 @@ const styles = {
   },
   sectionTitle: {
     marginTop: 0,
-    color: "#7c2d12",
+    color: "#7a2138",
   },
   memberSectionTitle: {
-    color: "#7c2d12",
-    borderBottom: "2px solid #f3e8dc",
+    color: "#7a2138",
+    borderBottom: "2px solid #efd6dc",
     paddingBottom: 6,
     marginTop: 22,
     marginBottom: 12,
@@ -177,8 +187,8 @@ const styles = {
   message: {
     marginBottom: 15,
     padding: 12,
-    background: "#fff3cd",
-    border: "1px solid #e0c36c",
+    background: "#fff1c7",
+    border: "1px solid #e6c768",
     borderRadius: 10,
   },
   linkBtn: {
@@ -217,12 +227,12 @@ const styles = {
     display: "inline-block",
     padding: "4px 8px",
     borderRadius: 999,
-    background: "#fff7ed",
-    color: "#b45309",
+    background: "#fff1e8",
+    color: "#9a3412",
     fontWeight: 700,
     fontSize: 12,
     marginBottom: 8,
-    border: "1px solid #fed7aa",
+    border: "1px solid #fdba74",
   },
   pinnedCard: {
     border: "2px solid #f59e0b",
@@ -1071,39 +1081,46 @@ export default function App() {
 
                 <div style={styles.panel}>
                   <h3 style={styles.sectionTitle}>Manage Office Bearers</h3>
-                  {sortedOfficeBearers.map((person, index) => (
-                    <div key={person.id} style={styles.card}>
-                      <strong>{person.role}</strong> — {person.name}
-                      <div style={{ marginTop: 8 }}>
-                        <button onClick={() => editOfficeBearer(person)} style={styles.smallBtn}>
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => deleteOfficeBearer(person.id)}
-                          style={styles.smallBtn}
-                        >
-                          Delete
-                        </button>
-                        <button
-                          onClick={() => moveOfficeBearer(person.id, "up")}
-                          style={styles.reorderBtn}
-                          disabled={index === 0}
-                        >
-                          ↑ Up
-                        </button>
-                        <button
-                          onClick={() => moveOfficeBearer(person.id, "down")}
-                          style={styles.reorderBtn}
-                          disabled={index === sortedOfficeBearers.length - 1}
-                        >
-                          ↓ Down
-                        </button>
+                  {sortedOfficeBearers.map((person, index) => {
+                    const canMoveUp = index > 0;
+                    const canMoveDown = index < sortedOfficeBearers.length - 1;
+
+                    return (
+                      <div key={person.id} style={styles.card}>
+                        <strong>{person.role}</strong> — {person.name}
+                        <div style={{ marginTop: 8 }}>
+                          <button onClick={() => editOfficeBearer(person)} style={styles.smallBtn}>
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => deleteOfficeBearer(person.id)}
+                            style={styles.smallBtn}
+                          >
+                            Delete
+                          </button>
+
+                          <button
+                            onClick={() => canMoveUp && moveOfficeBearer(person.id, "up")}
+                            style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
+                            type="button"
+                          >
+                            ↑ Up
+                          </button>
+
+                          <button
+                            onClick={() => canMoveDown && moveOfficeBearer(person.id, "down")}
+                            style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
+                            type="button"
+                          >
+                            ↓ Down
+                          </button>
+                        </div>
+                        <div style={{ marginTop: 8, color: "#666", fontSize: 13 }}>
+                          Position: {person.position ?? "not set"}
+                        </div>
                       </div>
-                      <div style={{ marginTop: 8, color: "#666", fontSize: 13 }}>
-                        Position: {person.position ?? "not set"}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div style={styles.panel}>
