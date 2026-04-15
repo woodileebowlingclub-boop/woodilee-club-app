@@ -255,13 +255,11 @@ function sortPosts(list) {
   });
 }
 
-function sortOfficeBearers(list) {
+function sortByPositionThenName(list) {
   return [...list].sort((a, b) => {
     const aPos = Number.isFinite(Number(a.position)) ? Number(a.position) : 999;
     const bPos = Number.isFinite(Number(b.position)) ? Number(b.position) : 999;
-
     if (aPos !== bPos) return aPos - bPos;
-
     return String(a.name || "").localeCompare(String(b.name || ""));
   });
 }
@@ -286,6 +284,7 @@ export default function App() {
   const [entries, setEntries] = useState([]);
   const [members, setMembers] = useState([]);
   const [officeBearers, setOfficeBearers] = useState([]);
+  const [clubCoaches, setClubCoaches] = useState([]);
   const [posts, setPosts] = useState([]);
 
   const [search, setSearch] = useState("");
@@ -302,6 +301,10 @@ export default function App() {
   const [newOfficerPhone, setNewOfficerPhone] = useState("");
   const [newOfficerPosition, setNewOfficerPosition] = useState("");
 
+  const [newCoachName, setNewCoachName] = useState("");
+  const [newCoachPhone, setNewCoachPhone] = useState("");
+  const [newCoachPosition, setNewCoachPosition] = useState("");
+
   const [postTitle, setPostTitle] = useState("");
   const [postMessage, setPostMessage] = useState("");
   const [postDate, setPostDate] = useState("");
@@ -313,20 +316,23 @@ export default function App() {
   const [editingEntryId, setEditingEntryId] = useState(null);
   const [editingMemberId, setEditingMemberId] = useState(null);
   const [editingOfficerId, setEditingOfficerId] = useState(null);
+  const [editingCoachId, setEditingCoachId] = useState(null);
   const [editingPostId, setEditingPostId] = useState(null);
 
   const sortedEntries = useMemo(() => sortEventsChronologically(entries), [entries]);
   const sortedPosts = useMemo(() => sortPosts(posts), [posts]);
   const sortedOfficeBearers = useMemo(
-    () => sortOfficeBearers(officeBearers),
+    () => sortByPositionThenName(officeBearers),
     [officeBearers]
+  );
+  const sortedClubCoaches = useMemo(
+    () => sortByPositionThenName(clubCoaches),
+    [clubCoaches]
   );
 
   const filteredMembers = useMemo(() => {
     return members.filter((m) =>
-      String(m.name || "")
-        .toLowerCase()
-        .includes(search.toLowerCase())
+      String(m.name || "").toLowerCase().includes(search.toLowerCase())
     );
   }, [members, search]);
 
@@ -360,7 +366,13 @@ export default function App() {
   }, [loggedIn]);
 
   const loadAll = async () => {
-    await Promise.all([loadEntries(), loadMembers(), loadOfficeBearers(), loadPosts()]);
+    await Promise.all([
+      loadEntries(),
+      loadMembers(),
+      loadOfficeBearers(),
+      loadClubCoaches(),
+      loadPosts(),
+    ]);
   };
 
   const loadEntries = async () => {
@@ -391,6 +403,18 @@ export default function App() {
       return;
     }
     setOfficeBearers(data || []);
+  };
+
+  const loadClubCoaches = async () => {
+    const { data, error } = await supabase
+      .from("club_coaches")
+      .select("*")
+      .order("position", { ascending: true });
+    if (error) {
+      setMessage(`Could not load club coaches: ${error.message}`);
+      return;
+    }
+    setClubCoaches(data || []);
   };
 
   const loadPosts = async () => {
@@ -439,6 +463,13 @@ export default function App() {
     setNewOfficerName("");
     setNewOfficerPhone("");
     setNewOfficerPosition("");
+  };
+
+  const clearCoachForm = () => {
+    setEditingCoachId(null);
+    setNewCoachName("");
+    setNewCoachPhone("");
+    setNewCoachPosition("");
   };
 
   const clearPostForm = () => {
@@ -628,9 +659,7 @@ export default function App() {
     setNewOfficerName(person.name || "");
     setNewOfficerPhone(person.phone || "");
     setNewOfficerPosition(
-      person.position === null || person.position === undefined
-        ? ""
-        : String(person.position)
+      person.position === null || person.position === undefined ? "" : String(person.position)
     );
     setTab("admin");
   };
@@ -645,14 +674,78 @@ export default function App() {
     setMessage("Office bearer deleted.");
   };
 
-  const moveOfficeBearer = async (id, direction) => {
-    const currentList = sortOfficeBearers(officeBearers);
-    const currentIndex = currentList.findIndex((person) => person.id === id);
+  const saveCoach = async () => {
+    if (!newCoachName) {
+      setMessage("Enter coach name.");
+      return;
+    }
 
+    const payload = {
+      name: newCoachName,
+      phone: newCoachPhone,
+      position: newCoachPosition === "" ? null : Number(newCoachPosition),
+    };
+
+    if (editingCoachId) {
+      const { data, error } = await supabase
+        .from("club_coaches")
+        .update(payload)
+        .eq("id", editingCoachId)
+        .select()
+        .single();
+
+      if (error) {
+        setMessage(`Could not update club coach: ${error.message}`);
+        return;
+      }
+
+      setClubCoaches((prev) => prev.map((x) => (x.id === editingCoachId ? data : x)));
+      setMessage("Club coach updated.");
+    } else {
+      const { data, error } = await supabase
+        .from("club_coaches")
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) {
+        setMessage(`Could not save club coach: ${error.message}`);
+        return;
+      }
+
+      setClubCoaches((prev) => [...prev, data]);
+      setMessage("Club coach added.");
+    }
+
+    clearCoachForm();
+  };
+
+  const editCoach = (coach) => {
+    setEditingCoachId(coach.id);
+    setNewCoachName(coach.name || "");
+    setNewCoachPhone(coach.phone || "");
+    setNewCoachPosition(
+      coach.position === null || coach.position === undefined ? "" : String(coach.position)
+    );
+    setTab("admin");
+  };
+
+  const deleteCoach = async (id) => {
+    const { error } = await supabase.from("club_coaches").delete().eq("id", id);
+    if (error) {
+      setMessage(`Could not delete club coach: ${error.message}`);
+      return;
+    }
+    setClubCoaches((prev) => prev.filter((x) => x.id !== id));
+    setMessage("Club coach deleted.");
+  };
+
+  const moveItem = async (table, items, setItems, id, direction, label) => {
+    const currentList = sortByPositionThenName(items);
+    const currentIndex = currentList.findIndex((item) => item.id === id);
     if (currentIndex === -1) return;
 
     const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
-
     if (targetIndex < 0 || targetIndex >= currentList.length) return;
 
     const currentItem = currentList[currentIndex];
@@ -664,26 +757,26 @@ export default function App() {
       Number.isFinite(Number(targetItem.position)) ? Number(targetItem.position) : targetIndex + 1;
 
     const { error: error1 } = await supabase
-      .from("office_bearers")
+      .from(table)
       .update({ position: targetPos })
       .eq("id", currentItem.id);
 
     if (error1) {
-      setMessage(`Could not move office bearer: ${error1.message}`);
+      setMessage(`Could not move ${label}: ${error1.message}`);
       return;
     }
 
     const { error: error2 } = await supabase
-      .from("office_bearers")
+      .from(table)
       .update({ position: currentPos })
       .eq("id", targetItem.id);
 
     if (error2) {
-      setMessage(`Could not move office bearer: ${error2.message}`);
+      setMessage(`Could not move ${label}: ${error2.message}`);
       return;
     }
 
-    setOfficeBearers((prev) =>
+    setItems((prev) =>
       prev.map((item) => {
         if (item.id === currentItem.id) return { ...item, position: targetPos };
         if (item.id === targetItem.id) return { ...item, position: currentPos };
@@ -691,7 +784,7 @@ export default function App() {
       })
     );
 
-    setMessage("Office bearer order updated.");
+    setMessage(`${label} order updated.`);
   };
 
   const uploadPostFile = async () => {
@@ -820,6 +913,44 @@ export default function App() {
     ));
   };
 
+  const renderCoachCards = (list) => {
+    if (list.length === 0) {
+      return <div style={{ color: "#777" }}>No club coach listed yet.</div>;
+    }
+
+    return (
+      <div style={styles.grid}>
+        {list.map((coach) => (
+          <div key={coach.id} style={styles.card}>
+            <span style={styles.badge}>Club Coach</span>
+            <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
+              {coach.name}
+            </div>
+            <div style={{ marginBottom: 10, color: "#444" }}>
+              {coach.phone || "No phone listed"}
+            </div>
+
+            {coach.phone ? (
+              <div>
+                <a href={`tel:${coach.phone}`} style={styles.callBtn}>
+                  📞 Call
+                </a>
+                <a
+                  href={`https://wa.me/${normaliseUkPhoneForWhatsApp(coach.phone)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={styles.whatsappBtn}
+                >
+                  WhatsApp
+                </a>
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   if (!loggedIn) {
     return (
       <div style={styles.page}>
@@ -865,10 +996,7 @@ export default function App() {
           <button style={styles.tab(tab === "members")} onClick={() => setTab("members")}>
             Members
           </button>
-          <button
-            style={styles.tab(tab === "information")}
-            onClick={() => setTab("information")}
-          >
+          <button style={styles.tab(tab === "information")} onClick={() => setTab("information")}>
             Information
           </button>
           <button style={styles.tab(tab === "admin")} onClick={() => setTab("admin")}>
@@ -909,6 +1037,11 @@ export default function App() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div style={styles.panel}>
+              <h3 style={styles.sectionTitle}>Club Coach</h3>
+              {renderCoachCards(sortedClubCoaches)}
             </div>
 
             <div style={styles.panel}>
@@ -1068,11 +1201,7 @@ export default function App() {
                   <button onClick={saveOfficeBearer} style={styles.button}>
                     {editingOfficerId ? "Update Office Bearer" : "Save Office Bearer"}
                   </button>
-                  {(editingOfficerId ||
-                    newRole ||
-                    newOfficerName ||
-                    newOfficerPhone ||
-                    newOfficerPosition) && (
+                  {(editingOfficerId || newRole || newOfficerName || newOfficerPhone || newOfficerPosition) && (
                     <button onClick={clearOfficerForm} style={styles.secondaryButton}>
                       Clear
                     </button>
@@ -1092,23 +1221,24 @@ export default function App() {
                           <button onClick={() => editOfficeBearer(person)} style={styles.smallBtn}>
                             Edit
                           </button>
-                          <button
-                            onClick={() => deleteOfficeBearer(person.id)}
-                            style={styles.smallBtn}
-                          >
+                          <button onClick={() => deleteOfficeBearer(person.id)} style={styles.smallBtn}>
                             Delete
                           </button>
-
                           <button
-                            onClick={() => canMoveUp && moveOfficeBearer(person.id, "up")}
+                            onClick={() =>
+                              canMoveUp &&
+                              moveItem("office_bearers", officeBearers, setOfficeBearers, person.id, "up", "Office bearer")
+                            }
                             style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
                             type="button"
                           >
                             ↑ Up
                           </button>
-
                           <button
-                            onClick={() => canMoveDown && moveOfficeBearer(person.id, "down")}
+                            onClick={() =>
+                              canMoveDown &&
+                              moveItem("office_bearers", officeBearers, setOfficeBearers, person.id, "down", "Office bearer")
+                            }
                             style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
                             type="button"
                           >
@@ -1117,6 +1247,84 @@ export default function App() {
                         </div>
                         <div style={{ marginTop: 8, color: "#666", fontSize: 13 }}>
                           Position: {person.position ?? "not set"}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div style={styles.panel}>
+                  <h3 style={styles.sectionTitle}>
+                    {editingCoachId ? "Edit Club Coach" : "Add Club Coach"}
+                  </h3>
+                  <input
+                    value={newCoachName}
+                    onChange={(e) => setNewCoachName(e.target.value)}
+                    placeholder="Name"
+                    style={styles.input}
+                  />
+                  <input
+                    value={newCoachPhone}
+                    onChange={(e) => setNewCoachPhone(e.target.value)}
+                    placeholder="Phone"
+                    style={styles.input}
+                  />
+                  <input
+                    type="number"
+                    value={newCoachPosition}
+                    onChange={(e) => setNewCoachPosition(e.target.value)}
+                    placeholder="Position order e.g. 1, 2, 3"
+                    style={styles.input}
+                  />
+                  <button onClick={saveCoach} style={styles.button}>
+                    {editingCoachId ? "Update Club Coach" : "Save Club Coach"}
+                  </button>
+                  {(editingCoachId || newCoachName || newCoachPhone || newCoachPosition) && (
+                    <button onClick={clearCoachForm} style={styles.secondaryButton}>
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                <div style={styles.panel}>
+                  <h3 style={styles.sectionTitle}>Manage Club Coaches</h3>
+                  {sortedClubCoaches.map((coach, index) => {
+                    const canMoveUp = index > 0;
+                    const canMoveDown = index < sortedClubCoaches.length - 1;
+
+                    return (
+                      <div key={coach.id} style={styles.card}>
+                        <strong>{coach.name}</strong> — {coach.phone || "no phone"}
+                        <div style={{ marginTop: 8 }}>
+                          <button onClick={() => editCoach(coach)} style={styles.smallBtn}>
+                            Edit
+                          </button>
+                          <button onClick={() => deleteCoach(coach.id)} style={styles.smallBtn}>
+                            Delete
+                          </button>
+                          <button
+                            onClick={() =>
+                              canMoveUp &&
+                              moveItem("club_coaches", clubCoaches, setClubCoaches, coach.id, "up", "Club coach")
+                            }
+                            style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
+                            type="button"
+                          >
+                            ↑ Up
+                          </button>
+                          <button
+                            onClick={() =>
+                              canMoveDown &&
+                              moveItem("club_coaches", clubCoaches, setClubCoaches, coach.id, "down", "Club coach")
+                            }
+                            style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
+                            type="button"
+                          >
+                            ↓ Down
+                          </button>
+                        </div>
+                        <div style={{ marginTop: 8, color: "#666", fontSize: 13 }}>
+                          Position: {coach.position ?? "not set"}
                         </div>
                       </div>
                     );
