@@ -167,6 +167,13 @@ const styles = {
     marginTop: 0,
     color: "#7c2d12",
   },
+  memberSectionTitle: {
+    color: "#7c2d12",
+    borderBottom: "2px solid #f3e8dc",
+    paddingBottom: 6,
+    marginTop: 22,
+    marginBottom: 12,
+  },
   message: {
     marginBottom: 15,
     padding: 12,
@@ -306,14 +313,36 @@ export default function App() {
   );
 
   const filteredMembers = useMemo(() => {
-    return members
-      .filter((m) =>
-        String(m.name || "")
-          .toLowerCase()
-          .includes(search.toLowerCase())
-      )
-      .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+    return members.filter((m) =>
+      String(m.name || "")
+        .toLowerCase()
+        .includes(search.toLowerCase())
+    );
   }, [members, search]);
+
+  const gentsMembers = useMemo(
+    () =>
+      filteredMembers
+        .filter((m) => String(m.section || "").trim().toLowerCase() === "gents")
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
+    [filteredMembers]
+  );
+
+  const ladiesMembers = useMemo(
+    () =>
+      filteredMembers
+        .filter((m) => String(m.section || "").trim().toLowerCase() === "ladies")
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
+    [filteredMembers]
+  );
+
+  const associateMembers = useMemo(
+    () =>
+      filteredMembers
+        .filter((m) => String(m.section || "").trim().toLowerCase() === "associate")
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
+    [filteredMembers]
+  );
 
   useEffect(() => {
     if (!loggedIn) return;
@@ -749,6 +778,38 @@ export default function App() {
     setMessage("Information post deleted.");
   };
 
+  const renderMemberCards = (list) => {
+    if (list.length === 0) {
+      return <div style={{ color: "#777", marginBottom: 12 }}>No members in this section.</div>;
+    }
+
+    return list.map((m) => (
+      <div key={m.id} style={styles.card}>
+        <div style={{ fontWeight: 700, fontSize: 18 }}>{m.name}</div>
+        <div style={{ color: "#92400e", marginTop: 4 }}>{m.section}</div>
+        <div style={{ marginTop: 10 }}>
+          {m.phone ? (
+            <>
+              <a href={`tel:${m.phone}`} style={styles.callBtn}>
+                📞 {m.phone}
+              </a>
+              <a
+                href={`https://wa.me/${normaliseUkPhoneForWhatsApp(m.phone)}`}
+                target="_blank"
+                rel="noreferrer"
+                style={styles.whatsappBtn}
+              >
+                WhatsApp
+              </a>
+            </>
+          ) : (
+            <span style={{ color: "#888" }}>No phone</span>
+          )}
+        </div>
+      </div>
+    ));
+  };
+
   if (!loggedIn) {
     return (
       <div style={styles.page}>
@@ -812,9 +873,7 @@ export default function App() {
               <div style={styles.grid}>
                 {sortedOfficeBearers.map((person) => (
                   <div key={person.id} style={styles.card}>
-                    <span style={styles.badge}>
-                      {person.role}
-                    </span>
+                    <span style={styles.badge}>{person.role}</span>
                     <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
                       {person.name}
                     </div>
@@ -864,31 +923,14 @@ export default function App() {
               style={styles.input}
             />
 
-            {filteredMembers.map((m) => (
-              <div key={m.id} style={styles.card}>
-                <div style={{ fontWeight: 700, fontSize: 18 }}>{m.name}</div>
-                <div style={{ color: "#92400e", marginTop: 4 }}>{m.section}</div>
-                <div style={{ marginTop: 10 }}>
-                  {m.phone ? (
-                    <>
-                      <a href={`tel:${m.phone}`} style={styles.callBtn}>
-                        📞 {m.phone}
-                      </a>
-                      <a
-                        href={`https://wa.me/${normaliseUkPhoneForWhatsApp(m.phone)}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={styles.whatsappBtn}
-                      >
-                        WhatsApp
-                      </a>
-                    </>
-                  ) : (
-                    <span style={{ color: "#888" }}>No phone</span>
-                  )}
-                </div>
-              </div>
-            ))}
+            <h4 style={styles.memberSectionTitle}>Gents</h4>
+            {renderMemberCards(gentsMembers)}
+
+            <h4 style={styles.memberSectionTitle}>Ladies</h4>
+            {renderMemberCards(ladiesMembers)}
+
+            <h4 style={styles.memberSectionTitle}>Associate</h4>
+            {renderMemberCards(associateMembers)}
           </div>
         )}
 
