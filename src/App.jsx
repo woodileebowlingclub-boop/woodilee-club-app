@@ -202,6 +202,59 @@ const styles = {
     color: "#666",
     marginBottom: 10,
   },
+  heroCard: {
+    background: "linear-gradient(135deg, #fff7ed 0%, #fde7d3 100%)",
+    border: "2px solid #f59e0b",
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 18,
+    boxShadow: "0 6px 16px rgba(0,0,0,0.10)",
+  },
+  heroTitle: {
+    margin: "0 0 8px 0",
+    color: "#9a3412",
+    fontSize: 24,
+    fontWeight: 700,
+  },
+  heroDate: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: "#7c2d12",
+    marginBottom: 8,
+  },
+  homeGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+    gap: 16,
+  },
+  homeActionBtn: {
+    display: "inline-block",
+    padding: "12px 16px",
+    background: "#8b1e3f",
+    color: "#fff",
+    borderRadius: 12,
+    textDecoration: "none",
+    fontWeight: 700,
+    marginRight: 10,
+    marginBottom: 10,
+    cursor: "pointer",
+    border: "none",
+  },
+  homeMiniCard: {
+    border: "1px solid #ead7dc",
+    borderRadius: 14,
+    padding: 14,
+    background: "#fffdfd",
+    minHeight: 150,
+  },
+  homeLabel: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#9a3412",
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: "0.4px",
+  },
 };
 
 function sortEventsChronologically(list) {
@@ -268,11 +321,12 @@ function getFileTypeLabel(url) {
 export default function App() {
   const [pin, setPin] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
-  const [tab, setTab] = useState("diary");
+  const [tab, setTab] = useState("home");
 
   const [adminPin, setAdminPin] = useState("");
   const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [message, setMessage] = useState("");
+  const [adminTab, setAdminTab] = useState("events");
 
   const [entries, setEntries] = useState([]);
   const [members, setMembers] = useState([]);
@@ -387,6 +441,23 @@ export default function App() {
         .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
     [filteredMembers]
   );
+
+  const upcomingEvents = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return sortedEntries.filter((e) => {
+      const d = new Date(e.date_text);
+      return !Number.isNaN(d.getTime()) && d >= today;
+    });
+  }, [sortedEntries]);
+
+  const nextEvent = useMemo(() => upcomingEvents[0] || null, [upcomingEvents]);
+  const nextTwoEvents = useMemo(() => upcomingEvents.slice(1, 3), [upcomingEvents]);
+  const latestMonday = useMemo(() => sortedMondayPoints[0] || null, [sortedMondayPoints]);
+  const latestPinnedPost = useMemo(() => {
+    return sortedPosts.find((p) => p.pinned) || null;
+  }, [sortedPosts]);
 
   useEffect(() => {
     if (!loggedIn) return;
@@ -551,9 +622,12 @@ export default function App() {
     setDate(entry.date_text || "");
     setNote(entry.note || "");
     setTab("admin");
+    setAdminTab("events");
   };
 
   const deleteEntry = async (id) => {
+    if (!window.confirm("Delete this event?")) return;
+
     const { error } = await supabase.from("events").delete().eq("id", id);
     if (error) return setMessage(`Could not delete event: ${error.message}`);
     setEntries((prev) => prev.filter((x) => x.id !== id));
@@ -601,9 +675,12 @@ export default function App() {
     setNewMemberSection(member.section || "Gents");
     setNewMemberPhone(member.phone || "");
     setTab("admin");
+    setAdminTab("members");
   };
 
   const deleteMember = async (id) => {
+    if (!window.confirm("Delete this member?")) return;
+
     const { error } = await supabase.from("members").delete().eq("id", id);
     if (error) return setMessage(`Could not delete member: ${error.message}`);
     setMembers((prev) => prev.filter((x) => x.id !== id));
@@ -653,9 +730,12 @@ export default function App() {
     setNewOfficerPhone(person.phone || "");
     setNewOfficerPosition(person.position == null ? "" : String(person.position));
     setTab("admin");
+    setAdminTab("officers");
   };
 
   const deleteOfficeBearer = async (id) => {
+    if (!window.confirm("Delete this office bearer?")) return;
+
     const { error } = await supabase.from("office_bearers").delete().eq("id", id);
     if (error) return setMessage(`Could not delete office bearer: ${error.message}`);
     setOfficeBearers((prev) => prev.filter((x) => x.id !== id));
@@ -703,9 +783,12 @@ export default function App() {
     setNewCoachPhone(coach.phone || "");
     setNewCoachPosition(coach.position == null ? "" : String(coach.position));
     setTab("admin");
+    setAdminTab("coaches");
   };
 
   const deleteCoach = async (id) => {
+    if (!window.confirm("Delete this club coach?")) return;
+
     const { error } = await supabase.from("club_coaches").delete().eq("id", id);
     if (error) return setMessage(`Could not delete club coach: ${error.message}`);
     setClubCoaches((prev) => prev.filter((x) => x.id !== id));
@@ -786,9 +869,12 @@ export default function App() {
     setPostPinned(!!post.pinned);
     setPostFile(null);
     setTab("admin");
+    setAdminTab("info");
   };
 
   const deletePost = async (id) => {
+    if (!window.confirm("Delete this information post?")) return;
+
     const { error } = await supabase.from("information_posts").delete().eq("id", id);
     if (error) return setMessage(`Could not delete information post: ${error.message}`);
     setPosts((prev) => prev.filter((x) => x.id !== id));
@@ -851,9 +937,12 @@ export default function App() {
     setMondayLink(item.file_url || "");
     setMondayFile(null);
     setTab("admin");
+    setAdminTab("monday");
   };
 
   const deleteMondayPoints = async (id) => {
+    if (!window.confirm("Delete this Monday Points item?")) return;
+
     const { error } = await supabase.from("monday_points").delete().eq("id", id);
     if (error) return setMessage(`Could not delete Monday Points: ${error.message}`);
     setMondayPoints((prev) => prev.filter((x) => x.id !== id));
@@ -998,12 +1087,139 @@ export default function App() {
         {message && <div style={styles.message}>{message}</div>}
 
         <div style={styles.tabs}>
+          <button style={styles.tab(tab === "home")} onClick={() => setTab("home")}>Home</button>
           <button style={styles.tab(tab === "diary")} onClick={() => setTab("diary")}>Diary</button>
           <button style={styles.tab(tab === "events")} onClick={() => setTab("events")}>Events</button>
           <button style={styles.tab(tab === "members")} onClick={() => setTab("members")}>Members</button>
           <button style={styles.tab(tab === "information")} onClick={() => setTab("information")}>Information</button>
           <button style={styles.tab(tab === "admin")} onClick={() => setTab("admin")}>Admin</button>
         </div>
+
+        {tab === "home" && (
+          <>
+            <div style={styles.heroCard}>
+              <div style={styles.homeLabel}>Next Club Event</div>
+
+              {nextEvent ? (
+                <>
+                  <div style={styles.heroTitle}>{nextEvent.title}</div>
+                  <div style={styles.heroDate}>{formatDiaryDate(nextEvent.date_text)}</div>
+                  {nextEvent.note ? (
+                    <div style={{ color: "#444", whiteSpace: "pre-wrap", marginBottom: 12 }}>
+                      {nextEvent.note}
+                    </div>
+                  ) : null}
+
+                  <div>
+                    <button style={styles.homeActionBtn} onClick={() => setTab("events")}>
+                      View All Events
+                    </button>
+                    <button style={styles.homeActionBtn} onClick={() => setTab("information")}>
+                      Club Notices
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={styles.heroTitle}>No upcoming events</div>
+                  <div style={{ color: "#555" }}>Add events in Admin to show them here.</div>
+                </>
+              )}
+            </div>
+
+            <div style={styles.homeGrid}>
+              <div style={styles.homeMiniCard}>
+                <div style={styles.homeLabel}>Latest Monday Points</div>
+
+                {latestMonday ? (
+                  <>
+                    <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
+                      {latestMonday.title}
+                    </div>
+                    <div style={{ color: "#92400e", fontWeight: 700, marginBottom: 8 }}>
+                      {formatDiaryDate(latestMonday.week_date)}
+                    </div>
+                    {latestMonday.note ? (
+                      <div style={{ color: "#555", whiteSpace: "pre-wrap", marginBottom: 10 }}>
+                        {latestMonday.note}
+                      </div>
+                    ) : null}
+                    {latestMonday.file_url ? (
+                      <a
+                        href={latestMonday.file_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={styles.linkBtn}
+                      >
+                        {latestMonday.button_text || "Open Monday Points"}
+                      </a>
+                    ) : null}
+                  </>
+                ) : (
+                  <div style={{ color: "#777" }}>No Monday Points uploaded yet.</div>
+                )}
+              </div>
+
+              <div style={styles.homeMiniCard}>
+                <div style={styles.homeLabel}>Pinned Notice</div>
+
+                {latestPinnedPost ? (
+                  <>
+                    <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
+                      {latestPinnedPost.title}
+                    </div>
+                    <div style={{ color: "#555", whiteSpace: "pre-wrap", marginBottom: 10 }}>
+                      {latestPinnedPost.message}
+                    </div>
+                    {latestPinnedPost.attachment_link ? (
+                      <a
+                        href={latestPinnedPost.attachment_link}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={styles.linkBtn}
+                      >
+                        {latestPinnedPost.button_text || "Open Notice"}
+                      </a>
+                    ) : null}
+                  </>
+                ) : (
+                  <div style={{ color: "#777" }}>No pinned notice.</div>
+                )}
+              </div>
+
+              <div style={styles.homeMiniCard}>
+                <div style={styles.homeLabel}>Coming Up</div>
+
+                {nextTwoEvents.length > 0 ? (
+                  nextTwoEvents.map((e) => (
+                    <div key={e.id} style={{ marginBottom: 12 }}>
+                      <div style={{ fontWeight: 700 }}>{e.title}</div>
+                      <div style={{ color: "#92400e" }}>{formatDiaryDate(e.date_text)}</div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ color: "#777" }}>No further upcoming events.</div>
+                )}
+              </div>
+            </div>
+
+            <div style={styles.panel}>
+              <h3 style={styles.sectionTitle}>Quick Links</h3>
+              <button style={styles.homeActionBtn} onClick={() => setTab("diary")}>
+                Diary
+              </button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("events")}>
+                Events
+              </button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("members")}>
+                Members
+              </button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("information")}>
+                Information
+              </button>
+            </div>
+          </>
+        )}
 
         {tab === "diary" && (
           <>
@@ -1184,382 +1400,427 @@ export default function App() {
               </div>
             ) : (
               <>
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>
-                    {editingEntryId ? "Edit Event" : "Add Event"}
-                  </h3>
-
-                  <input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Event title"
-                    style={styles.input}
-                  />
-
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    style={styles.input}
-                  />
-
-                  <textarea
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="Optional note"
-                    style={styles.textarea}
-                  />
-
-                  <button onClick={saveEntry} style={styles.button}>
-                    {editingEntryId ? "Update Event" : "Save Event"}
+                <div style={styles.tabs}>
+                  <button onClick={() => setAdminTab("events")} style={styles.tab(adminTab === "events")}>
+                    Events
                   </button>
-
-                  {(editingEntryId || title || date || note) && (
-                    <button onClick={clearEntryForm} style={styles.secondaryButton}>
-                      Clear
-                    </button>
-                  )}
+                  <button onClick={() => setAdminTab("monday")} style={styles.tab(adminTab === "monday")}>
+                    Monday Points
+                  </button>
+                  <button onClick={() => setAdminTab("officers")} style={styles.tab(adminTab === "officers")}>
+                    Office Bearers
+                  </button>
+                  <button onClick={() => setAdminTab("coaches")} style={styles.tab(adminTab === "coaches")}>
+                    Coaches
+                  </button>
+                  <button onClick={() => setAdminTab("members")} style={styles.tab(adminTab === "members")}>
+                    Members
+                  </button>
+                  <button onClick={() => setAdminTab("info")} style={styles.tab(adminTab === "info")}>
+                    Information
+                  </button>
                 </div>
 
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>Manage Events</h3>
-                  {sortedEntries.map((e) => (
-                    <div key={e.id} style={styles.card}>
-                      <strong>{formatDiaryDate(e.date_text)}</strong> — {e.title}
-                      {e.note ? (
-                        <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>
-                          {e.note}
-                        </div>
-                      ) : null}
-                      <div style={{ marginTop: 8 }}>
-                        <button onClick={() => editEntry(e)} style={styles.smallBtn}>Edit</button>
-                        <button onClick={() => deleteEntry(e.id)} style={styles.smallBtn}>Delete</button>
-                      </div>
+                {adminTab === "events" && (
+                  <>
+                    <div style={styles.panel}>
+                      <h3 style={styles.sectionTitle}>
+                        {editingEntryId ? "Edit Event" : "Add Event"}
+                      </h3>
+
+                      <input
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder="Event title"
+                        style={styles.input}
+                      />
+
+                      <input
+                        type="date"
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                        style={styles.input}
+                      />
+
+                      <textarea
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="Optional note"
+                        style={styles.textarea}
+                      />
+
+                      <button onClick={saveEntry} style={styles.button}>
+                        {editingEntryId ? "Update Event" : "Save Event"}
+                      </button>
+
+                      {(editingEntryId || title || date || note) && (
+                        <button onClick={clearEntryForm} style={styles.secondaryButton}>
+                          Clear
+                        </button>
+                      )}
                     </div>
-                  ))}
-                </div>
 
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>
-                    {editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}
-                  </h3>
-                  <input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Role" style={styles.input} />
-                  <input value={newOfficerName} onChange={(e) => setNewOfficerName(e.target.value)} placeholder="Name" style={styles.input} />
-                  <input value={newOfficerPhone} onChange={(e) => setNewOfficerPhone(e.target.value)} placeholder="Phone" style={styles.input} />
-                  <input
-                    type="number"
-                    value={newOfficerPosition}
-                    onChange={(e) => setNewOfficerPosition(e.target.value)}
-                    placeholder="Position order"
-                    style={styles.input}
-                  />
-                  <button onClick={saveOfficeBearer} style={styles.button}>
-                    {editingOfficerId ? "Update Office Bearer" : "Save Office Bearer"}
-                  </button>
-                  {(editingOfficerId || newRole || newOfficerName || newOfficerPhone || newOfficerPosition) && (
-                    <button onClick={clearOfficerForm} style={styles.secondaryButton}>Clear</button>
-                  )}
-                </div>
-
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>Manage Office Bearers</h3>
-                  {sortedOfficeBearers.map((person, index) => {
-                    const canMoveUp = index > 0;
-                    const canMoveDown = index < sortedOfficeBearers.length - 1;
-
-                    return (
-                      <div key={person.id} style={styles.card}>
-                        <strong>{person.role}</strong> — {person.name}
-                        <div style={{ marginTop: 8 }}>
-                          <button onClick={() => editOfficeBearer(person)} style={styles.smallBtn}>Edit</button>
-                          <button onClick={() => deleteOfficeBearer(person.id)} style={styles.smallBtn}>Delete</button>
-                          <button
-                            onClick={() =>
-                              canMoveUp &&
-                              moveItem(
-                                "office_bearers",
-                                officeBearers,
-                                (updated) => setOfficeBearers(updated),
-                                person.id,
-                                "up",
-                                "Office bearer"
-                              )
-                            }
-                            style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
-                            type="button"
-                          >
-                            ↑ Up
-                          </button>
-                          <button
-                            onClick={() =>
-                              canMoveDown &&
-                              moveItem(
-                                "office_bearers",
-                                officeBearers,
-                                (updated) => setOfficeBearers(updated),
-                                person.id,
-                                "down",
-                                "Office bearer"
-                              )
-                            }
-                            style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
-                            type="button"
-                          >
-                            ↓ Down
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>
-                    {editingCoachId ? "Edit Club Coach" : "Add Club Coach"}
-                  </h3>
-                  <input value={newCoachName} onChange={(e) => setNewCoachName(e.target.value)} placeholder="Name" style={styles.input} />
-                  <input value={newCoachPhone} onChange={(e) => setNewCoachPhone(e.target.value)} placeholder="Phone" style={styles.input} />
-                  <input
-                    type="number"
-                    value={newCoachPosition}
-                    onChange={(e) => setNewCoachPosition(e.target.value)}
-                    placeholder="Position order"
-                    style={styles.input}
-                  />
-                  <button onClick={saveCoach} style={styles.button}>
-                    {editingCoachId ? "Update Club Coach" : "Save Club Coach"}
-                  </button>
-                  {(editingCoachId || newCoachName || newCoachPhone || newCoachPosition) && (
-                    <button onClick={clearCoachForm} style={styles.secondaryButton}>Clear</button>
-                  )}
-                </div>
-
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>Manage Club Coaches</h3>
-                  {sortedClubCoaches.map((coach, index) => {
-                    const canMoveUp = index > 0;
-                    const canMoveDown = index < sortedClubCoaches.length - 1;
-
-                    return (
-                      <div key={coach.id} style={styles.card}>
-                        <strong>{coach.name}</strong> — {coach.phone || "no phone"}
-                        <div style={{ marginTop: 8 }}>
-                          <button onClick={() => editCoach(coach)} style={styles.smallBtn}>Edit</button>
-                          <button onClick={() => deleteCoach(coach.id)} style={styles.smallBtn}>Delete</button>
-                          <button
-                            onClick={() =>
-                              canMoveUp &&
-                              moveItem(
-                                "club_coaches",
-                                clubCoaches,
-                                (updated) => setClubCoaches(updated),
-                                coach.id,
-                                "up",
-                                "Club coach"
-                              )
-                            }
-                            style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
-                            type="button"
-                          >
-                            ↑ Up
-                          </button>
-                          <button
-                            onClick={() =>
-                              canMoveDown &&
-                              moveItem(
-                                "club_coaches",
-                                clubCoaches,
-                                (updated) => setClubCoaches(updated),
-                                coach.id,
-                                "down",
-                                "Club coach"
-                              )
-                            }
-                            style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
-                            type="button"
-                          >
-                            ↓ Down
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>
-                    {editingMondayId ? "Edit Monday Points" : "Add Monday Points"}
-                  </h3>
-
-                  <input
-                    value={mondayTitle}
-                    onChange={(e) => setMondayTitle(e.target.value)}
-                    placeholder="Title e.g. Monday Points Week 1"
-                    style={styles.input}
-                  />
-
-                  <input
-                    type="date"
-                    value={mondayDate}
-                    onChange={(e) => setMondayDate(e.target.value)}
-                    style={styles.input}
-                  />
-
-                  <textarea
-                    value={mondayNote}
-                    onChange={(e) => setMondayNote(e.target.value)}
-                    placeholder="Optional note"
-                    style={styles.textarea}
-                  />
-
-                  <input
-                    value={mondayLink}
-                    onChange={(e) => setMondayLink(e.target.value)}
-                    placeholder="Attachment link (optional if uploading file)"
-                    style={styles.input}
-                  />
-
-                  <input
-                    value={mondayButtonText}
-                    onChange={(e) => setMondayButtonText(e.target.value)}
-                    placeholder="Button text"
-                    style={styles.input}
-                  />
-
-                  <div style={{ marginBottom: 10 }}>
-                    <input
-                      type="file"
-                      accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx,application/pdf,image/png,image/jpeg,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                      onChange={(e) => setMondayFile(e.target.files?.[0] || null)}
-                    />
-                    {mondayFile ? (
-                      <div style={styles.fileInfo}>Selected file: {mondayFile.name}</div>
-                    ) : null}
-                  </div>
-
-                  <button onClick={saveMondayPoints} style={styles.button}>
-                    {editingMondayId ? "Update Monday Points" : "Save Monday Points"}
-                  </button>
-
-                  {(editingMondayId || mondayTitle || mondayDate || mondayNote || mondayLink || mondayButtonText || mondayFile) && (
-                    <button onClick={clearMondayForm} style={styles.secondaryButton}>
-                      Clear
-                    </button>
-                  )}
-                </div>
-
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>Manage Monday Points</h3>
-                  {sortedMondayPoints.length === 0 ? (
-                    <div style={{ color: "#777" }}>No Monday Points yet.</div>
-                  ) : (
-                    sortedMondayPoints.map((item) => (
-                      <div key={item.id} style={styles.card}>
-                        <strong>{formatDiaryDate(item.week_date)}</strong> — {item.title}
-                        {item.file_url ? (
-                          <div style={{ marginTop: 6, color: "#666" }}>
-                            {getFileTypeLabel(item.file_url)}
+                    <div style={styles.panel}>
+                      <h3 style={styles.sectionTitle}>Manage Events</h3>
+                      {sortedEntries.map((e) => (
+                        <div key={e.id} style={styles.card}>
+                          <strong>{formatDiaryDate(e.date_text)}</strong> — {e.title}
+                          {e.note ? (
+                            <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>
+                              {e.note}
+                            </div>
+                          ) : null}
+                          <div style={{ marginTop: 8 }}>
+                            <button onClick={() => editEntry(e)} style={styles.smallBtn}>Edit</button>
+                            <button onClick={() => deleteEntry(e.id)} style={styles.smallBtn}>Delete</button>
                           </div>
-                        ) : null}
-                        <div style={{ marginTop: 8 }}>
-                          <button onClick={() => editMondayPoints(item)} style={styles.smallBtn}>Edit</button>
-                          <button onClick={() => deleteMondayPoints(item.id)} style={styles.smallBtn}>Delete</button>
                         </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>{editingMemberId ? "Edit Member" : "Add Member"}</h3>
-                  <input value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="Name" style={styles.input} />
-                  <select value={newMemberSection} onChange={(e) => setNewMemberSection(e.target.value)} style={styles.input}>
-                    <option>Gents</option>
-                    <option>Ladies</option>
-                    <option>Associate</option>
-                  </select>
-                  <input value={newMemberPhone} onChange={(e) => setNewMemberPhone(e.target.value)} placeholder="Phone" style={styles.input} />
-                  <button onClick={saveMember} style={styles.button}>
-                    {editingMemberId ? "Update Member" : "Save Member"}
-                  </button>
-                  {(editingMemberId || newMemberName || newMemberPhone) && (
-                    <button onClick={clearMemberForm} style={styles.secondaryButton}>Clear</button>
-                  )}
-                </div>
-
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>Manage Members</h3>
-                  {members
-                    .slice()
-                    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
-                    .map((m) => (
-                      <div key={m.id} style={styles.card}>
-                        <strong>{m.name}</strong> — {m.section} — {m.phone || "no phone"}
-                        <div style={{ marginTop: 8 }}>
-                          <button onClick={() => editMember(m)} style={styles.smallBtn}>Edit</button>
-                          <button onClick={() => deleteMember(m.id)} style={styles.smallBtn}>Delete</button>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>
-                    {editingPostId ? "Edit Information Post" : "Add Information Post"}
-                  </h3>
-                  <input value={postTitle} onChange={(e) => setPostTitle(e.target.value)} placeholder="Title" style={styles.input} />
-                  <textarea value={postMessage} onChange={(e) => setPostMessage(e.target.value)} placeholder="Message" style={styles.textarea} />
-                  <input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} style={styles.input} />
-                  <input value={postLink} onChange={(e) => setPostLink(e.target.value)} placeholder="Attachment link (optional if uploading file)" style={styles.input} />
-                  <input value={postButtonText} onChange={(e) => setPostButtonText(e.target.value)} placeholder="Button text" style={styles.input} />
-
-                  <div style={{ marginBottom: 10 }}>
-                    <input
-                      type="file"
-                      accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx,application/pdf,image/png,image/jpeg,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                      onChange={(e) => setPostFile(e.target.files?.[0] || null)}
-                    />
-                    {postFile ? (
-                      <div style={styles.fileInfo}>Selected file: {postFile.name}</div>
-                    ) : null}
-                  </div>
-
-                  <label style={{ display: "block", marginBottom: 10 }}>
-                    <input
-                      type="checkbox"
-                      checked={postPinned}
-                      onChange={(e) => setPostPinned(e.target.checked)}
-                      style={{ marginRight: 8 }}
-                    />
-                    Pin this post to the top
-                  </label>
-
-                  <button onClick={savePost} style={styles.button}>
-                    {editingPostId ? "Update Information Post" : "Save Information Post"}
-                  </button>
-
-                  {(editingPostId || postTitle || postMessage || postDate || postLink || postButtonText || postPinned || postFile) && (
-                    <button onClick={clearPostForm} style={styles.secondaryButton}>Clear</button>
-                  )}
-                </div>
-
-                <div style={styles.panel}>
-                  <h3 style={styles.sectionTitle}>Manage Information Posts</h3>
-                  {sortedPosts.map((post) => (
-                    <div key={post.id} style={styles.card}>
-                      <strong>{post.date_posted}</strong> — {post.title} {post.pinned ? "• PINNED" : ""}
-                      {post.attachment_link ? (
-                        <div style={{ marginTop: 6, color: "#666" }}>
-                          {getFileTypeLabel(post.attachment_link)}
-                        </div>
-                      ) : null}
-                      <div style={{ marginTop: 8 }}>
-                        <button onClick={() => editPost(post)} style={styles.smallBtn}>Edit</button>
-                        <button onClick={() => deletePost(post.id)} style={styles.smallBtn}>Delete</button>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                )}
+
+                {adminTab === "monday" && (
+                  <>
+                    <div style={styles.panel}>
+                      <h3 style={styles.sectionTitle}>
+                        {editingMondayId ? "Edit Monday Points" : "Add Monday Points"}
+                      </h3>
+
+                      <input
+                        value={mondayTitle}
+                        onChange={(e) => setMondayTitle(e.target.value)}
+                        placeholder="Title e.g. Monday Points Week 1"
+                        style={styles.input}
+                      />
+
+                      <input
+                        type="date"
+                        value={mondayDate}
+                        onChange={(e) => setMondayDate(e.target.value)}
+                        style={styles.input}
+                      />
+
+                      <textarea
+                        value={mondayNote}
+                        onChange={(e) => setMondayNote(e.target.value)}
+                        placeholder="Optional note"
+                        style={styles.textarea}
+                      />
+
+                      <input
+                        value={mondayLink}
+                        onChange={(e) => setMondayLink(e.target.value)}
+                        placeholder="Attachment link (optional if uploading file)"
+                        style={styles.input}
+                      />
+
+                      <input
+                        value={mondayButtonText}
+                        onChange={(e) => setMondayButtonText(e.target.value)}
+                        placeholder="Button text"
+                        style={styles.input}
+                      />
+
+                      <div style={{ marginBottom: 10 }}>
+                        <input
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx,application/pdf,image/png,image/jpeg,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                          onChange={(e) => setMondayFile(e.target.files?.[0] || null)}
+                        />
+                        {mondayFile ? (
+                          <div style={styles.fileInfo}>Selected file: {mondayFile.name}</div>
+                        ) : null}
+                      </div>
+
+                      <button onClick={saveMondayPoints} style={styles.button}>
+                        {editingMondayId ? "Update Monday Points" : "Save Monday Points"}
+                      </button>
+
+                      {(editingMondayId || mondayTitle || mondayDate || mondayNote || mondayLink || mondayButtonText || mondayFile) && (
+                        <button onClick={clearMondayForm} style={styles.secondaryButton}>
+                          Clear
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={styles.panel}>
+                      <h3 style={styles.sectionTitle}>Manage Monday Points</h3>
+                      {sortedMondayPoints.length === 0 ? (
+                        <div style={{ color: "#777" }}>No Monday Points yet.</div>
+                      ) : (
+                        sortedMondayPoints.map((item) => (
+                          <div key={item.id} style={styles.card}>
+                            <strong>{formatDiaryDate(item.week_date)}</strong> — {item.title}
+                            {item.file_url ? (
+                              <div style={{ marginTop: 6, color: "#666" }}>
+                                {getFileTypeLabel(item.file_url)}
+                              </div>
+                            ) : null}
+                            <div style={{ marginTop: 8 }}>
+                              <button onClick={() => editMondayPoints(item)} style={styles.smallBtn}>Edit</button>
+                              <button onClick={() => deleteMondayPoints(item.id)} style={styles.smallBtn}>Delete</button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {adminTab === "officers" && (
+                  <>
+                    <div style={styles.panel}>
+                      <h3 style={styles.sectionTitle}>
+                        {editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}
+                      </h3>
+                      <input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Role" style={styles.input} />
+                      <input value={newOfficerName} onChange={(e) => setNewOfficerName(e.target.value)} placeholder="Name" style={styles.input} />
+                      <input value={newOfficerPhone} onChange={(e) => setNewOfficerPhone(e.target.value)} placeholder="Phone" style={styles.input} />
+                      <input
+                        type="number"
+                        value={newOfficerPosition}
+                        onChange={(e) => setNewOfficerPosition(e.target.value)}
+                        placeholder="Position order"
+                        style={styles.input}
+                      />
+                      <button onClick={saveOfficeBearer} style={styles.button}>
+                        {editingOfficerId ? "Update Office Bearer" : "Save Office Bearer"}
+                      </button>
+                      {(editingOfficerId || newRole || newOfficerName || newOfficerPhone || newOfficerPosition) && (
+                        <button onClick={clearOfficerForm} style={styles.secondaryButton}>Clear</button>
+                      )}
+                    </div>
+
+                    <div style={styles.panel}>
+                      <h3 style={styles.sectionTitle}>Manage Office Bearers</h3>
+                      {sortedOfficeBearers.map((person, index) => {
+                        const canMoveUp = index > 0;
+                        const canMoveDown = index < sortedOfficeBearers.length - 1;
+
+                        return (
+                          <div key={person.id} style={styles.card}>
+                            <strong>{person.role}</strong> — {person.name}
+                            <div style={{ marginTop: 8 }}>
+                              <button onClick={() => editOfficeBearer(person)} style={styles.smallBtn}>Edit</button>
+                              <button onClick={() => deleteOfficeBearer(person.id)} style={styles.smallBtn}>Delete</button>
+                              <button
+                                onClick={() =>
+                                  canMoveUp &&
+                                  moveItem(
+                                    "office_bearers",
+                                    officeBearers,
+                                    (updated) => setOfficeBearers(updated),
+                                    person.id,
+                                    "up",
+                                    "Office bearer"
+                                  )
+                                }
+                                style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
+                                type="button"
+                              >
+                                ↑ Up
+                              </button>
+                              <button
+                                onClick={() =>
+                                  canMoveDown &&
+                                  moveItem(
+                                    "office_bearers",
+                                    officeBearers,
+                                    (updated) => setOfficeBearers(updated),
+                                    person.id,
+                                    "down",
+                                    "Office bearer"
+                                  )
+                                }
+                                style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
+                                type="button"
+                              >
+                                ↓ Down
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {adminTab === "coaches" && (
+                  <>
+                    <div style={styles.panel}>
+                      <h3 style={styles.sectionTitle}>
+                        {editingCoachId ? "Edit Club Coach" : "Add Club Coach"}
+                      </h3>
+                      <input value={newCoachName} onChange={(e) => setNewCoachName(e.target.value)} placeholder="Name" style={styles.input} />
+                      <input value={newCoachPhone} onChange={(e) => setNewCoachPhone(e.target.value)} placeholder="Phone" style={styles.input} />
+                      <input
+                        type="number"
+                        value={newCoachPosition}
+                        onChange={(e) => setNewCoachPosition(e.target.value)}
+                        placeholder="Position order"
+                        style={styles.input}
+                      />
+                      <button onClick={saveCoach} style={styles.button}>
+                        {editingCoachId ? "Update Club Coach" : "Save Club Coach"}
+                      </button>
+                      {(editingCoachId || newCoachName || newCoachPhone || newCoachPosition) && (
+                        <button onClick={clearCoachForm} style={styles.secondaryButton}>Clear</button>
+                      )}
+                    </div>
+
+                    <div style={styles.panel}>
+                      <h3 style={styles.sectionTitle}>Manage Club Coaches</h3>
+                      {sortedClubCoaches.map((coach, index) => {
+                        const canMoveUp = index > 0;
+                        const canMoveDown = index < sortedClubCoaches.length - 1;
+
+                        return (
+                          <div key={coach.id} style={styles.card}>
+                            <strong>{coach.name}</strong> — {coach.phone || "no phone"}
+                            <div style={{ marginTop: 8 }}>
+                              <button onClick={() => editCoach(coach)} style={styles.smallBtn}>Edit</button>
+                              <button onClick={() => deleteCoach(coach.id)} style={styles.smallBtn}>Delete</button>
+                              <button
+                                onClick={() =>
+                                  canMoveUp &&
+                                  moveItem(
+                                    "club_coaches",
+                                    clubCoaches,
+                                    (updated) => setClubCoaches(updated),
+                                    coach.id,
+                                    "up",
+                                    "Club coach"
+                                  )
+                                }
+                                style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
+                                type="button"
+                              >
+                                ↑ Up
+                              </button>
+                              <button
+                                onClick={() =>
+                                  canMoveDown &&
+                                  moveItem(
+                                    "club_coaches",
+                                    clubCoaches,
+                                    (updated) => setClubCoaches(updated),
+                                    coach.id,
+                                    "down",
+                                    "Club coach"
+                                  )
+                                }
+                                style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
+                                type="button"
+                              >
+                                ↓ Down
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {adminTab === "members" && (
+                  <>
+                    <div style={styles.panel}>
+                      <h3 style={styles.sectionTitle}>{editingMemberId ? "Edit Member" : "Add Member"}</h3>
+                      <input value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="Name" style={styles.input} />
+                      <select value={newMemberSection} onChange={(e) => setNewMemberSection(e.target.value)} style={styles.input}>
+                        <option>Gents</option>
+                        <option>Ladies</option>
+                        <option>Associate</option>
+                      </select>
+                      <input value={newMemberPhone} onChange={(e) => setNewMemberPhone(e.target.value)} placeholder="Phone" style={styles.input} />
+                      <button onClick={saveMember} style={styles.button}>
+                        {editingMemberId ? "Update Member" : "Save Member"}
+                      </button>
+                      {(editingMemberId || newMemberName || newMemberPhone) && (
+                        <button onClick={clearMemberForm} style={styles.secondaryButton}>Clear</button>
+                      )}
+                    </div>
+
+                    <div style={styles.panel}>
+                      <h3 style={styles.sectionTitle}>Manage Members</h3>
+                      {members
+                        .slice()
+                        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
+                        .map((m) => (
+                          <div key={m.id} style={styles.card}>
+                            <strong>{m.name}</strong> — {m.section} — {m.phone || "no phone"}
+                            <div style={{ marginTop: 8 }}>
+                              <button onClick={() => editMember(m)} style={styles.smallBtn}>Edit</button>
+                              <button onClick={() => deleteMember(m.id)} style={styles.smallBtn}>Delete</button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </>
+                )}
+
+                {adminTab === "info" && (
+                  <>
+                    <div style={styles.panel}>
+                      <h3 style={styles.sectionTitle}>
+                        {editingPostId ? "Edit Information Post" : "Add Information Post"}
+                      </h3>
+                      <input value={postTitle} onChange={(e) => setPostTitle(e.target.value)} placeholder="Title" style={styles.input} />
+                      <textarea value={postMessage} onChange={(e) => setPostMessage(e.target.value)} placeholder="Message" style={styles.textarea} />
+                      <input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} style={styles.input} />
+                      <input value={postLink} onChange={(e) => setPostLink(e.target.value)} placeholder="Attachment link (optional if uploading file)" style={styles.input} />
+                      <input value={postButtonText} onChange={(e) => setPostButtonText(e.target.value)} placeholder="Button text" style={styles.input} />
+
+                      <div style={{ marginBottom: 10 }}>
+                        <input
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx,application/pdf,image/png,image/jpeg,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                          onChange={(e) => setPostFile(e.target.files?.[0] || null)}
+                        />
+                        {postFile ? (
+                          <div style={styles.fileInfo}>Selected file: {postFile.name}</div>
+                        ) : null}
+                      </div>
+
+                      <label style={{ display: "block", marginBottom: 10 }}>
+                        <input
+                          type="checkbox"
+                          checked={postPinned}
+                          onChange={(e) => setPostPinned(e.target.checked)}
+                          style={{ marginRight: 8 }}
+                        />
+                        Pin this post to the top
+                      </label>
+
+                      <button onClick={savePost} style={styles.button}>
+                        {editingPostId ? "Update Information Post" : "Save Information Post"}
+                      </button>
+
+                      {(editingPostId || postTitle || postMessage || postDate || postLink || postButtonText || postPinned || postFile) && (
+                        <button onClick={clearPostForm} style={styles.secondaryButton}>Clear</button>
+                      )}
+                    </div>
+
+                    <div style={styles.panel}>
+                      <h3 style={styles.sectionTitle}>Manage Information Posts</h3>
+                      {sortedPosts.map((post) => (
+                        <div key={post.id} style={styles.card}>
+                          <strong>{post.date_posted}</strong> — {post.title} {post.pinned ? "• PINNED" : ""}
+                          {post.attachment_link ? (
+                            <div style={{ marginTop: 6, color: "#666" }}>
+                              {getFileTypeLabel(post.attachment_link)}
+                            </div>
+                          ) : null}
+                          <div style={{ marginTop: 8 }}>
+                            <button onClick={() => editPost(post)} style={styles.smallBtn}>Edit</button>
+                            <button onClick={() => deletePost(post.id)} style={styles.smallBtn}>Delete</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </>
             )}
           </div>
