@@ -271,6 +271,14 @@ const styles = {
     textTransform: "uppercase",
     letterSpacing: "0.4px",
   },
+  imagePreview: {
+    width: "100%",
+    maxWidth: 420,
+    borderRadius: 12,
+    marginTop: 12,
+    border: "1px solid #e5c8cf",
+    display: "block",
+  },
 };
 
 function sortEventsChronologically(list) {
@@ -332,12 +340,24 @@ function formatDiaryDate(dateValue) {
 
 function getFileTypeLabel(url) {
   const lower = String(url || "").toLowerCase();
-  if (lower.endsWith(".pdf")) return "PDF";
-  if (lower.endsWith(".png")) return "PNG image";
-  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "JPEG image";
-  if (lower.endsWith(".xls") || lower.endsWith(".xlsx")) return "Excel file";
-  if (lower.endsWith(".doc") || lower.endsWith(".docx")) return "Word document";
+  if (lower.endsWith(".pdf") || lower.includes(".pdf?")) return "PDF";
+  if (lower.endsWith(".png") || lower.includes(".png?")) return "PNG image";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.includes(".jpg?") || lower.includes(".jpeg?")) return "JPEG image";
+  if (lower.endsWith(".xls") || lower.endsWith(".xlsx") || lower.includes(".xls?") || lower.includes(".xlsx?")) return "Excel file";
+  if (lower.endsWith(".doc") || lower.endsWith(".docx") || lower.includes(".doc?") || lower.includes(".docx?")) return "Word document";
   return "Attachment";
+}
+
+function isImageFile(url) {
+  const lower = String(url || "").toLowerCase();
+  return (
+    lower.endsWith(".png") ||
+    lower.endsWith(".jpg") ||
+    lower.endsWith(".jpeg") ||
+    lower.includes(".png?") ||
+    lower.includes(".jpg?") ||
+    lower.includes(".jpeg?")
+  );
 }
 
 export default function App() {
@@ -413,14 +433,8 @@ export default function App() {
   const sortedEntries = useMemo(() => sortEventsChronologically(entries), [entries]);
   const sortedPosts = useMemo(() => sortPosts(posts), [posts]);
   const sortedMondayPoints = useMemo(() => sortMondayPoints(mondayPoints), [mondayPoints]);
-  const sortedOfficeBearers = useMemo(
-    () => sortByPositionThenName(officeBearers),
-    [officeBearers]
-  );
-  const sortedClubCoaches = useMemo(
-    () => sortByPositionThenName(clubCoaches),
-    [clubCoaches]
-  );
+  const sortedOfficeBearers = useMemo(() => sortByPositionThenName(officeBearers), [officeBearers]);
+  const sortedClubCoaches = useMemo(() => sortByPositionThenName(clubCoaches), [clubCoaches]);
   const sortedDocuments = useMemo(() => sortDocuments(documents), [documents]);
 
   const filteredEvents = useMemo(() => {
@@ -499,9 +513,7 @@ export default function App() {
   const nextEvent = useMemo(() => upcomingEvents[0] || null, [upcomingEvents]);
   const nextTwoEvents = useMemo(() => upcomingEvents.slice(1, 3), [upcomingEvents]);
   const latestMonday = useMemo(() => sortedMondayPoints[0] || null, [sortedMondayPoints]);
-  const latestPinnedPost = useMemo(() => {
-    return sortedPosts.find((p) => p.pinned) || null;
-  }, [sortedPosts]);
+  const latestPinnedPost = useMemo(() => sortedPosts.find((p) => p.pinned) || null, [sortedPosts]);
 
   useEffect(() => {
     if (!loggedIn) return;
@@ -1095,18 +1107,10 @@ export default function App() {
       ? Number(targetItem.position)
       : targetIndex + 1;
 
-    const { error: error1 } = await supabase
-      .from(table)
-      .update({ position: targetPos })
-      .eq("id", currentItem.id);
-
+    const { error: error1 } = await supabase.from(table).update({ position: targetPos }).eq("id", currentItem.id);
     if (error1) return setMessage(`Could not move ${label}: ${error1.message}`);
 
-    const { error: error2 } = await supabase
-      .from(table)
-      .update({ position: currentPos })
-      .eq("id", targetItem.id);
-
+    const { error: error2 } = await supabase.from(table).update({ position: currentPos }).eq("id", targetItem.id);
     if (error2) return setMessage(`Could not move ${label}: ${error2.message}`);
 
     const updatedList = items.map((item) => {
@@ -1282,14 +1286,19 @@ export default function App() {
                       </div>
                     ) : null}
                     {latestMonday.file_url ? (
-                      <a
-                        href={latestMonday.file_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={styles.linkBtn}
-                      >
-                        {latestMonday.button_text || "Open Monday Points"}
-                      </a>
+                      <>
+                        {isImageFile(latestMonday.file_url) ? (
+                          <img src={latestMonday.file_url} alt={latestMonday.title} style={styles.imagePreview} />
+                        ) : null}
+                        <a
+                          href={latestMonday.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={styles.linkBtn}
+                        >
+                          {latestMonday.button_text || "Open Monday Points"}
+                        </a>
+                      </>
                     ) : null}
                   </>
                 ) : (
@@ -1309,14 +1318,23 @@ export default function App() {
                       {latestPinnedPost.message}
                     </div>
                     {latestPinnedPost.attachment_link ? (
-                      <a
-                        href={latestPinnedPost.attachment_link}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={styles.linkBtn}
-                      >
-                        {latestPinnedPost.button_text || "Open Notice"}
-                      </a>
+                      <>
+                        {isImageFile(latestPinnedPost.attachment_link) ? (
+                          <img
+                            src={latestPinnedPost.attachment_link}
+                            alt={latestPinnedPost.title}
+                            style={styles.imagePreview}
+                          />
+                        ) : null}
+                        <a
+                          href={latestPinnedPost.attachment_link}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={styles.linkBtn}
+                        >
+                          {latestPinnedPost.button_text || "Open Notice"}
+                        </a>
+                      </>
                     ) : null}
                   </>
                 ) : (
@@ -1342,21 +1360,11 @@ export default function App() {
 
             <div style={styles.panel}>
               <h3 style={styles.sectionTitle}>Quick Links</h3>
-              <button style={styles.homeActionBtn} onClick={() => setTab("diary")}>
-                Diary
-              </button>
-              <button style={styles.homeActionBtn} onClick={() => setTab("events")}>
-                Events
-              </button>
-              <button style={styles.homeActionBtn} onClick={() => setTab("members")}>
-                Members
-              </button>
-              <button style={styles.homeActionBtn} onClick={() => setTab("documents")}>
-                Documents
-              </button>
-              <button style={styles.homeActionBtn} onClick={() => setTab("information")}>
-                Information
-              </button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("diary")}>Diary</button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("events")}>Events</button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("members")}>Members</button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("documents")}>Documents</button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("information")}>Information</button>
             </div>
           </>
         )}
@@ -1369,12 +1377,8 @@ export default function App() {
                 {sortedOfficeBearers.map((person) => (
                   <div key={person.id} style={styles.card}>
                     <span style={styles.badge}>{person.role}</span>
-                    <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
-                      {person.name}
-                    </div>
-                    <div style={{ marginBottom: 10, color: "#444" }}>
-                      {person.phone || "No phone listed"}
-                    </div>
+                    <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{person.name}</div>
+                    <div style={{ marginBottom: 10, color: "#444" }}>{person.phone || "No phone listed"}</div>
                     {person.phone ? (
                       <div>
                         <a href={`tel:${person.phone}`} style={styles.linkBtn}>Call</a>
@@ -1414,6 +1418,9 @@ export default function App() {
                     {item.file_url ? (
                       <div style={{ marginTop: 10 }}>
                         <div style={styles.fileInfo}>{getFileTypeLabel(item.file_url)}</div>
+                        {isImageFile(item.file_url) ? (
+                          <img src={item.file_url} alt={item.title} style={styles.imagePreview} />
+                        ) : null}
                         <a
                           href={item.file_url}
                           target="_blank"
@@ -1508,14 +1515,29 @@ export default function App() {
                   {doc.file_url ? (
                     <div style={{ marginTop: 10 }}>
                       <div style={styles.fileInfo}>{getFileTypeLabel(doc.file_url)}</div>
-                      <a
-                        href={doc.file_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={styles.linkBtn}
-                      >
-                        {doc.button_text || "Open Document"}
-                      </a>
+
+                      {isImageFile(doc.file_url) ? (
+                        <>
+                          <img src={doc.file_url} alt={doc.title} style={styles.imagePreview} />
+                          <a
+                            href={doc.file_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={styles.linkBtn}
+                          >
+                            {doc.button_text || "Open Image"}
+                          </a>
+                        </>
+                      ) : (
+                        <a
+                          href={doc.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={styles.linkBtn}
+                        >
+                          {doc.button_text || "Open Document"}
+                        </a>
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -1552,14 +1574,29 @@ export default function App() {
                   {post.attachment_link ? (
                     <div style={{ marginTop: 10 }}>
                       <div style={styles.fileInfo}>{getFileTypeLabel(post.attachment_link)}</div>
-                      <a
-                        href={post.attachment_link}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={styles.linkBtn}
-                      >
-                        {post.button_text || "Open Attachment"}
-                      </a>
+
+                      {isImageFile(post.attachment_link) ? (
+                        <>
+                          <img src={post.attachment_link} alt={post.title} style={styles.imagePreview} />
+                          <a
+                            href={post.attachment_link}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={styles.linkBtn}
+                          >
+                            {post.button_text || "Open Image"}
+                          </a>
+                        </>
+                      ) : (
+                        <a
+                          href={post.attachment_link}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={styles.linkBtn}
+                        >
+                          {post.button_text || "Open Attachment"}
+                        </a>
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -1584,35 +1621,19 @@ export default function App() {
             ) : (
               <>
                 <div style={styles.tabs}>
-                  <button onClick={() => setAdminTab("events")} style={styles.tab(adminTab === "events")}>
-                    Events
-                  </button>
-                  <button onClick={() => setAdminTab("monday")} style={styles.tab(adminTab === "monday")}>
-                    Monday Points
-                  </button>
-                  <button onClick={() => setAdminTab("officers")} style={styles.tab(adminTab === "officers")}>
-                    Office Bearers
-                  </button>
-                  <button onClick={() => setAdminTab("coaches")} style={styles.tab(adminTab === "coaches")}>
-                    Coaches
-                  </button>
-                  <button onClick={() => setAdminTab("members")} style={styles.tab(adminTab === "members")}>
-                    Members
-                  </button>
-                  <button onClick={() => setAdminTab("documents")} style={styles.tab(adminTab === "documents")}>
-                    Documents
-                  </button>
-                  <button onClick={() => setAdminTab("info")} style={styles.tab(adminTab === "info")}>
-                    Information
-                  </button>
+                  <button onClick={() => setAdminTab("events")} style={styles.tab(adminTab === "events")}>Events</button>
+                  <button onClick={() => setAdminTab("monday")} style={styles.tab(adminTab === "monday")}>Monday Points</button>
+                  <button onClick={() => setAdminTab("officers")} style={styles.tab(adminTab === "officers")}>Office Bearers</button>
+                  <button onClick={() => setAdminTab("coaches")} style={styles.tab(adminTab === "coaches")}>Coaches</button>
+                  <button onClick={() => setAdminTab("members")} style={styles.tab(adminTab === "members")}>Members</button>
+                  <button onClick={() => setAdminTab("documents")} style={styles.tab(adminTab === "documents")}>Documents</button>
+                  <button onClick={() => setAdminTab("info")} style={styles.tab(adminTab === "info")}>Information</button>
                 </div>
 
                 {adminTab === "events" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>
-                        {editingEntryId ? "Edit Event" : "Add Event"}
-                      </h3>
+                      <h3 style={styles.sectionTitle}>{editingEntryId ? "Edit Event" : "Add Event"}</h3>
 
                       <input
                         value={title}
@@ -1640,9 +1661,7 @@ export default function App() {
                       </button>
 
                       {(editingEntryId || title || date || note) && (
-                        <button onClick={clearEntryForm} style={styles.secondaryButton}>
-                          Clear
-                        </button>
+                        <button onClick={clearEntryForm} style={styles.secondaryButton}>Clear</button>
                       )}
                     </div>
 
@@ -1669,9 +1688,7 @@ export default function App() {
                 {adminTab === "monday" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>
-                        {editingMondayId ? "Edit Monday Points" : "Add Monday Points"}
-                      </h3>
+                      <h3 style={styles.sectionTitle}>{editingMondayId ? "Edit Monday Points" : "Add Monday Points"}</h3>
 
                       <input
                         value={mondayTitle}
@@ -1714,9 +1731,7 @@ export default function App() {
                           accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx,application/pdf,image/png,image/jpeg,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                           onChange={(e) => setMondayFile(e.target.files?.[0] || null)}
                         />
-                        {mondayFile ? (
-                          <div style={styles.fileInfo}>Selected file: {mondayFile.name}</div>
-                        ) : null}
+                        {mondayFile ? <div style={styles.fileInfo}>Selected file: {mondayFile.name}</div> : null}
                       </div>
 
                       <button onClick={saveMondayPoints} style={styles.button}>
@@ -1724,9 +1739,7 @@ export default function App() {
                       </button>
 
                       {(editingMondayId || mondayTitle || mondayDate || mondayNote || mondayLink || mondayButtonText || mondayFile) && (
-                        <button onClick={clearMondayForm} style={styles.secondaryButton}>
-                          Clear
-                        </button>
+                        <button onClick={clearMondayForm} style={styles.secondaryButton}>Clear</button>
                       )}
                     </div>
 
@@ -1757,9 +1770,7 @@ export default function App() {
                 {adminTab === "officers" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>
-                        {editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}
-                      </h3>
+                      <h3 style={styles.sectionTitle}>{editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}</h3>
                       <input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Role" style={styles.input} />
                       <input value={newOfficerName} onChange={(e) => setNewOfficerName(e.target.value)} placeholder="Name" style={styles.input} />
                       <input value={newOfficerPhone} onChange={(e) => setNewOfficerPhone(e.target.value)} placeholder="Phone" style={styles.input} />
@@ -1835,9 +1846,7 @@ export default function App() {
                 {adminTab === "coaches" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>
-                        {editingCoachId ? "Edit Club Coach" : "Add Club Coach"}
-                      </h3>
+                      <h3 style={styles.sectionTitle}>{editingCoachId ? "Edit Club Coach" : "Add Club Coach"}</h3>
                       <input value={newCoachName} onChange={(e) => setNewCoachName(e.target.value)} placeholder="Name" style={styles.input} />
                       <input value={newCoachPhone} onChange={(e) => setNewCoachPhone(e.target.value)} placeholder="Phone" style={styles.input} />
                       <input
@@ -1949,9 +1958,7 @@ export default function App() {
                 {adminTab === "documents" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>
-                        {editingDocumentId ? "Edit Document" : "Add Document"}
-                      </h3>
+                      <h3 style={styles.sectionTitle}>{editingDocumentId ? "Edit Document" : "Add Document"}</h3>
 
                       <input
                         value={documentTitle}
@@ -2000,9 +2007,7 @@ export default function App() {
                           accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx,application/pdf,image/png,image/jpeg,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                           onChange={(e) => setDocumentFile(e.target.files?.[0] || null)}
                         />
-                        {documentFile ? (
-                          <div style={styles.fileInfo}>Selected file: {documentFile.name}</div>
-                        ) : null}
+                        {documentFile ? <div style={styles.fileInfo}>Selected file: {documentFile.name}</div> : null}
                       </div>
 
                       <button onClick={saveDocument} style={styles.button}>
@@ -2010,9 +2015,7 @@ export default function App() {
                       </button>
 
                       {(editingDocumentId || documentTitle || documentDescription || documentCategory || documentLink || documentButtonText || documentFile) && (
-                        <button onClick={clearDocumentForm} style={styles.secondaryButton}>
-                          Clear
-                        </button>
+                        <button onClick={clearDocumentForm} style={styles.secondaryButton}>Clear</button>
                       )}
                     </div>
 
@@ -2043,9 +2046,7 @@ export default function App() {
                 {adminTab === "info" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>
-                        {editingPostId ? "Edit Information Post" : "Add Information Post"}
-                      </h3>
+                      <h3 style={styles.sectionTitle}>{editingPostId ? "Edit Information Post" : "Add Information Post"}</h3>
                       <input value={postTitle} onChange={(e) => setPostTitle(e.target.value)} placeholder="Title" style={styles.input} />
                       <textarea value={postMessage} onChange={(e) => setPostMessage(e.target.value)} placeholder="Message" style={styles.textarea} />
                       <input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} style={styles.input} />
@@ -2058,9 +2059,7 @@ export default function App() {
                           accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx,application/pdf,image/png,image/jpeg,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                           onChange={(e) => setPostFile(e.target.files?.[0] || null)}
                         />
-                        {postFile ? (
-                          <div style={styles.fileInfo}>Selected file: {postFile.name}</div>
-                        ) : null}
+                        {postFile ? <div style={styles.fileInfo}>Selected file: {postFile.name}</div> : null}
                       </div>
 
                       <label style={{ display: "block", marginBottom: 10 }}>
