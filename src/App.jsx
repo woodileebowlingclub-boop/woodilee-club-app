@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "./lib/supabase";
+import logo from "./assets/logo.png";
 
 const CLUB_PIN = "1911";
 const ADMIN_PIN = "1954";
@@ -24,6 +25,21 @@ const styles = {
     padding: 18,
     marginBottom: 18,
     boxShadow: "0 8px 20px rgba(0,0,0,0.22)",
+  },
+  headerRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
+    flexWrap: "wrap",
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    borderRadius: "50%",
+    objectFit: "cover",
+    background: "#fff",
+    border: "3px solid #f3c76b",
+    boxShadow: "0 3px 10px rgba(0,0,0,0.25)",
   },
   title: {
     margin: 0,
@@ -278,6 +294,12 @@ function sortMondayPoints(list) {
   );
 }
 
+function sortDocuments(list) {
+  return [...list].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+}
+
 function sortByPositionThenName(list) {
   return [...list].sort((a, b) => {
     const aPos = Number.isFinite(Number(a.position)) ? Number(a.position) : 999;
@@ -334,10 +356,12 @@ export default function App() {
   const [clubCoaches, setClubCoaches] = useState([]);
   const [posts, setPosts] = useState([]);
   const [mondayPoints, setMondayPoints] = useState([]);
+  const [documents, setDocuments] = useState([]);
 
   const [search, setSearch] = useState("");
   const [eventSearch, setEventSearch] = useState("");
   const [infoSearch, setInfoSearch] = useState("");
+  const [documentSearch, setDocumentSearch] = useState("");
 
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
@@ -371,12 +395,20 @@ export default function App() {
   const [mondayLink, setMondayLink] = useState("");
   const [mondayFile, setMondayFile] = useState(null);
 
+  const [documentTitle, setDocumentTitle] = useState("");
+  const [documentDescription, setDocumentDescription] = useState("");
+  const [documentCategory, setDocumentCategory] = useState("General");
+  const [documentButtonText, setDocumentButtonText] = useState("");
+  const [documentLink, setDocumentLink] = useState("");
+  const [documentFile, setDocumentFile] = useState(null);
+
   const [editingEntryId, setEditingEntryId] = useState(null);
   const [editingMemberId, setEditingMemberId] = useState(null);
   const [editingOfficerId, setEditingOfficerId] = useState(null);
   const [editingCoachId, setEditingCoachId] = useState(null);
   const [editingPostId, setEditingPostId] = useState(null);
   const [editingMondayId, setEditingMondayId] = useState(null);
+  const [editingDocumentId, setEditingDocumentId] = useState(null);
 
   const sortedEntries = useMemo(() => sortEventsChronologically(entries), [entries]);
   const sortedPosts = useMemo(() => sortPosts(posts), [posts]);
@@ -389,6 +421,7 @@ export default function App() {
     () => sortByPositionThenName(clubCoaches),
     [clubCoaches]
   );
+  const sortedDocuments = useMemo(() => sortDocuments(documents), [documents]);
 
   const filteredEvents = useMemo(() => {
     return sortedEntries.filter((e) => {
@@ -411,6 +444,17 @@ export default function App() {
       );
     });
   }, [sortedPosts, infoSearch]);
+
+  const filteredDocuments = useMemo(() => {
+    return sortedDocuments.filter((doc) => {
+      const q = documentSearch.toLowerCase();
+      return (
+        String(doc.title || "").toLowerCase().includes(q) ||
+        String(doc.description || "").toLowerCase().includes(q) ||
+        String(doc.category || "").toLowerCase().includes(q)
+      );
+    });
+  }, [sortedDocuments, documentSearch]);
 
   const filteredMembers = useMemo(() => {
     return members.filter((m) =>
@@ -472,6 +516,7 @@ export default function App() {
       loadClubCoaches(),
       loadPosts(),
       loadMondayPoints(),
+      loadDocuments(),
     ]);
   };
 
@@ -517,6 +562,12 @@ export default function App() {
     const { data, error } = await supabase.from("monday_points").select("*");
     if (error) return setMessage(`Could not load Monday Points: ${error.message}`);
     setMondayPoints(data || []);
+  };
+
+  const loadDocuments = async () => {
+    const { data, error } = await supabase.from("documents").select("*");
+    if (error) return setMessage(`Could not load documents: ${error.message}`);
+    setDocuments(data || []);
   };
 
   const handleLogin = () => {
@@ -585,6 +636,16 @@ export default function App() {
     setMondayButtonText("");
     setMondayLink("");
     setMondayFile(null);
+  };
+
+  const clearDocumentForm = () => {
+    setEditingDocumentId(null);
+    setDocumentTitle("");
+    setDocumentDescription("");
+    setDocumentCategory("General");
+    setDocumentButtonText("");
+    setDocumentLink("");
+    setDocumentFile(null);
   };
 
   const saveEntry = async () => {
@@ -949,6 +1010,72 @@ export default function App() {
     setMessage("Monday Points deleted.");
   };
 
+  const saveDocument = async () => {
+    if (!documentTitle) return setMessage("Enter a document title.");
+
+    try {
+      const finalLink = documentFile
+        ? await uploadFileToBucket(documentFile, "documents")
+        : documentLink || null;
+
+      const payload = {
+        title: documentTitle,
+        description: documentDescription || null,
+        file_url: finalLink,
+        button_text: documentButtonText || null,
+        category: documentCategory || "General",
+      };
+
+      if (editingDocumentId) {
+        const { data, error } = await supabase
+          .from("documents")
+          .update(payload)
+          .eq("id", editingDocumentId)
+          .select()
+          .single();
+
+        if (error) return setMessage(`Could not update document: ${error.message}`);
+        setDocuments((prev) => prev.map((x) => (x.id === editingDocumentId ? data : x)));
+        setMessage("Document updated.");
+      } else {
+        const { data, error } = await supabase
+          .from("documents")
+          .insert([payload])
+          .select()
+          .single();
+
+        if (error) return setMessage(`Could not save document: ${error.message}`);
+        setDocuments((prev) => [...prev, data]);
+        setMessage("Document added.");
+      }
+
+      clearDocumentForm();
+    } catch (err) {
+      setMessage(`Could not upload document: ${err.message}`);
+    }
+  };
+
+  const editDocument = (doc) => {
+    setEditingDocumentId(doc.id);
+    setDocumentTitle(doc.title || "");
+    setDocumentDescription(doc.description || "");
+    setDocumentCategory(doc.category || "General");
+    setDocumentButtonText(doc.button_text || "");
+    setDocumentLink(doc.file_url || "");
+    setDocumentFile(null);
+    setTab("admin");
+    setAdminTab("documents");
+  };
+
+  const deleteDocument = async (id) => {
+    if (!window.confirm("Delete this document?")) return;
+
+    const { error } = await supabase.from("documents").delete().eq("id", id);
+    if (error) return setMessage(`Could not delete document: ${error.message}`);
+    setDocuments((prev) => prev.filter((x) => x.id !== id));
+    setMessage("Document deleted.");
+  };
+
   const moveItem = async (table, items, onItemsUpdated, id, direction, label) => {
     const currentList = sortByPositionThenName(items);
     const currentIndex = currentList.findIndex((item) => item.id === id);
@@ -1057,6 +1184,7 @@ export default function App() {
     return (
       <div style={styles.page}>
         <div style={styles.loginPanel}>
+          <img src={logo} alt="Club Logo" style={{ ...styles.logo, margin: "0 auto 12px auto" }} />
           <h1 style={{ ...styles.title, marginBottom: 14 }}>Woodilee Bowling Club</h1>
           <input
             type="password"
@@ -1080,8 +1208,13 @@ export default function App() {
     <div style={styles.page}>
       <div style={styles.wrap}>
         <div style={styles.header}>
-          <h1 style={styles.title}>Woodilee Bowling Club</h1>
-          <p style={styles.subtitle}>Members diary, notices and contact details</p>
+          <div style={styles.headerRow}>
+            <img src={logo} alt="Club Logo" style={styles.logo} />
+            <div>
+              <h1 style={styles.title}>Woodilee Bowling Club</h1>
+              <p style={styles.subtitle}>Members diary, notices and contact details</p>
+            </div>
+          </div>
         </div>
 
         {message && <div style={styles.message}>{message}</div>}
@@ -1091,6 +1224,7 @@ export default function App() {
           <button style={styles.tab(tab === "diary")} onClick={() => setTab("diary")}>Diary</button>
           <button style={styles.tab(tab === "events")} onClick={() => setTab("events")}>Events</button>
           <button style={styles.tab(tab === "members")} onClick={() => setTab("members")}>Members</button>
+          <button style={styles.tab(tab === "documents")} onClick={() => setTab("documents")}>Documents</button>
           <button style={styles.tab(tab === "information")} onClick={() => setTab("information")}>Information</button>
           <button style={styles.tab(tab === "admin")} onClick={() => setTab("admin")}>Admin</button>
         </div>
@@ -1116,6 +1250,9 @@ export default function App() {
                     </button>
                     <button style={styles.homeActionBtn} onClick={() => setTab("information")}>
                       Club Notices
+                    </button>
+                    <button style={styles.homeActionBtn} onClick={() => setTab("documents")}>
+                      Club Documents
                     </button>
                   </div>
                 </>
@@ -1213,6 +1350,9 @@ export default function App() {
               </button>
               <button style={styles.homeActionBtn} onClick={() => setTab("members")}>
                 Members
+              </button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("documents")}>
+                Documents
               </button>
               <button style={styles.homeActionBtn} onClick={() => setTab("information")}>
                 Information
@@ -1341,6 +1481,49 @@ export default function App() {
           </div>
         )}
 
+        {tab === "documents" && (
+          <div style={styles.panel}>
+            <h3 style={styles.sectionTitle}>Documents</h3>
+
+            <input
+              type="text"
+              placeholder="Search documents..."
+              value={documentSearch}
+              onChange={(e) => setDocumentSearch(e.target.value)}
+              style={styles.input}
+            />
+
+            {filteredDocuments.length === 0 ? (
+              <div style={{ color: "#777" }}>No matching documents found.</div>
+            ) : (
+              filteredDocuments.map((doc) => (
+                <div key={doc.id} style={styles.card}>
+                  <div style={styles.badge}>{doc.category || "General"}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>{doc.title}</div>
+                  {doc.description ? (
+                    <div style={{ marginTop: 8, whiteSpace: "pre-wrap", color: "#555" }}>
+                      {doc.description}
+                    </div>
+                  ) : null}
+                  {doc.file_url ? (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={styles.fileInfo}>{getFileTypeLabel(doc.file_url)}</div>
+                      <a
+                        href={doc.file_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={styles.linkBtn}
+                      >
+                        {doc.button_text || "Open Document"}
+                      </a>
+                    </div>
+                  ) : null}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
         {tab === "information" && (
           <div style={styles.panel}>
             <h3 style={styles.sectionTitle}>General Information</h3>
@@ -1415,6 +1598,9 @@ export default function App() {
                   </button>
                   <button onClick={() => setAdminTab("members")} style={styles.tab(adminTab === "members")}>
                     Members
+                  </button>
+                  <button onClick={() => setAdminTab("documents")} style={styles.tab(adminTab === "documents")}>
+                    Documents
                   </button>
                   <button onClick={() => setAdminTab("info")} style={styles.tab(adminTab === "info")}>
                     Information
@@ -1756,6 +1942,100 @@ export default function App() {
                             </div>
                           </div>
                         ))}
+                    </div>
+                  </>
+                )}
+
+                {adminTab === "documents" && (
+                  <>
+                    <div style={styles.panel}>
+                      <h3 style={styles.sectionTitle}>
+                        {editingDocumentId ? "Edit Document" : "Add Document"}
+                      </h3>
+
+                      <input
+                        value={documentTitle}
+                        onChange={(e) => setDocumentTitle(e.target.value)}
+                        placeholder="Document title"
+                        style={styles.input}
+                      />
+
+                      <textarea
+                        value={documentDescription}
+                        onChange={(e) => setDocumentDescription(e.target.value)}
+                        placeholder="Description"
+                        style={styles.textarea}
+                      />
+
+                      <select
+                        value={documentCategory}
+                        onChange={(e) => setDocumentCategory(e.target.value)}
+                        style={styles.input}
+                      >
+                        <option>General</option>
+                        <option>Forms</option>
+                        <option>Guides</option>
+                        <option>Competitions</option>
+                        <option>Minutes</option>
+                        <option>Results</option>
+                      </select>
+
+                      <input
+                        value={documentLink}
+                        onChange={(e) => setDocumentLink(e.target.value)}
+                        placeholder="Attachment link (optional if uploading file)"
+                        style={styles.input}
+                      />
+
+                      <input
+                        value={documentButtonText}
+                        onChange={(e) => setDocumentButtonText(e.target.value)}
+                        placeholder="Button text"
+                        style={styles.input}
+                      />
+
+                      <div style={{ marginBottom: 10 }}>
+                        <input
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx,application/pdf,image/png,image/jpeg,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                          onChange={(e) => setDocumentFile(e.target.files?.[0] || null)}
+                        />
+                        {documentFile ? (
+                          <div style={styles.fileInfo}>Selected file: {documentFile.name}</div>
+                        ) : null}
+                      </div>
+
+                      <button onClick={saveDocument} style={styles.button}>
+                        {editingDocumentId ? "Update Document" : "Save Document"}
+                      </button>
+
+                      {(editingDocumentId || documentTitle || documentDescription || documentCategory || documentLink || documentButtonText || documentFile) && (
+                        <button onClick={clearDocumentForm} style={styles.secondaryButton}>
+                          Clear
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={styles.panel}>
+                      <h3 style={styles.sectionTitle}>Manage Documents</h3>
+                      {sortedDocuments.length === 0 ? (
+                        <div style={{ color: "#777" }}>No documents yet.</div>
+                      ) : (
+                        sortedDocuments.map((doc) => (
+                          <div key={doc.id} style={styles.card}>
+                            <strong>{doc.title}</strong> — {doc.category || "General"}
+                            {doc.file_url ? (
+                              <div style={{ marginTop: 6, color: "#666" }}>
+                                {getFileTypeLabel(doc.file_url)}
+                              </div>
+                            ) : null}
+                            <div style={{ marginTop: 8 }}>
+                              <button onClick={() => editDocument(doc)} style={styles.smallBtn}>Edit</button>
+                              <button onClick={() => deleteDocument(doc.id)} style={styles.smallBtn}>Delete</button>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </>
                 )}
