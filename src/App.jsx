@@ -470,6 +470,11 @@ function MondayPointsAdmin({ members = [] }) {
     savePoints(updated);
   };
 
+  const clearAllPoints = () => {
+    if (!window.confirm("Clear all Monday night points for 2026?")) return;
+    savePoints({});
+  };
+
   const getTotal = (memberName) => {
     const memberPoints = points[memberName] || {};
     return mondayDates2026.reduce((total, date) => {
@@ -483,7 +488,10 @@ function MondayPointsAdmin({ members = [] }) {
 
   return (
     <div style={{ overflowX: "auto" }}>
-      <h3 style={styles.sectionTitle}>Monday Night Points Entry – 2026</h3>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <h3 style={styles.sectionTitle}>Monday Night Points Edit – 2026</h3>
+        <button onClick={clearAllPoints} style={styles.secondaryButton}>Clear All Scores</button>
+      </div>
 
       <table style={styles.adminTable}>
         <thead>
@@ -617,7 +625,7 @@ export default function App() {
   const [adminPin, setAdminPin] = useState("");
   const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [message, setMessage] = useState("");
-  const [adminTab, setAdminTab] = useState("events");
+  const [adminTab, setAdminTab] = useState("mondayscores");
 
   const [entries, setEntries] = useState([]);
   const [members, setMembers] = useState([]);
@@ -842,6 +850,7 @@ export default function App() {
     if (adminPin === ADMIN_PIN) {
       setAdminUnlocked(true);
       setMessage("");
+      setAdminTab("mondayscores");
     } else {
       setMessage("Incorrect admin PIN.");
     }
@@ -1773,9 +1782,9 @@ export default function App() {
             ) : (
               <>
                 <div style={styles.tabs}>
-                  <button onClick={() => setAdminTab("events")} style={styles.tab(adminTab === "events")}>Events</button>
+                  <button onClick={() => setAdminTab("mondayscores")} style={styles.tab(adminTab === "mondayscores")}>Monday Points Edit</button>
                   <button onClick={() => setAdminTab("monday")} style={styles.tab(adminTab === "monday")}>Monday Uploads</button>
-                  <button onClick={() => setAdminTab("mondayscores")} style={styles.tab(adminTab === "mondayscores")}>Monday Scores</button>
+                  <button onClick={() => setAdminTab("events")} style={styles.tab(adminTab === "events")}>Events</button>
                   <button onClick={() => setAdminTab("officers")} style={styles.tab(adminTab === "officers")}>Office Bearers</button>
                   <button onClick={() => setAdminTab("coaches")} style={styles.tab(adminTab === "coaches")}>Coaches</button>
                   <button onClick={() => setAdminTab("members")} style={styles.tab(adminTab === "members")}>Members</button>
@@ -1783,42 +1792,16 @@ export default function App() {
                   <button onClick={() => setAdminTab("info")} style={styles.tab(adminTab === "info")}>Information</button>
                 </div>
 
-                {adminTab === "events" && (
-                  <>
-                    <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>{editingEntryId ? "Edit Event" : "Add Event"}</h3>
-
-                      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" style={styles.input} />
-                      <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={styles.input} />
-                      <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional note" style={styles.textarea} />
-
-                      <button onClick={saveEntry} style={styles.button}>{editingEntryId ? "Update Event" : "Save Event"}</button>
-
-                      {(editingEntryId || title || date || note) && (
-                        <button onClick={clearEntryForm} style={styles.secondaryButton}>Clear</button>
-                      )}
-                    </div>
-
-                    <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>Manage Events</h3>
-                      {sortedEntries.map((e) => (
-                        <div key={e.id} style={styles.card}>
-                          <strong>{formatDiaryDate(e.date_text)}</strong> — {e.title}
-                          {e.note ? <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>{e.note}</div> : null}
-                          <div style={{ marginTop: 8 }}>
-                            <button onClick={() => editEntry(e)} style={styles.smallBtn}>Edit</button>
-                            <button onClick={() => deleteEntry(e.id)} style={styles.smallBtn}>Delete</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
+                {adminTab === "mondayscores" && (
+                  <div style={styles.panel}>
+                    <MondayPointsAdmin members={members} />
+                  </div>
                 )}
 
                 {adminTab === "monday" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>{editingMondayId ? "Edit Monday Points" : "Add Monday Points"}</h3>
+                      <h3 style={styles.sectionTitle}>{editingMondayId ? "Edit Monday Points Upload" : "Add Monday Points Upload"}</h3>
 
                       <input
                         value={mondayTitle}
@@ -1855,7 +1838,7 @@ export default function App() {
                       </div>
 
                       <button onClick={saveMondayPoints} style={styles.button}>
-                        {editingMondayId ? "Update Monday Points" : "Save Monday Points"}
+                        {editingMondayId ? "Update Monday Points Upload" : "Save Monday Points Upload"}
                       </button>
 
                       {(editingMondayId || mondayTitle || mondayDate || mondayNote || mondayLink || mondayButtonText || mondayFile) && (
@@ -1883,10 +1866,36 @@ export default function App() {
                   </>
                 )}
 
-                {adminTab === "mondayscores" && (
-                  <div style={styles.panel}>
-                    <MondayPointsAdmin members={members} />
-                  </div>
+                {adminTab === "events" && (
+                  <>
+                    <div style={styles.panel}>
+                      <h3 style={styles.sectionTitle}>{editingEntryId ? "Edit Event" : "Add Event"}</h3>
+
+                      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" style={styles.input} />
+                      <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={styles.input} />
+                      <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional note" style={styles.textarea} />
+
+                      <button onClick={saveEntry} style={styles.button}>{editingEntryId ? "Update Event" : "Save Event"}</button>
+
+                      {(editingEntryId || title || date || note) && (
+                        <button onClick={clearEntryForm} style={styles.secondaryButton}>Clear</button>
+                      )}
+                    </div>
+
+                    <div style={styles.panel}>
+                      <h3 style={styles.sectionTitle}>Manage Events</h3>
+                      {sortedEntries.map((e) => (
+                        <div key={e.id} style={styles.card}>
+                          <strong>{formatDiaryDate(e.date_text)}</strong> — {e.title}
+                          {e.note ? <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>{e.note}</div> : null}
+                          <div style={{ marginTop: 8 }}>
+                            <button onClick={() => editEntry(e)} style={styles.smallBtn}>Edit</button>
+                            <button onClick={() => deleteEntry(e.id)} style={styles.smallBtn}>Delete</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
 
                 {adminTab === "officers" && (
