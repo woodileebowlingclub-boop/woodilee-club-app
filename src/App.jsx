@@ -488,9 +488,19 @@ function MondayPointsAdmin({ members = [] }) {
 
   return (
     <div style={{ overflowX: "auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
+        }}
+      >
         <h3 style={styles.sectionTitle}>Monday Night Points Edit – 2026</h3>
-        <button onClick={clearAllPoints} style={styles.secondaryButton}>Clear All Scores</button>
+        <button onClick={clearAllPoints} style={styles.secondaryButton}>
+          Clear All Scores
+        </button>
       </div>
 
       <table style={styles.adminTable}>
@@ -525,7 +535,9 @@ function MondayPointsAdmin({ members = [] }) {
                 </td>
               ))}
 
-              <td style={{ ...styles.adminTd, fontWeight: 700 }}>{getTotal(member.name)}</td>
+              <td style={{ ...styles.adminTd, fontWeight: 700 }}>
+                {getTotal(member.name)}
+              </td>
             </tr>
           ))}
         </tbody>
