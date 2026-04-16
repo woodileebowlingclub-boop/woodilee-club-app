@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "./lib/supabase";
-import logo from "./assets/logo.png";
+import logo from "./assets/WBC Logo.png";
 
 const CLUB_PIN = "1911";
 const ADMIN_PIN = "1954";
