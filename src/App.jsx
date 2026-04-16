@@ -303,29 +303,6 @@ const styles = {
     background: "#fffdfd",
     fontSize: 14,
   },
-  stickyCol: {
-    position: "sticky",
-    left: 0,
-    zIndex: 3,
-    background: "#8b1e3f",
-  },
-  stickyColBody: {
-    position: "sticky",
-    left: 0,
-    zIndex: 2,
-    background: "#fff7f9",
-    textAlign: "left",
-    fontWeight: 700,
-    minWidth: 180,
-  },
-  pointsInput: {
-    width: 55,
-    padding: 6,
-    borderRadius: 8,
-    border: "1px solid #d7b7be",
-    textAlign: "center",
-    boxSizing: "border-box",
-  },
 };
 
 const mondayDates2026 = [
@@ -369,12 +346,6 @@ function sortPosts(list) {
   });
 }
 
-function sortMondayPoints(list) {
-  return [...list].sort(
-    (a, b) => new Date(b.week_date).getTime() - new Date(a.week_date).getTime()
-  );
-}
-
 function sortDocuments(list) {
   return [...list].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -411,200 +382,225 @@ function formatDiaryDate(dateValue) {
   });
 }
 
-function getFileTypeLabel(url) {
-  const lower = String(url || "").toLowerCase();
-  if (lower.endsWith(".pdf") || lower.includes(".pdf?")) return "PDF";
-  if (lower.endsWith(".png") || lower.includes(".png?")) return "PNG image";
-  if (
-    lower.endsWith(".jpg") ||
-    lower.endsWith(".jpeg") ||
-    lower.includes(".jpg?") ||
-    lower.includes(".jpeg?")
-  )
-    return "JPEG image";
-  if (
-    lower.endsWith(".xls") ||
-    lower.endsWith(".xlsx") ||
-    lower.includes(".xls?") ||
-    lower.includes(".xlsx?")
-  )
-    return "Excel file";
-  if (
-    lower.endsWith(".doc") ||
-    lower.endsWith(".docx") ||
-    lower.includes(".doc?") ||
-    lower.includes(".docx?")
-  )
-    return "Word document";
-  return "Attachment";
-}
-
-function isImageFile(url) {
-  const lower = String(url || "").toLowerCase();
-  return (
-    lower.endsWith(".png") ||
-    lower.endsWith(".jpg") ||
-    lower.endsWith(".jpeg") ||
-    lower.includes(".png?") ||
-    lower.includes(".jpg?") ||
-    lower.includes(".jpeg?")
-  );
-}
-
 function MondayPointsAdmin({ members = [] }) {
-  const [points, setPoints] = useState(() => {
+  const [pointsData, setPointsData] = useState(() => {
     try {
-      const saved = localStorage.getItem("mondayPoints2026");
-      return saved ? JSON.parse(saved) : {};
+      const saved = localStorage.getItem("mondayPoints2026Entries");
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return {};
+      return [];
     }
   });
 
-  const savePoints = (updated) => {
-    setPoints(updated);
-    localStorage.setItem("mondayPoints2026", JSON.stringify(updated));
+  const [selectedDate, setSelectedDate] = useState(mondayDates2026[0] || "");
+  const [selectedMember, setSelectedMember] = useState("");
+  const [selectedPoints, setSelectedPoints] = useState("");
+  const [editingId, setEditingId] = useState(null);
+
+  const saveEntries = (updated) => {
+    setPointsData(updated);
+    localStorage.setItem("mondayPoints2026Entries", JSON.stringify(updated));
   };
 
-  const formatShortDate = (dateStr) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-    });
-  };
-
-  const handleChange = (memberName, date, value) => {
-    const numericValue = value === "" ? "" : Math.max(0, Number(value));
-
-    const updated = {
-      ...points,
-      [memberName]: {
-        ...(points[memberName] || {}),
-        [date]: numericValue,
-      },
-    };
-
-    savePoints(updated);
-  };
-
-  const clearAllPoints = () => {
-    if (!window.confirm("Clear all Monday night points for 2026?")) return;
-    savePoints({});
-  };
-
-  const getTotal = (memberName) => {
-    const memberPoints = points[memberName] || {};
-    return mondayDates2026.reduce((total, date) => {
-      return total + (Number(memberPoints[date]) || 0);
-    }, 0);
+  const resetForm = () => {
+    setSelectedDate(mondayDates2026[0] || "");
+    setSelectedMember("");
+    setSelectedPoints("");
+    setEditingId(null);
   };
 
   const sortedMembers = [...members]
     .filter((m) => m?.name)
     .sort((a, b) => String(a.name).localeCompare(String(b.name), "en-GB"));
 
+  const saveScore = () => {
+    if (!selectedDate || !selectedMember || selectedPoints === "") {
+      return alert("Choose date, member and points.");
+    }
+
+    const cleanPoints = Math.max(0, Number(selectedPoints) || 0);
+
+    if (editingId) {
+      const updated = pointsData.map((entry) =>
+        entry.id === editingId
+          ? {
+              ...entry,
+              date: selectedDate,
+              member: selectedMember,
+              points: cleanPoints,
+            }
+          : entry
+      );
+      saveEntries(updated);
+    } else {
+      const updated = [
+        ...pointsData,
+        {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          date: selectedDate,
+          member: selectedMember,
+          points: cleanPoints,
+        },
+      ];
+      saveEntries(updated);
+    }
+
+    resetForm();
+  };
+
+  const editScore = (entry) => {
+    setEditingId(entry.id);
+    setSelectedDate(entry.date);
+    setSelectedMember(entry.member);
+    setSelectedPoints(String(entry.points));
+  };
+
+  const deleteScore = (id) => {
+    if (!window.confirm("Delete this score entry?")) return;
+    const updated = pointsData.filter((entry) => entry.id !== id);
+    saveEntries(updated);
+    if (editingId === id) resetForm();
+  };
+
+  const clearAllScores = () => {
+    if (!window.confirm("Clear all Monday night points for 2026?")) return;
+    saveEntries([]);
+    resetForm();
+  };
+
+  const entriesByDate = mondayDates2026.map((date) => ({
+    date,
+    entries: pointsData
+      .filter((entry) => entry.date === date)
+      .sort((a, b) => a.member.localeCompare(b.member, "en-GB")),
+  }));
+
   return (
-    <div style={{ overflowX: "auto" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 10,
-          flexWrap: "wrap",
-        }}
-      >
-        <h3 style={styles.sectionTitle}>Monday Night Points Edit – 2026</h3>
-        <button onClick={clearAllPoints} style={styles.secondaryButton}>
-          Clear All Scores
+    <>
+      <div style={styles.panel}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+          }}
+        >
+          <h3 style={styles.sectionTitle}>Monday Points Edit – 2026</h3>
+          <button onClick={clearAllScores} style={styles.secondaryButton}>
+            Clear All Scores
+          </button>
+        </div>
+
+        <select
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          style={styles.input}
+        >
+          {mondayDates2026.map((date) => (
+            <option key={date} value={date}>
+              {formatDiaryDate(date)}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={selectedMember}
+          onChange={(e) => setSelectedMember(e.target.value)}
+          style={styles.input}
+        >
+          <option value="">Select member</option>
+          {sortedMembers.map((member) => (
+            <option key={member.id} value={member.name}>
+              {member.name}
+            </option>
+          ))}
+        </select>
+
+        <input
+          type="number"
+          min="0"
+          placeholder="Points"
+          value={selectedPoints}
+          onChange={(e) => setSelectedPoints(e.target.value)}
+          style={styles.input}
+        />
+
+        <button onClick={saveScore} style={styles.button}>
+          {editingId ? "Update Score" : "Save Score"}
         </button>
+
+        {(editingId || selectedMember || selectedPoints) && (
+          <button onClick={resetForm} style={styles.secondaryButton}>
+            Clear
+          </button>
+        )}
       </div>
 
-      <table style={styles.adminTable}>
-        <thead>
-          <tr>
-            <th style={{ ...styles.adminTh, ...styles.stickyCol }}>Member</th>
-            {mondayDates2026.map((date) => (
-              <th key={date} style={styles.adminTh}>
-                {formatShortDate(date)}
-              </th>
-            ))}
-            <th style={styles.adminTh}>Total</th>
-          </tr>
-        </thead>
+      <div style={styles.panel}>
+        <h3 style={styles.sectionTitle}>Saved Monday Night Scores</h3>
 
-        <tbody>
-          {sortedMembers.map((member) => (
-            <tr key={member.name}>
-              <td style={{ ...styles.adminTd, ...styles.stickyColBody }}>
-                {member.name}
-              </td>
-
-              {mondayDates2026.map((date) => (
-                <td key={date} style={styles.adminTd}>
-                  <input
-                    type="number"
-                    min="0"
-                    value={points[member.name]?.[date] ?? ""}
-                    onChange={(e) => handleChange(member.name, date, e.target.value)}
-                    style={styles.pointsInput}
-                  />
-                </td>
-              ))}
-
-              <td style={{ ...styles.adminTd, fontWeight: 700 }}>
-                {getTotal(member.name)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+        {entriesByDate.every((group) => group.entries.length === 0) ? (
+          <div style={{ color: "#777" }}>No Monday night scores entered yet.</div>
+        ) : (
+          entriesByDate.map((group) =>
+            group.entries.length > 0 ? (
+              <div key={group.date} style={{ marginBottom: 18 }}>
+                <h4 style={styles.memberSectionTitle}>{formatDiaryDate(group.date)}</h4>
+                {group.entries.map((entry) => (
+                  <div key={entry.id} style={styles.card}>
+                    <strong>{entry.member}</strong> — {entry.points} point{entry.points === 1 ? "" : "s"}
+                    <div style={{ marginTop: 8 }}>
+                      <button onClick={() => editScore(entry)} style={styles.smallBtn}>
+                        Edit
+                      </button>
+                      <button onClick={() => deleteScore(entry.id)} style={styles.smallBtn}>
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null
+          )
+        )}
+      </div>
+    </>
   );
 }
 
 function Leaderboard({ members = [] }) {
-  const [points, setPoints] = useState({});
+  const [pointsData, setPointsData] = useState([]);
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("mondayPoints2026");
-      setPoints(saved ? JSON.parse(saved) : {});
+      const saved = localStorage.getItem("mondayPoints2026Entries");
+      setPointsData(saved ? JSON.parse(saved) : []);
     } catch {
-      setPoints({});
+      setPointsData([]);
     }
   }, []);
 
-  const totals = members
-    .filter((m) => m?.name)
-    .map((m) => {
-      const memberPoints = points[m.name] || {};
-      const total = Object.values(memberPoints).reduce(
-        (sum, value) => sum + (Number(value) || 0),
-        0
-      );
+  const totalsMap = {};
+  pointsData.forEach((entry) => {
+    const name = entry.member;
+    totalsMap[name] = (totalsMap[name] || 0) + (Number(entry.points) || 0);
+  });
 
-      return {
-        name: m.name,
-        total,
-      };
+  const ranked = Object.entries(totalsMap)
+    .map(([name, total]) => ({ name, total }))
+    .sort((a, b) => {
+      if (b.total !== a.total) return b.total - a.total;
+      return a.name.localeCompare(b.name, "en-GB");
+    })
+    .map((item, index, arr) => {
+      let rank = index + 1;
+      if (index > 0 && item.total === arr[index - 1].total) {
+        rank = arr[index - 1].rank;
+      }
+      return { ...item, rank };
     });
-
-  const sorted = [...totals].sort((a, b) => {
-    if (b.total !== a.total) return b.total - a.total;
-    return a.name.localeCompare(b.name, "en-GB");
-  });
-
-  let lastScore = null;
-  let lastRank = 0;
-
-  const ranked = sorted.map((member, index) => {
-    const rank = member.total === lastScore ? lastRank : index + 1;
-    lastScore = member.total;
-    lastRank = rank;
-    return { ...member, rank };
-  });
 
   return (
     <div style={styles.panel}>
@@ -618,7 +614,6 @@ function Leaderboard({ members = [] }) {
             <th style={styles.adminTh}>Total Points</th>
           </tr>
         </thead>
-
         <tbody>
           {ranked.length > 0 ? (
             ranked.map((member) => (
@@ -639,7 +634,7 @@ function Leaderboard({ members = [] }) {
           ) : (
             <tr>
               <td colSpan="3" style={styles.adminTd}>
-                No members found
+                No Monday night points entered yet
               </td>
             </tr>
           )}
@@ -664,7 +659,6 @@ export default function App() {
   const [officeBearers, setOfficeBearers] = useState([]);
   const [clubCoaches, setClubCoaches] = useState([]);
   const [posts, setPosts] = useState([]);
-  const [mondayPoints, setMondayPoints] = useState([]);
   const [documents, setDocuments] = useState([]);
 
   const [search, setSearch] = useState("");
@@ -697,13 +691,6 @@ export default function App() {
   const [postPinned, setPostPinned] = useState(false);
   const [postFile, setPostFile] = useState(null);
 
-  const [mondayTitle, setMondayTitle] = useState("");
-  const [mondayDate, setMondayDate] = useState("");
-  const [mondayNote, setMondayNote] = useState("");
-  const [mondayButtonText, setMondayButtonText] = useState("");
-  const [mondayLink, setMondayLink] = useState("");
-  const [mondayFile, setMondayFile] = useState(null);
-
   const [documentTitle, setDocumentTitle] = useState("");
   const [documentDescription, setDocumentDescription] = useState("");
   const [documentCategory, setDocumentCategory] = useState("General");
@@ -716,12 +703,10 @@ export default function App() {
   const [editingOfficerId, setEditingOfficerId] = useState(null);
   const [editingCoachId, setEditingCoachId] = useState(null);
   const [editingPostId, setEditingPostId] = useState(null);
-  const [editingMondayId, setEditingMondayId] = useState(null);
   const [editingDocumentId, setEditingDocumentId] = useState(null);
 
   const sortedEntries = useMemo(() => sortEventsChronologically(entries), [entries]);
   const sortedPosts = useMemo(() => sortPosts(posts), [posts]);
-  const sortedMondayPoints = useMemo(() => sortMondayPoints(mondayPoints), [mondayPoints]);
   const sortedOfficeBearers = useMemo(() => sortByPositionThenName(officeBearers), [officeBearers]);
   const sortedClubCoaches = useMemo(() => sortByPositionThenName(clubCoaches), [clubCoaches]);
   const sortedDocuments = useMemo(() => sortDocuments(documents), [documents]);
@@ -801,7 +786,7 @@ export default function App() {
 
   const nextEvent = useMemo(() => upcomingEvents[0] || null, [upcomingEvents]);
   const nextTwoEvents = useMemo(() => upcomingEvents.slice(1, 3), [upcomingEvents]);
-  const latestMonday = useMemo(() => sortedMondayPoints[0] || null, [sortedMondayPoints]);
+
   const latestPinnedPost = useMemo(() => sortedPosts.find((p) => p.pinned) || null, [sortedPosts]);
 
   useEffect(() => {
@@ -816,7 +801,6 @@ export default function App() {
       loadOfficeBearers(),
       loadClubCoaches(),
       loadPosts(),
-      loadMondayPoints(),
       loadDocuments(),
     ]);
   };
@@ -857,12 +841,6 @@ export default function App() {
     const { data, error } = await supabase.from("information_posts").select("*");
     if (error) return setMessage(`Could not load information posts: ${error.message}`);
     setPosts(data || []);
-  };
-
-  const loadMondayPoints = async () => {
-    const { data, error } = await supabase.from("monday_points").select("*");
-    if (error) return setMessage(`Could not load Monday Points: ${error.message}`);
-    setMondayPoints(data || []);
   };
 
   const loadDocuments = async () => {
@@ -928,16 +906,6 @@ export default function App() {
     setPostButtonText("");
     setPostPinned(false);
     setPostFile(null);
-  };
-
-  const clearMondayForm = () => {
-    setEditingMondayId(null);
-    setMondayTitle("");
-    setMondayDate("");
-    setMondayNote("");
-    setMondayButtonText("");
-    setMondayLink("");
-    setMondayFile(null);
   };
 
   const clearDocumentForm = () => {
@@ -1244,74 +1212,6 @@ export default function App() {
     setMessage("Information post deleted.");
   };
 
-  const saveMondayPoints = async () => {
-    if (!mondayTitle || !mondayDate) {
-      return setMessage("Enter Monday Points title and week date.");
-    }
-
-    try {
-      const finalLink = mondayFile
-        ? await uploadFileToBucket(mondayFile, "monday-points")
-        : mondayLink || null;
-
-      const payload = {
-        title: mondayTitle,
-        week_date: mondayDate,
-        note: mondayNote || null,
-        file_url: finalLink,
-        button_text: mondayButtonText || null,
-      };
-
-      if (editingMondayId) {
-        const { data, error } = await supabase
-          .from("monday_points")
-          .update(payload)
-          .eq("id", editingMondayId)
-          .select()
-          .single();
-
-        if (error) return setMessage(`Could not update Monday Points: ${error.message}`);
-        setMondayPoints((prev) => prev.map((x) => (x.id === editingMondayId ? data : x)));
-        setMessage("Monday Points updated.");
-      } else {
-        const { data, error } = await supabase
-          .from("monday_points")
-          .insert([payload])
-          .select()
-          .single();
-
-        if (error) return setMessage(`Could not save Monday Points: ${error.message}`);
-        setMondayPoints((prev) => [...prev, data]);
-        setMessage("Monday Points added.");
-      }
-
-      clearMondayForm();
-    } catch (err) {
-      setMessage(`Could not upload Monday Points file: ${err.message}`);
-    }
-  };
-
-  const editMondayPoints = (item) => {
-    setEditingMondayId(item.id);
-    setMondayTitle(item.title || "");
-    setMondayDate(item.week_date || "");
-    setMondayNote(item.note || "");
-    setMondayButtonText(item.button_text || "");
-    setMondayLink(item.file_url || "");
-    setMondayFile(null);
-    setTab("admin");
-    setAdminTab("monday");
-  };
-
-  const deleteMondayPoints = async (id) => {
-    if (!window.confirm("Delete this Monday Points item?")) return;
-
-    const { error } = await supabase.from("monday_points").delete().eq("id", id);
-    if (error) return setMessage(`Could not delete Monday Points: ${error.message}`);
-    setMondayPoints((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Monday Points deleted.");
-  };
-
   const saveDocument = async () => {
     if (!documentTitle) return setMessage("Enter a document title.");
 
@@ -1397,16 +1297,10 @@ export default function App() {
       ? Number(targetItem.position)
       : targetIndex + 1;
 
-    const { error: error1 } = await supabase
-      .from(table)
-      .update({ position: targetPos })
-      .eq("id", currentItem.id);
+    const { error: error1 } = await supabase.from(table).update({ position: targetPos }).eq("id", currentItem.id);
     if (error1) return setMessage(`Could not move ${label}: ${error1.message}`);
 
-    const { error: error2 } = await supabase
-      .from(table)
-      .update({ position: currentPos })
-      .eq("id", targetItem.id);
+    const { error: error2 } = await supabase.from(table).update({ position: currentPos }).eq("id", targetItem.id);
     if (error2) return setMessage(`Could not move ${label}: ${error2.message}`);
 
     const updatedList = items.map((item) => {
@@ -1492,11 +1386,7 @@ export default function App() {
             style={styles.input}
           />
           <button onClick={handleLogin} style={styles.button}>Enter</button>
-          {message ? (
-            <div style={{ marginTop: 8, color: "#8b1e3f", fontWeight: 700 }}>
-              {message}
-            </div>
-          ) : null}
+          {message ? <div style={{ marginTop: 8, color: "#8b1e3f", fontWeight: 700 }}>{message}</div> : null}
         </div>
       </div>
     );
@@ -1538,21 +1428,13 @@ export default function App() {
                   <div style={styles.heroTitle}>{nextEvent.title}</div>
                   <div style={styles.heroDate}>{formatDiaryDate(nextEvent.date_text)}</div>
                   {nextEvent.note ? (
-                    <div style={{ color: "#444", whiteSpace: "pre-wrap", marginBottom: 12 }}>
-                      {nextEvent.note}
-                    </div>
+                    <div style={{ color: "#444", whiteSpace: "pre-wrap", marginBottom: 12 }}>{nextEvent.note}</div>
                   ) : null}
 
                   <div>
-                    <button style={styles.homeActionBtn} onClick={() => setTab("events")}>
-                      View All Events
-                    </button>
-                    <button style={styles.homeActionBtn} onClick={() => setTab("information")}>
-                      Club Notices
-                    </button>
-                    <button style={styles.homeActionBtn} onClick={() => setTab("documents")}>
-                      Club Documents
-                    </button>
+                    <button style={styles.homeActionBtn} onClick={() => setTab("events")}>View All Events</button>
+                    <button style={styles.homeActionBtn} onClick={() => setTab("information")}>Club Notices</button>
+                    <button style={styles.homeActionBtn} onClick={() => setTab("documents")}>Club Documents</button>
                   </div>
                 </>
               ) : (
@@ -1565,40 +1447,10 @@ export default function App() {
 
             <div style={styles.homeGrid}>
               <div style={styles.homeMiniCard}>
-                <div style={styles.homeLabel}>Latest Monday Points</div>
-
-                {latestMonday ? (
-                  <>
-                    <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
-                      {latestMonday.title}
-                    </div>
-                    <div style={{ color: "#92400e", fontWeight: 700, marginBottom: 8 }}>
-                      {formatDiaryDate(latestMonday.week_date)}
-                    </div>
-                    {latestMonday.note ? (
-                      <div style={{ color: "#555", whiteSpace: "pre-wrap", marginBottom: 10 }}>
-                        {latestMonday.note}
-                      </div>
-                    ) : null}
-                    {latestMonday.file_url ? (
-                      <>
-                        {isImageFile(latestMonday.file_url) ? (
-                          <img src={latestMonday.file_url} alt={latestMonday.title} style={styles.imagePreview} />
-                        ) : null}
-                        <a
-                          href={latestMonday.file_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={styles.linkBtn}
-                        >
-                          {latestMonday.button_text || "Open Monday Points"}
-                        </a>
-                      </>
-                    ) : null}
-                  </>
-                ) : (
-                  <div style={{ color: "#777" }}>No Monday Points uploaded yet.</div>
-                )}
+                <div style={styles.homeLabel}>Monday Night Leaderboard</div>
+                <button style={styles.homeActionBtn} onClick={() => setTab("leaderboard")}>
+                  View Leaderboard
+                </button>
               </div>
 
               <div style={styles.homeMiniCard}>
@@ -1606,30 +1458,12 @@ export default function App() {
 
                 {latestPinnedPost ? (
                   <>
-                    <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
-                      {latestPinnedPost.title}
-                    </div>
-                    <div style={{ color: "#555", whiteSpace: "pre-wrap", marginBottom: 10 }}>
-                      {latestPinnedPost.message}
-                    </div>
+                    <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>{latestPinnedPost.title}</div>
+                    <div style={{ color: "#555", whiteSpace: "pre-wrap", marginBottom: 10 }}>{latestPinnedPost.message}</div>
                     {latestPinnedPost.attachment_link ? (
-                      <>
-                        {isImageFile(latestPinnedPost.attachment_link) ? (
-                          <img
-                            src={latestPinnedPost.attachment_link}
-                            alt={latestPinnedPost.title}
-                            style={styles.imagePreview}
-                          />
-                        ) : null}
-                        <a
-                          href={latestPinnedPost.attachment_link}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={styles.linkBtn}
-                        >
-                          {latestPinnedPost.button_text || "Open Notice"}
-                        </a>
-                      </>
+                      <a href={latestPinnedPost.attachment_link} target="_blank" rel="noreferrer" style={styles.linkBtn}>
+                        {latestPinnedPost.button_text || "Open Notice"}
+                      </a>
                     ) : null}
                   </>
                 ) : (
@@ -1699,37 +1533,10 @@ export default function App() {
             </div>
 
             <div style={styles.panel}>
-              <h3 style={styles.sectionTitle}>Monday Points</h3>
-              {sortedMondayPoints.length === 0 ? (
-                <div style={{ color: "#777" }}>No Monday Points uploaded yet.</div>
-              ) : (
-                sortedMondayPoints.map((item) => (
-                  <div key={item.id} style={styles.card}>
-                    <strong style={{ color: "#92400e" }}>{formatDiaryDate(item.week_date)}</strong> — {item.title}
-                    {item.note ? (
-                      <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>
-                        {item.note}
-                      </div>
-                    ) : null}
-                    {item.file_url ? (
-                      <div style={{ marginTop: 10 }}>
-                        <div style={styles.fileInfo}>{getFileTypeLabel(item.file_url)}</div>
-                        {isImageFile(item.file_url) ? (
-                          <img src={item.file_url} alt={item.title} style={styles.imagePreview} />
-                        ) : null}
-                        <a
-                          href={item.file_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={styles.linkBtn}
-                        >
-                          {item.button_text || "Open Monday Points"}
-                        </a>
-                      </div>
-                    ) : null}
-                  </div>
-                ))
-              )}
+              <h3 style={styles.sectionTitle}>Monday Night Points</h3>
+              <div style={{ color: "#555" }}>
+                Use the Leaderboard tab to view current Monday night standings.
+              </div>
             </div>
           </>
         )}
@@ -1754,9 +1561,7 @@ export default function App() {
               filteredEvents.map((e) => (
                 <div key={e.id} style={styles.card}>
                   <strong style={{ color: "#92400e" }}>{formatDiaryDate(e.date_text)}</strong> — {e.title}
-                  {e.note ? (
-                    <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>{e.note}</div>
-                  ) : null}
+                  {e.note ? <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>{e.note}</div> : null}
                 </div>
               ))
             )}
@@ -1766,12 +1571,7 @@ export default function App() {
         {tab === "members" && (
           <div style={styles.panel}>
             <h3 style={styles.sectionTitle}>Members</h3>
-            <input
-              placeholder="Search members..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={styles.input}
-            />
+            <input placeholder="Search members..." value={search} onChange={(e) => setSearch(e.target.value)} style={styles.input} />
 
             <h4 style={styles.memberSectionTitle}>Gents</h4>
             {renderMemberCards(gentsMembers)}
@@ -1803,27 +1603,12 @@ export default function App() {
                 <div key={doc.id} style={styles.card}>
                   <div style={styles.badge}>{doc.category || "General"}</div>
                   <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>{doc.title}</div>
-                  {doc.description ? (
-                    <div style={{ marginTop: 8, whiteSpace: "pre-wrap", color: "#555" }}>
-                      {doc.description}
-                    </div>
-                  ) : null}
+                  {doc.description ? <div style={{ marginTop: 8, whiteSpace: "pre-wrap", color: "#555" }}>{doc.description}</div> : null}
                   {doc.file_url ? (
                     <div style={{ marginTop: 10 }}>
-                      <div style={styles.fileInfo}>{getFileTypeLabel(doc.file_url)}</div>
-
-                      {isImageFile(doc.file_url) ? (
-                        <>
-                          <img src={doc.file_url} alt={doc.title} style={styles.imagePreview} />
-                          <a href={doc.file_url} target="_blank" rel="noreferrer" style={styles.linkBtn}>
-                            {doc.button_text || "Open Image"}
-                          </a>
-                        </>
-                      ) : (
-                        <a href={doc.file_url} target="_blank" rel="noreferrer" style={styles.linkBtn}>
-                          {doc.button_text || "Open Document"}
-                        </a>
-                      )}
+                      <a href={doc.file_url} target="_blank" rel="noreferrer" style={styles.linkBtn}>
+                        {doc.button_text || "Open Document"}
+                      </a>
                     </div>
                   ) : null}
                 </div>
@@ -1856,20 +1641,9 @@ export default function App() {
 
                   {post.attachment_link ? (
                     <div style={{ marginTop: 10 }}>
-                      <div style={styles.fileInfo}>{getFileTypeLabel(post.attachment_link)}</div>
-
-                      {isImageFile(post.attachment_link) ? (
-                        <>
-                          <img src={post.attachment_link} alt={post.title} style={styles.imagePreview} />
-                          <a href={post.attachment_link} target="_blank" rel="noreferrer" style={styles.linkBtn}>
-                            {post.button_text || "Open Image"}
-                          </a>
-                        </>
-                      ) : (
-                        <a href={post.attachment_link} target="_blank" rel="noreferrer" style={styles.linkBtn}>
-                          {post.button_text || "Open Attachment"}
-                        </a>
-                      )}
+                      <a href={post.attachment_link} target="_blank" rel="noreferrer" style={styles.linkBtn}>
+                        {post.button_text || "Open Attachment"}
+                      </a>
                     </div>
                   ) : null}
                 </div>
@@ -1883,188 +1657,45 @@ export default function App() {
             {!adminUnlocked ? (
               <div style={{ ...styles.panel, maxWidth: 420 }}>
                 <h3 style={styles.sectionTitle}>Admin Login</h3>
-                <input
-                  type="password"
-                  value={adminPin}
-                  onChange={(e) => setAdminPin(e.target.value)}
-                  style={styles.input}
-                />
+                <input type="password" value={adminPin} onChange={(e) => setAdminPin(e.target.value)} style={styles.input} />
                 <button onClick={handleAdminLogin} style={styles.button}>Enter</button>
               </div>
             ) : (
               <>
                 <div style={styles.tabs}>
-                  <button
-                    onClick={() => setAdminTab("mondayscores")}
-                    style={styles.tab(adminTab === "mondayscores")}
-                  >
+                  <button onClick={() => setAdminTab("mondayscores")} style={styles.tab(adminTab === "mondayscores")}>
                     Monday Points Edit
                   </button>
-                  <button
-                    onClick={() => setAdminTab("monday")}
-                    style={styles.tab(adminTab === "monday")}
-                  >
-                    Monday Uploads
-                  </button>
-                  <button
-                    onClick={() => setAdminTab("events")}
-                    style={styles.tab(adminTab === "events")}
-                  >
+                  <button onClick={() => setAdminTab("events")} style={styles.tab(adminTab === "events")}>
                     Events
                   </button>
-                  <button
-                    onClick={() => setAdminTab("officers")}
-                    style={styles.tab(adminTab === "officers")}
-                  >
+                  <button onClick={() => setAdminTab("officers")} style={styles.tab(adminTab === "officers")}>
                     Office Bearers
                   </button>
-                  <button
-                    onClick={() => setAdminTab("coaches")}
-                    style={styles.tab(adminTab === "coaches")}
-                  >
+                  <button onClick={() => setAdminTab("coaches")} style={styles.tab(adminTab === "coaches")}>
                     Coaches
                   </button>
-                  <button
-                    onClick={() => setAdminTab("members")}
-                    style={styles.tab(adminTab === "members")}
-                  >
+                  <button onClick={() => setAdminTab("members")} style={styles.tab(adminTab === "members")}>
                     Members
                   </button>
-                  <button
-                    onClick={() => setAdminTab("documents")}
-                    style={styles.tab(adminTab === "documents")}
-                  >
+                  <button onClick={() => setAdminTab("documents")} style={styles.tab(adminTab === "documents")}>
                     Documents
                   </button>
-                  <button
-                    onClick={() => setAdminTab("info")}
-                    style={styles.tab(adminTab === "info")}
-                  >
+                  <button onClick={() => setAdminTab("info")} style={styles.tab(adminTab === "info")}>
                     Information
                   </button>
                 </div>
 
-                {adminTab === "mondayscores" && (
-                  <div style={styles.panel}>
-                    <MondayPointsAdmin members={members} />
-                  </div>
-                )}
-
-                {adminTab === "monday" && (
-                  <>
-                    <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>
-                        {editingMondayId ? "Edit Monday Points Upload" : "Add Monday Points Upload"}
-                      </h3>
-
-                      <input
-                        value={mondayTitle}
-                        onChange={(e) => setMondayTitle(e.target.value)}
-                        placeholder="Title e.g. Monday Points Week 1"
-                        style={styles.input}
-                      />
-
-                      <input
-                        type="date"
-                        value={mondayDate}
-                        onChange={(e) => setMondayDate(e.target.value)}
-                        style={styles.input}
-                      />
-
-                      <textarea
-                        value={mondayNote}
-                        onChange={(e) => setMondayNote(e.target.value)}
-                        placeholder="Optional note"
-                        style={styles.textarea}
-                      />
-
-                      <input
-                        value={mondayLink}
-                        onChange={(e) => setMondayLink(e.target.value)}
-                        placeholder="Attachment link (optional if uploading file)"
-                        style={styles.input}
-                      />
-
-                      <input
-                        value={mondayButtonText}
-                        onChange={(e) => setMondayButtonText(e.target.value)}
-                        placeholder="Button text"
-                        style={styles.input}
-                      />
-
-                      <div style={{ marginBottom: 10 }}>
-                        <input
-                          type="file"
-                          accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx,application/pdf,image/png,image/jpeg,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                          onChange={(e) => setMondayFile(e.target.files?.[0] || null)}
-                        />
-                        {mondayFile ? <div style={styles.fileInfo}>Selected file: {mondayFile.name}</div> : null}
-                      </div>
-
-                      <button onClick={saveMondayPoints} style={styles.button}>
-                        {editingMondayId ? "Update Monday Points Upload" : "Save Monday Points Upload"}
-                      </button>
-
-                      {(editingMondayId ||
-                        mondayTitle ||
-                        mondayDate ||
-                        mondayNote ||
-                        mondayLink ||
-                        mondayButtonText ||
-                        mondayFile) && (
-                        <button onClick={clearMondayForm} style={styles.secondaryButton}>
-                          Clear
-                        </button>
-                      )}
-                    </div>
-
-                    <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>Manage Monday Points Uploads</h3>
-                      {sortedMondayPoints.length === 0 ? (
-                        <div style={{ color: "#777" }}>No Monday Points yet.</div>
-                      ) : (
-                        sortedMondayPoints.map((item) => (
-                          <div key={item.id} style={styles.card}>
-                            <strong>{formatDiaryDate(item.week_date)}</strong> — {item.title}
-                            {item.file_url ? (
-                              <div style={{ marginTop: 6, color: "#666" }}>
-                                {getFileTypeLabel(item.file_url)}
-                              </div>
-                            ) : null}
-                            <div style={{ marginTop: 8 }}>
-                              <button onClick={() => editMondayPoints(item)} style={styles.smallBtn}>Edit</button>
-                              <button onClick={() => deleteMondayPoints(item.id)} style={styles.smallBtn}>Delete</button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </>
-                )}
+                {adminTab === "mondayscores" && <MondayPointsAdmin members={members} />}
 
                 {adminTab === "events" && (
                   <>
                     <div style={styles.panel}>
                       <h3 style={styles.sectionTitle}>{editingEntryId ? "Edit Event" : "Add Event"}</h3>
 
-                      <input
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        placeholder="Event title"
-                        style={styles.input}
-                      />
-                      <input
-                        type="date"
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        style={styles.input}
-                      />
-                      <textarea
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        placeholder="Optional note"
-                        style={styles.textarea}
-                      />
+                      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" style={styles.input} />
+                      <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={styles.input} />
+                      <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional note" style={styles.textarea} />
 
                       <button onClick={saveEntry} style={styles.button}>
                         {editingEntryId ? "Update Event" : "Save Event"}
@@ -2080,11 +1711,7 @@ export default function App() {
                       {sortedEntries.map((e) => (
                         <div key={e.id} style={styles.card}>
                           <strong>{formatDiaryDate(e.date_text)}</strong> — {e.title}
-                          {e.note ? (
-                            <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>
-                              {e.note}
-                            </div>
-                          ) : null}
+                          {e.note ? <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>{e.note}</div> : null}
                           <div style={{ marginTop: 8 }}>
                             <button onClick={() => editEntry(e)} style={styles.smallBtn}>Edit</button>
                             <button onClick={() => deleteEntry(e.id)} style={styles.smallBtn}>Delete</button>
@@ -2098,19 +1725,11 @@ export default function App() {
                 {adminTab === "officers" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>
-                        {editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}
-                      </h3>
+                      <h3 style={styles.sectionTitle}>{editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}</h3>
                       <input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Role" style={styles.input} />
                       <input value={newOfficerName} onChange={(e) => setNewOfficerName(e.target.value)} placeholder="Name" style={styles.input} />
                       <input value={newOfficerPhone} onChange={(e) => setNewOfficerPhone(e.target.value)} placeholder="Phone" style={styles.input} />
-                      <input
-                        type="number"
-                        value={newOfficerPosition}
-                        onChange={(e) => setNewOfficerPosition(e.target.value)}
-                        placeholder="Position order"
-                        style={styles.input}
-                      />
+                      <input type="number" value={newOfficerPosition} onChange={(e) => setNewOfficerPosition(e.target.value)} placeholder="Position order" style={styles.input} />
                       <button onClick={saveOfficeBearer} style={styles.button}>
                         {editingOfficerId ? "Update Office Bearer" : "Save Office Bearer"}
                       </button>
@@ -2179,13 +1798,7 @@ export default function App() {
                       <h3 style={styles.sectionTitle}>{editingCoachId ? "Edit Club Coach" : "Add Club Coach"}</h3>
                       <input value={newCoachName} onChange={(e) => setNewCoachName(e.target.value)} placeholder="Name" style={styles.input} />
                       <input value={newCoachPhone} onChange={(e) => setNewCoachPhone(e.target.value)} placeholder="Phone" style={styles.input} />
-                      <input
-                        type="number"
-                        value={newCoachPosition}
-                        onChange={(e) => setNewCoachPosition(e.target.value)}
-                        placeholder="Position order"
-                        style={styles.input}
-                      />
+                      <input type="number" value={newCoachPosition} onChange={(e) => setNewCoachPosition(e.target.value)} placeholder="Position order" style={styles.input} />
                       <button onClick={saveCoach} style={styles.button}>
                         {editingCoachId ? "Update Club Coach" : "Save Club Coach"}
                       </button>
@@ -2290,25 +1903,10 @@ export default function App() {
                     <div style={styles.panel}>
                       <h3 style={styles.sectionTitle}>{editingDocumentId ? "Edit Document" : "Add Document"}</h3>
 
-                      <input
-                        value={documentTitle}
-                        onChange={(e) => setDocumentTitle(e.target.value)}
-                        placeholder="Document title"
-                        style={styles.input}
-                      />
+                      <input value={documentTitle} onChange={(e) => setDocumentTitle(e.target.value)} placeholder="Document title" style={styles.input} />
+                      <textarea value={documentDescription} onChange={(e) => setDocumentDescription(e.target.value)} placeholder="Description" style={styles.textarea} />
 
-                      <textarea
-                        value={documentDescription}
-                        onChange={(e) => setDocumentDescription(e.target.value)}
-                        placeholder="Description"
-                        style={styles.textarea}
-                      />
-
-                      <select
-                        value={documentCategory}
-                        onChange={(e) => setDocumentCategory(e.target.value)}
-                        style={styles.input}
-                      >
+                      <select value={documentCategory} onChange={(e) => setDocumentCategory(e.target.value)} style={styles.input}>
                         <option>General</option>
                         <option>Forms</option>
                         <option>Guides</option>
@@ -2324,12 +1922,7 @@ export default function App() {
                         style={styles.input}
                       />
 
-                      <input
-                        value={documentButtonText}
-                        onChange={(e) => setDocumentButtonText(e.target.value)}
-                        placeholder="Button text"
-                        style={styles.input}
-                      />
+                      <input value={documentButtonText} onChange={(e) => setDocumentButtonText(e.target.value)} placeholder="Button text" style={styles.input} />
 
                       <div style={{ marginBottom: 10 }}>
                         <input
@@ -2344,13 +1937,7 @@ export default function App() {
                         {editingDocumentId ? "Update Document" : "Save Document"}
                       </button>
 
-                      {(editingDocumentId ||
-                        documentTitle ||
-                        documentDescription ||
-                        documentCategory ||
-                        documentLink ||
-                        documentButtonText ||
-                        documentFile) && (
+                      {(editingDocumentId || documentTitle || documentDescription || documentCategory || documentLink || documentButtonText || documentFile) && (
                         <button onClick={clearDocumentForm} style={styles.secondaryButton}>Clear</button>
                       )}
                     </div>
@@ -2363,11 +1950,7 @@ export default function App() {
                         sortedDocuments.map((doc) => (
                           <div key={doc.id} style={styles.card}>
                             <strong>{doc.title}</strong> — {doc.category || "General"}
-                            {doc.file_url ? (
-                              <div style={{ marginTop: 6, color: "#666" }}>
-                                {getFileTypeLabel(doc.file_url)}
-                              </div>
-                            ) : null}
+                            {doc.file_url ? <div style={{ marginTop: 6, color: "#666" }}>Document attached</div> : null}
                             <div style={{ marginTop: 8 }}>
                               <button onClick={() => editDocument(doc)} style={styles.smallBtn}>Edit</button>
                               <button onClick={() => deleteDocument(doc.id)} style={styles.smallBtn}>Delete</button>
@@ -2382,9 +1965,7 @@ export default function App() {
                 {adminTab === "info" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>
-                        {editingPostId ? "Edit Information Post" : "Add Information Post"}
-                      </h3>
+                      <h3 style={styles.sectionTitle}>{editingPostId ? "Edit Information Post" : "Add Information Post"}</h3>
                       <input value={postTitle} onChange={(e) => setPostTitle(e.target.value)} placeholder="Title" style={styles.input} />
                       <textarea value={postMessage} onChange={(e) => setPostMessage(e.target.value)} placeholder="Message" style={styles.textarea} />
                       <input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} style={styles.input} />
@@ -2414,14 +1995,7 @@ export default function App() {
                         {editingPostId ? "Update Information Post" : "Save Information Post"}
                       </button>
 
-                      {(editingPostId ||
-                        postTitle ||
-                        postMessage ||
-                        postDate ||
-                        postLink ||
-                        postButtonText ||
-                        postPinned ||
-                        postFile) && (
+                      {(editingPostId || postTitle || postMessage || postDate || postLink || postButtonText || postPinned || postFile) && (
                         <button onClick={clearPostForm} style={styles.secondaryButton}>Clear</button>
                       )}
                     </div>
@@ -2431,11 +2005,6 @@ export default function App() {
                       {sortedPosts.map((post) => (
                         <div key={post.id} style={styles.card}>
                           <strong>{post.date_posted}</strong> — {post.title} {post.pinned ? "• PINNED" : ""}
-                          {post.attachment_link ? (
-                            <div style={{ marginTop: 6, color: "#666" }}>
-                              {getFileTypeLabel(post.attachment_link)}
-                            </div>
-                          ) : null}
                           <div style={{ marginTop: 8 }}>
                             <button onClick={() => editPost(post)} style={styles.smallBtn}>Edit</button>
                             <button onClick={() => deletePost(post.id)} style={styles.smallBtn}>Delete</button>
