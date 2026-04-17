@@ -897,7 +897,7 @@ export default function App() {
 
   const loadEntries = async () => {
     const { data, error } = await supabase.from("events").select("*");
-    if (error) return setMessage(`Could not load events: ${error.message}`);
+    if (error) return setMessage(`Could not load diary entries: ${error.message}`);
     setEntries(data || []);
   };
 
@@ -1015,7 +1015,7 @@ export default function App() {
   };
 
   const saveEntry = async () => {
-    if (!title || !date) return setMessage("Enter event title and date.");
+    if (!title || !date) return setMessage("Enter diary title and date.");
 
     if (editingEntryId) {
       const { data, error } = await supabase
@@ -1025,9 +1025,9 @@ export default function App() {
         .select()
         .single();
 
-      if (error) return setMessage(`Could not update event: ${error.message}`);
+      if (error) return setMessage(`Could not update diary entry: ${error.message}`);
       setEntries((prev) => prev.map((x) => (x.id === editingEntryId ? data : x)));
-      setMessage("Event updated.");
+      setMessage("Diary entry updated.");
     } else {
       const { data, error } = await supabase
         .from("events")
@@ -1035,9 +1035,9 @@ export default function App() {
         .select()
         .single();
 
-      if (error) return setMessage(`Could not save event: ${error.message}`);
+      if (error) return setMessage(`Could not save diary entry: ${error.message}`);
       setEntries((prev) => [...prev, data]);
-      setMessage("Event added.");
+      setMessage("Diary entry added.");
     }
 
     clearEntryForm();
@@ -1049,16 +1049,16 @@ export default function App() {
     setDate(entry.date_text || "");
     setNote(entry.note || "");
     setTab("admin");
-    setAdminTab("events");
+    setAdminTab("diary");
   };
 
   const deleteEntry = async (id) => {
-    if (!window.confirm("Delete this event?")) return;
+    if (!window.confirm("Delete this diary entry?")) return;
 
     const { error } = await supabase.from("events").delete().eq("id", id);
-    if (error) return setMessage(`Could not delete event: ${error.message}`);
+    if (error) return setMessage(`Could not delete diary entry: ${error.message}`);
     setEntries((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Event deleted.");
+    setMessage("Diary entry deleted.");
   };
 
   const saveMember = async () => {
@@ -1552,14 +1552,14 @@ export default function App() {
           <button style={styles.tab(tab === "diary")} onClick={() => setTab("diary")}>
             Diary
           </button>
+          <button style={styles.tab(tab === "office")} onClick={() => setTab("office")}>
+            Office Bearers / Club Coaches
+          </button>
           <button
             style={styles.tab(tab === "leaderboard")}
             onClick={() => setTab("leaderboard")}
           >
             Leaderboard
-          </button>
-          <button style={styles.tab(tab === "events")} onClick={() => setTab("events")}>
-            Events
           </button>
           <button style={styles.tab(tab === "members")} onClick={() => setTab("members")}>
             Members
@@ -1607,9 +1607,9 @@ export default function App() {
                   <div>
                     <button
                       style={styles.homeActionBtn}
-                      onClick={() => setTab("events")}
+                      onClick={() => setTab("diary")}
                     >
-                      View All Events
+                      View Diary
                     </button>
                     <button
                       style={styles.homeActionBtn}
@@ -1629,7 +1629,7 @@ export default function App() {
                 <>
                   <div style={styles.heroTitle}>No upcoming events</div>
                   <div style={{ color: "#555" }}>
-                    Add events in Admin to show them here.
+                    Add diary entries in Admin to show them here.
                   </div>
                 </>
               )}
@@ -1722,15 +1722,15 @@ export default function App() {
               </button>
               <button
                 style={styles.homeActionBtn}
-                onClick={() => setTab("leaderboard")}
+                onClick={() => setTab("office")}
               >
-                Leaderboard
+                Office Bearers / Club Coaches
               </button>
               <button
                 style={styles.homeActionBtn}
-                onClick={() => setTab("events")}
+                onClick={() => setTab("leaderboard")}
               >
-                Events
+                Leaderboard
               </button>
               <button
                 style={styles.homeActionBtn}
@@ -1755,6 +1755,40 @@ export default function App() {
         )}
 
         {tab === "diary" && (
+          <div style={styles.panel}>
+            <h3 style={styles.sectionTitle}>Diary</h3>
+
+            <input
+              type="text"
+              placeholder="Search diary..."
+              value={eventSearch}
+              onChange={(e) => setEventSearch(e.target.value)}
+              style={styles.input}
+            />
+
+            {filteredEvents.length === 0 ? (
+              <div style={{ color: "#777" }}>No matching diary entries found.</div>
+            ) : (
+              filteredEvents.map((e) => (
+                <div key={e.id} style={styles.card}>
+                  <strong style={{ color: "#92400e" }}>
+                    {formatDiaryDate(e.date_text)}
+                  </strong>{" "}
+                  — {e.title}
+                  {e.note ? (
+                    <div
+                      style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}
+                    >
+                      {e.note}
+                    </div>
+                  ) : null}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {tab === "office" && (
           <>
             <div style={styles.panel}>
               <h3 style={styles.sectionTitle}>Office Bearers</h3>
@@ -1804,51 +1838,10 @@ export default function App() {
               <h3 style={styles.sectionTitle}>Club Coaches</h3>
               {renderPersonCards(sortedClubCoaches, "Club Coach")}
             </div>
-
-            <div style={styles.panel}>
-              <h3 style={styles.sectionTitle}>Monday Night Points</h3>
-              <div style={{ color: "#555" }}>
-                Use the Leaderboard tab to view current Monday night standings.
-              </div>
-            </div>
           </>
         )}
 
         {tab === "leaderboard" && <Leaderboard />}
-
-        {tab === "events" && (
-          <div style={styles.panel}>
-            <h3 style={styles.sectionTitle}>Events</h3>
-
-            <input
-              type="text"
-              placeholder="Search events..."
-              value={eventSearch}
-              onChange={(e) => setEventSearch(e.target.value)}
-              style={styles.input}
-            />
-
-            {filteredEvents.length === 0 ? (
-              <div style={{ color: "#777" }}>No matching events found.</div>
-            ) : (
-              filteredEvents.map((e) => (
-                <div key={e.id} style={styles.card}>
-                  <strong style={{ color: "#92400e" }}>
-                    {formatDiaryDate(e.date_text)}
-                  </strong>{" "}
-                  — {e.title}
-                  {e.note ? (
-                    <div
-                      style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}
-                    >
-                      {e.note}
-                    </div>
-                  ) : null}
-                </div>
-              ))
-            )}
-          </div>
-        )}
 
         {tab === "members" && (
           <div style={styles.panel}>
@@ -2033,10 +2026,10 @@ export default function App() {
                     Monday Points Edit
                   </button>
                   <button
-                    onClick={() => setAdminTab("events")}
-                    style={styles.tab(adminTab === "events")}
+                    onClick={() => setAdminTab("diary")}
+                    style={styles.tab(adminTab === "diary")}
                   >
-                    Events
+                    Diary
                   </button>
                   <button
                     onClick={() => setAdminTab("officers")}
@@ -2074,17 +2067,17 @@ export default function App() {
                   <MondayPointsAdmin members={members} />
                 )}
 
-                {adminTab === "events" && (
+                {adminTab === "diary" && (
                   <>
                     <div style={styles.panel}>
                       <h3 style={styles.sectionTitle}>
-                        {editingEntryId ? "Edit Event" : "Add Event"}
+                        {editingEntryId ? "Edit Diary Entry" : "Add Diary Entry"}
                       </h3>
 
                       <input
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        placeholder="Event title"
+                        placeholder="Diary title"
                         style={styles.input}
                       />
                       <input
@@ -2101,7 +2094,7 @@ export default function App() {
                       />
 
                       <button onClick={saveEntry} style={styles.button}>
-                        {editingEntryId ? "Update Event" : "Save Event"}
+                        {editingEntryId ? "Update Diary Entry" : "Save Diary Entry"}
                       </button>
 
                       {(editingEntryId || title || date || note) && (
@@ -2112,7 +2105,7 @@ export default function App() {
                     </div>
 
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>Manage Events</h3>
+                      <h3 style={styles.sectionTitle}>Manage Diary</h3>
                       {sortedEntries.map((e) => (
                         <div key={e.id} style={styles.card}>
                           <strong>{formatDiaryDate(e.date_text)}</strong> — {e.title}
