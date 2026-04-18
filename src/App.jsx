@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import * as XLSX from "xlsx";
 import { supabase } from "./lib/supabase";
 import logo from "./assets/WBC Logo.png";
 
@@ -353,17 +352,11 @@ const styles = {
     textAlign: "center",
     boxSizing: "border-box",
   },
-  tickWrap: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    fontWeight: 700,
-  },
   prizeRow1: {
     background: "#fff7cc",
   },
   prizeRow2: {
-    background: "#f1f5f9",
+    background: "#edf2f7",
   },
   prizeRow3: {
     background: "#fbe4d5",
@@ -504,14 +497,18 @@ function MondayPointsAdmin({ members = [] }) {
     let changed = false;
 
     displayedPlayers.forEach((memberName) => {
-      if (!updated[memberName]) updated[memberName] = {};
+      if (!updated[memberName]) {
+        updated[memberName] = {};
+      }
       if (updated[memberName][selectedDate] === undefined) {
         updated[memberName][selectedDate] = Number(updated[memberName][previousDate]) || 0;
         changed = true;
       }
     });
 
-    if (changed) savePoints(updated);
+    if (changed) {
+      savePoints(updated);
+    }
   }, [selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChange = (memberName, date, value) => {
@@ -543,22 +540,6 @@ function MondayPointsAdmin({ members = [] }) {
     setPlayerSearch("");
   };
 
-  const togglePlayedThisWeek = (memberName, isChecked) => {
-    if (isChecked) {
-      addPlayerToWeek(memberName);
-      return;
-    }
-
-    const updated = { ...points };
-    if (updated[memberName]) {
-      delete updated[memberName][selectedDate];
-      if (Object.keys(updated[memberName]).length === 0) {
-        delete updated[memberName];
-      }
-    }
-    savePoints(updated);
-  };
-
   const clearAllPoints = () => {
     if (!window.confirm("Clear all Monday night points for 2026?")) return;
     savePoints({});
@@ -571,33 +552,6 @@ function MondayPointsAdmin({ members = [] }) {
     }, 0);
   };
 
-  const exportToExcel = () => {
-    const allPlayers = Object.keys(points).sort((a, b) =>
-      a.localeCompare(b, "en-GB")
-    );
-
-    const rows = allPlayers.map((memberName) => {
-      const memberPoints = points[memberName] || {};
-      const row = { Member: memberName };
-
-      mondayDates2026.forEach((date) => {
-        row[date] = Number(memberPoints[date]) || 0;
-      });
-
-      row.Total = mondayDates2026.reduce(
-        (total, date) => total + (Number(memberPoints[date]) || 0),
-        0
-      );
-
-      return row;
-    });
-
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Monday Points 2026");
-    XLSX.writeFile(workbook, "Monday-Points-2026.xlsx");
-  };
-
   const formatShortDate = (dateStr) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-GB", {
@@ -607,12 +561,17 @@ function MondayPointsAdmin({ members = [] }) {
   };
 
   const nonAssociateMembers = members
-    .filter((m) => m?.name && String(m.section || "").trim().toLowerCase() !== "associate")
+    .filter(
+      (m) =>
+        m?.name &&
+        String(m.section || "").trim().toLowerCase() !== "associate"
+    )
     .map((m) => m.name)
     .sort((a, b) => a.localeCompare(b, "en-GB"));
 
   const searchableMembers = nonAssociateMembers
-    .filter((name) => name.toLowerCase().includes(playerSearch.toLowerCase()));
+    .filter((name) => name.toLowerCase().includes(playerSearch.toLowerCase()))
+    .filter((name) => !displayedPlayers.includes(name));
 
   return (
     <div style={{ overflowX: "auto" }}>
@@ -641,9 +600,6 @@ function MondayPointsAdmin({ members = [] }) {
         </select>
 
         <div>
-          <button onClick={exportToExcel} style={styles.button}>
-            Export to Excel
-          </button>
           <button onClick={clearAllPoints} style={styles.secondaryButton}>
             Clear All Scores
           </button>
@@ -651,7 +607,7 @@ function MondayPointsAdmin({ members = [] }) {
       </div>
 
       <div style={styles.panel}>
-        <h4 style={styles.sectionTitle}>Search Member</h4>
+        <h4 style={styles.sectionTitle}>Add Player To This Week</h4>
 
         <input
           type="text"
@@ -663,23 +619,17 @@ function MondayPointsAdmin({ members = [] }) {
 
         {playerSearch && searchableMembers.length > 0 && (
           <div>
-            {searchableMembers.slice(0, 12).map((name) => {
-              const checked = points[name]?.[selectedDate] !== undefined;
-
-              return (
-                <div key={name} style={styles.card}>
-                  <strong>{name}</strong>
-                  <label style={{ ...styles.tickWrap, marginLeft: 14 }}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={(e) => togglePlayedThisWeek(name, e.target.checked)}
-                    />
-                    Played this week
-                  </label>
-                </div>
-              );
-            })}
+            {searchableMembers.slice(0, 12).map((name) => (
+              <div key={name} style={styles.card}>
+                <strong>{name}</strong>
+                <button
+                  onClick={() => addPlayerToWeek(name)}
+                  style={styles.smallBtn}
+                >
+                  Add Player
+                </button>
+              </div>
+            ))}
           </div>
         )}
 
@@ -701,7 +651,7 @@ function MondayPointsAdmin({ members = [] }) {
           {displayedPlayers.length === 0 ? (
             <tr>
               <td colSpan="3" style={styles.adminTd}>
-                No players yet for this week. Use search above and tick “Played this week”.
+                No players yet for this week. Use search above to add one.
               </td>
             </tr>
           ) : (
@@ -747,8 +697,8 @@ function MondayPointsLeaderboard({ members = [] }) {
     }
   }, []);
 
-  const totals = useMemo(() => {
-    return members
+  const ranked = useMemo(() => {
+    const totals = members
       .filter((m) => m?.name)
       .map((m) => {
         const memberPoints = points[m.name] || {};
@@ -763,9 +713,7 @@ function MondayPointsLeaderboard({ members = [] }) {
         };
       })
       .filter((m) => m.total > 0 || points[m.name]);
-  }, [members, points]);
 
-  const ranked = useMemo(() => {
     const sorted = [...totals].sort((a, b) => {
       if (b.total !== a.total) return b.total - a.total;
       return a.name.localeCompare(b.name, "en-GB");
@@ -780,9 +728,9 @@ function MondayPointsLeaderboard({ members = [] }) {
       lastRank = rank;
       return { ...member, rank };
     });
-  }, [totals]);
+  }, [members, points]);
 
-  const getPrizeRowStyle = (rank) => {
+  const prizeStyle = (rank) => {
     if (rank === 1) return styles.prizeRow1;
     if (rank === 2) return styles.prizeRow2;
     if (rank === 3) return styles.prizeRow3;
@@ -805,8 +753,8 @@ function MondayPointsLeaderboard({ members = [] }) {
         <tbody>
           {ranked.length > 0 ? (
             ranked.map((member) => (
-              <tr key={member.name} style={getPrizeRowStyle(member.rank)}>
-                <td style={{ ...styles.adminTd, ...getPrizeRowStyle(member.rank) }}>
+              <tr key={member.name} style={prizeStyle(member.rank)}>
+                <td style={{ ...styles.adminTd, ...prizeStyle(member.rank) }}>
                   {member.rank === 1
                     ? "🥇 1"
                     : member.rank === 2
@@ -815,10 +763,22 @@ function MondayPointsLeaderboard({ members = [] }) {
                     ? "🥉 3"
                     : member.rank}
                 </td>
-                <td style={{ ...styles.adminTd, ...getPrizeRowStyle(member.rank), fontWeight: member.rank <= 3 ? 700 : 400 }}>
+                <td
+                  style={{
+                    ...styles.adminTd,
+                    ...prizeStyle(member.rank),
+                    fontWeight: member.rank <= 3 ? 700 : 400,
+                  }}
+                >
                   {member.name}
                 </td>
-                <td style={{ ...styles.adminTd, ...getPrizeRowStyle(member.rank), fontWeight: 700 }}>
+                <td
+                  style={{
+                    ...styles.adminTd,
+                    ...prizeStyle(member.rank),
+                    fontWeight: 700,
+                  }}
+                >
                   {member.total}
                 </td>
               </tr>
@@ -1733,8 +1693,12 @@ export default function App() {
               <button style={styles.homeActionBtn} onClick={() => setTab("members")}>Members</button>
               <button style={styles.homeActionBtn} onClick={() => setTab("documents")}>Documents</button>
               <button style={styles.homeActionBtn} onClick={() => setTab("information")}>Information</button>
-              <button style={styles.homeActionBtn} onClick={() => setTab("office")}>Office Bearers / Coaches</button>
-              <button style={styles.homeActionBtn} onClick={() => setTab("leaderboard")}>Monday Points Leaderboard</button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("office")}>
+                Office Bearers / Coaches
+              </button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("leaderboard")}>
+                Monday Points Leaderboard
+              </button>
             </div>
           </>
         )}
@@ -2050,7 +2014,9 @@ export default function App() {
                 {adminTab === "officers" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>{editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}</h3>
+                      <h3 style={styles.sectionTitle}>
+                        {editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}
+                      </h3>
                       <input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Role" style={styles.input} />
                       <input value={newOfficerName} onChange={(e) => setNewOfficerName(e.target.value)} placeholder="Name" style={styles.input} />
                       <input value={newOfficerPhone} onChange={(e) => setNewOfficerPhone(e.target.value)} placeholder="Phone" style={styles.input} />
