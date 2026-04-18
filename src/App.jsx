@@ -7,6 +7,32 @@ const CLUB_PIN = "1911";
 const ADMIN_PIN = "1954";
 const BUCKET = "club-files";
 
+const mondayDates2026 = [
+  "2026-04-20",
+  "2026-04-27",
+  "2026-05-04",
+  "2026-05-11",
+  "2026-05-18",
+  "2026-05-25",
+  "2026-06-01",
+  "2026-06-08",
+  "2026-06-15",
+  "2026-06-22",
+  "2026-06-29",
+  "2026-07-06",
+  "2026-07-13",
+  "2026-07-20",
+  "2026-07-27",
+  "2026-08-03",
+  "2026-08-10",
+  "2026-08-17",
+  "2026-08-24",
+  "2026-08-31",
+  "2026-09-07",
+  "2026-09-14",
+  "2026-09-21",
+];
+
 const styles = {
   page: {
     padding: 16,
@@ -327,33 +353,22 @@ const styles = {
     textAlign: "center",
     boxSizing: "border-box",
   },
+  tickWrap: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    fontWeight: 700,
+  },
+  prizeRow1: {
+    background: "#fff7cc",
+  },
+  prizeRow2: {
+    background: "#f1f5f9",
+  },
+  prizeRow3: {
+    background: "#fbe4d5",
+  },
 };
-
-const mondayDates2026 = [
-  "2026-04-20",
-  "2026-04-27",
-  "2026-05-04",
-  "2026-05-11",
-  "2026-05-18",
-  "2026-05-25",
-  "2026-06-01",
-  "2026-06-08",
-  "2026-06-15",
-  "2026-06-22",
-  "2026-06-29",
-  "2026-07-06",
-  "2026-07-13",
-  "2026-07-20",
-  "2026-07-27",
-  "2026-08-03",
-  "2026-08-10",
-  "2026-08-17",
-  "2026-08-24",
-  "2026-08-31",
-  "2026-09-07",
-  "2026-09-14",
-  "2026-09-21",
-];
 
 function sortEventsChronologically(list) {
   return [...list].sort(
@@ -489,19 +504,14 @@ function MondayPointsAdmin({ members = [] }) {
     let changed = false;
 
     displayedPlayers.forEach((memberName) => {
-      if (!updated[memberName]) {
-        updated[memberName] = {};
-      }
-
+      if (!updated[memberName]) updated[memberName] = {};
       if (updated[memberName][selectedDate] === undefined) {
         updated[memberName][selectedDate] = Number(updated[memberName][previousDate]) || 0;
         changed = true;
       }
     });
 
-    if (changed) {
-      savePoints(updated);
-    }
+    if (changed) savePoints(updated);
   }, [selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChange = (memberName, date, value) => {
@@ -531,6 +541,22 @@ function MondayPointsAdmin({ members = [] }) {
 
     savePoints(updated);
     setPlayerSearch("");
+  };
+
+  const togglePlayedThisWeek = (memberName, isChecked) => {
+    if (isChecked) {
+      addPlayerToWeek(memberName);
+      return;
+    }
+
+    const updated = { ...points };
+    if (updated[memberName]) {
+      delete updated[memberName][selectedDate];
+      if (Object.keys(updated[memberName]).length === 0) {
+        delete updated[memberName];
+      }
+    }
+    savePoints(updated);
   };
 
   const clearAllPoints = () => {
@@ -580,12 +606,13 @@ function MondayPointsAdmin({ members = [] }) {
     });
   };
 
-  const searchableMembers = members
-    .filter((m) => m?.name)
+  const nonAssociateMembers = members
+    .filter((m) => m?.name && String(m.section || "").trim().toLowerCase() !== "associate")
     .map((m) => m.name)
-    .filter((name) => name.toLowerCase().includes(playerSearch.toLowerCase()))
-    .filter((name) => !displayedPlayers.includes(name))
     .sort((a, b) => a.localeCompare(b, "en-GB"));
+
+  const searchableMembers = nonAssociateMembers
+    .filter((name) => name.toLowerCase().includes(playerSearch.toLowerCase()));
 
   return (
     <div style={{ overflowX: "auto" }}>
@@ -624,7 +651,7 @@ function MondayPointsAdmin({ members = [] }) {
       </div>
 
       <div style={styles.panel}>
-        <h4 style={styles.sectionTitle}>Add Player To This Week</h4>
+        <h4 style={styles.sectionTitle}>Search Member</h4>
 
         <input
           type="text"
@@ -636,17 +663,23 @@ function MondayPointsAdmin({ members = [] }) {
 
         {playerSearch && searchableMembers.length > 0 && (
           <div>
-            {searchableMembers.slice(0, 10).map((name) => (
-              <div key={name} style={styles.card}>
-                <strong>{name}</strong>
-                <button
-                  onClick={() => addPlayerToWeek(name)}
-                  style={styles.smallBtn}
-                >
-                  Add Player
-                </button>
-              </div>
-            ))}
+            {searchableMembers.slice(0, 12).map((name) => {
+              const checked = points[name]?.[selectedDate] !== undefined;
+
+              return (
+                <div key={name} style={styles.card}>
+                  <strong>{name}</strong>
+                  <label style={{ ...styles.tickWrap, marginLeft: 14 }}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => togglePlayedThisWeek(name, e.target.checked)}
+                    />
+                    Played this week
+                  </label>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -668,7 +701,7 @@ function MondayPointsAdmin({ members = [] }) {
           {displayedPlayers.length === 0 ? (
             <tr>
               <td colSpan="3" style={styles.adminTd}>
-                No players yet for this week. Use search above to add one.
+                No players yet for this week. Use search above and tick “Played this week”.
               </td>
             </tr>
           ) : (
@@ -714,36 +747,47 @@ function MondayPointsLeaderboard({ members = [] }) {
     }
   }, []);
 
-  const totals = members
-    .filter((m) => m?.name)
-    .map((m) => {
-      const memberPoints = points[m.name] || {};
-      const total = Object.values(memberPoints).reduce(
-        (sum, value) => sum + (Number(value) || 0),
-        0
-      );
+  const totals = useMemo(() => {
+    return members
+      .filter((m) => m?.name)
+      .map((m) => {
+        const memberPoints = points[m.name] || {};
+        const total = Object.values(memberPoints).reduce(
+          (sum, value) => sum + (Number(value) || 0),
+          0
+        );
 
-      return {
-        name: m.name,
-        total,
-      };
-    })
-    .filter((m) => m.total > 0 || points[m.name]);
+        return {
+          name: m.name,
+          total,
+        };
+      })
+      .filter((m) => m.total > 0 || points[m.name]);
+  }, [members, points]);
 
-  const sorted = [...totals].sort((a, b) => {
-    if (b.total !== a.total) return b.total - a.total;
-    return a.name.localeCompare(b.name, "en-GB");
-  });
+  const ranked = useMemo(() => {
+    const sorted = [...totals].sort((a, b) => {
+      if (b.total !== a.total) return b.total - a.total;
+      return a.name.localeCompare(b.name, "en-GB");
+    });
 
-  let lastScore = null;
-  let lastRank = 0;
+    let lastScore = null;
+    let lastRank = 0;
 
-  const ranked = sorted.map((member, index) => {
-    const rank = member.total === lastScore ? lastRank : index + 1;
-    lastScore = member.total;
-    lastRank = rank;
-    return { ...member, rank };
-  });
+    return sorted.map((member, index) => {
+      const rank = member.total === lastScore ? lastRank : index + 1;
+      lastScore = member.total;
+      lastRank = rank;
+      return { ...member, rank };
+    });
+  }, [totals]);
+
+  const getPrizeRowStyle = (rank) => {
+    if (rank === 1) return styles.prizeRow1;
+    if (rank === 2) return styles.prizeRow2;
+    if (rank === 3) return styles.prizeRow3;
+    return {};
+  };
 
   return (
     <div style={styles.panel}>
@@ -761,8 +805,8 @@ function MondayPointsLeaderboard({ members = [] }) {
         <tbody>
           {ranked.length > 0 ? (
             ranked.map((member) => (
-              <tr key={member.name}>
-                <td style={styles.adminTd}>
+              <tr key={member.name} style={getPrizeRowStyle(member.rank)}>
+                <td style={{ ...styles.adminTd, ...getPrizeRowStyle(member.rank) }}>
                   {member.rank === 1
                     ? "🥇 1"
                     : member.rank === 2
@@ -771,8 +815,12 @@ function MondayPointsLeaderboard({ members = [] }) {
                     ? "🥉 3"
                     : member.rank}
                 </td>
-                <td style={styles.adminTd}>{member.name}</td>
-                <td style={{ ...styles.adminTd, fontWeight: 700 }}>{member.total}</td>
+                <td style={{ ...styles.adminTd, ...getPrizeRowStyle(member.rank), fontWeight: member.rank <= 3 ? 700 : 400 }}>
+                  {member.name}
+                </td>
+                <td style={{ ...styles.adminTd, ...getPrizeRowStyle(member.rank), fontWeight: 700 }}>
+                  {member.total}
+                </td>
               </tr>
             ))
           ) : (
@@ -1576,8 +1624,8 @@ export default function App() {
           <button style={styles.tab(tab === "documents")} onClick={() => setTab("documents")}>Documents</button>
           <button style={styles.tab(tab === "information")} onClick={() => setTab("information")}>Information</button>
           <button style={styles.tab(tab === "admin")} onClick={() => setTab("admin")}>Admin</button>
-          <button style={styles.tab(tab === "diary")} onClick={() => setTab("diary")}>
-            Office Bearers / Club Coaches
+          <button style={styles.tab(tab === "office")} onClick={() => setTab("office")}>
+            Office Bearers / Coaches
           </button>
           <button style={styles.tab(tab === "leaderboard")} onClick={() => setTab("leaderboard")}>
             Monday Points Leaderboard
@@ -1685,20 +1733,16 @@ export default function App() {
               <button style={styles.homeActionBtn} onClick={() => setTab("members")}>Members</button>
               <button style={styles.homeActionBtn} onClick={() => setTab("documents")}>Documents</button>
               <button style={styles.homeActionBtn} onClick={() => setTab("information")}>Information</button>
-              <button style={styles.homeActionBtn} onClick={() => setTab("diary")}>
-                Office Bearers / Club Coaches
-              </button>
-              <button style={styles.homeActionBtn} onClick={() => setTab("leaderboard")}>
-                Monday Points Leaderboard
-              </button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("office")}>Office Bearers / Coaches</button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("leaderboard")}>Monday Points Leaderboard</button>
             </div>
           </>
         )}
 
-        {tab === "diary" && (
+        {tab === "office" && (
           <>
             <div style={styles.panel}>
-              <h3 style={styles.sectionTitle}>Office Bearers / Club Coaches</h3>
+              <h3 style={styles.sectionTitle}>Office Bearers / Coaches</h3>
             </div>
 
             <div style={styles.panel}>
