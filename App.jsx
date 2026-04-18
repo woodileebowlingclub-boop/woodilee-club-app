@@ -1,145 +1,234 @@
-// ONLY SHOWING CHANGED PARTS + FINAL STRUCTURE
-// (your logic remains exactly the same — this avoids breaking anything)
+function MondayPointsAdmin({ members = [] }) {
+  const [points, setPoints] = useState(() => {
+    try {
+      const saved = localStorage.getItem("mondayPoints2026");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
 
-export default function App() {
+  const [selectedDate, setSelectedDate] = useState(mondayDates2026[0]);
+  const [playerSearch, setPlayerSearch] = useState("");
 
-  // --- KEEP ALL YOUR EXISTING STATE + LOGIC ABOVE THIS ---
+  const savePoints = (updated) => {
+    setPoints(updated);
+    localStorage.setItem("mondayPoints2026", JSON.stringify(updated));
+  };
+
+  const currentIndex = mondayDates2026.indexOf(selectedDate);
+  const previousDate = currentIndex > 0 ? mondayDates2026[currentIndex - 1] : null;
+
+  const displayedPlayers = useMemo(() => {
+    const playerSet = new Set();
+
+    Object.keys(points).forEach((name) => {
+      if (previousDate && points[name]?.[previousDate] !== undefined) {
+        playerSet.add(name);
+      }
+
+      if (points[name]?.[selectedDate] !== undefined) {
+        playerSet.add(name);
+      }
+    });
+
+    return Array.from(playerSet).sort((a, b) => a.localeCompare(b, "en-GB"));
+  }, [points, previousDate, selectedDate]);
+
+  useEffect(() => {
+    if (!previousDate) return;
+
+    const updated = { ...points };
+    let changed = false;
+
+    Object.keys(points).forEach((memberName) => {
+      if (updated[memberName]?.[previousDate] !== undefined) {
+        if (!updated[memberName]) {
+          updated[memberName] = {};
+        }
+
+        if (updated[memberName][selectedDate] === undefined) {
+          updated[memberName][selectedDate] = 0;
+          changed = true;
+        }
+      }
+    });
+
+    if (changed) {
+      savePoints(updated);
+    }
+  }, [selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleChange = (memberName, date, value) => {
+    const numericValue = value === "" ? 0 : Math.max(0, Number(value));
+
+    const updated = {
+      ...points,
+      [memberName]: {
+        ...(points[memberName] || {}),
+        [date]: numericValue,
+      },
+    };
+
+    savePoints(updated);
+  };
+
+  const addPlayerToWeek = (memberName) => {
+    if (!memberName) return;
+
+    const updated = {
+      ...points,
+      [memberName]: {
+        ...(points[memberName] || {}),
+        [selectedDate]: 0,
+      },
+    };
+
+    savePoints(updated);
+    setPlayerSearch("");
+  };
+
+  const clearAllPoints = () => {
+    if (!window.confirm("Clear all Monday night points for 2026?")) return;
+    savePoints({});
+  };
+
+  const getTotal = (memberName) => {
+    const memberPoints = points[memberName] || {};
+    return mondayDates2026.reduce((total, date) => {
+      return total + (Number(memberPoints[date]) || 0);
+    }, 0);
+  };
+
+  const formatShortDate = (dateStr) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+    });
+  };
+
+  const nonAssociateMembers = members
+    .filter(
+      (m) =>
+        m?.name &&
+        String(m.section || "").trim().toLowerCase() !== "associate"
+    )
+    .map((m) => m.name)
+    .sort((a, b) => a.localeCompare(b, "en-GB"));
+
+  const searchableMembers = nonAssociateMembers
+    .filter((name) => name.toLowerCase().includes(playerSearch.toLowerCase()))
+    .filter((name) => !displayedPlayers.includes(name));
 
   return (
-    <div style={styles.page}>
-      <div style={styles.wrap}>
+    <div style={{ overflowX: "auto" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
+          marginBottom: 10,
+        }}
+      >
+        <h3 style={styles.sectionTitle}>Monday Night Points Edit – 2026</h3>
 
-        {/* HEADER */}
-        <div style={styles.header}>
-          <div style={styles.headerRow}>
-            <img src={logo} alt="Club Logo" style={styles.logo} />
-            <div>
-              <h1 style={styles.title}>Woodilee Bowling Club</h1>
-              <p style={styles.subtitle}>Members diary, notices and contact details</p>
-            </div>
-          </div>
-        </div>
+        <select
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          style={{ ...styles.input, width: 240, marginBottom: 0 }}
+        >
+          {mondayDates2026.map((d) => (
+            <option key={d} value={d}>
+              {formatDiaryDate(d)}
+            </option>
+          ))}
+        </select>
 
-        {/* MESSAGE */}
-        {message && <div style={styles.message}>{message}</div>}
-
-        {/* ===== TOP TABS (UPDATED ORDER) ===== */}
-        <div style={styles.tabs}>
-          <button style={styles.tab(tab === "home")} onClick={() => setTab("home")}>Home</button>
-          <button style={styles.tab(tab === "leaderboard")} onClick={() => setTab("leaderboard")}>Leaderboard</button>
-          <button style={styles.tab(tab === "events")} onClick={() => setTab("events")}>Events</button>
-          <button style={styles.tab(tab === "members")} onClick={() => setTab("members")}>Members</button>
-          <button style={styles.tab(tab === "documents")} onClick={() => setTab("documents")}>Documents</button>
-          <button style={styles.tab(tab === "information")} onClick={() => setTab("information")}>Information</button>
-          <button style={styles.tab(tab === "admin")} onClick={() => setTab("admin")}>Admin</button>
-          <button style={styles.tab(tab === "diary")} onClick={() => setTab("diary")}>
-            Office Bearers / Club Coaches
+        <div>
+          <button onClick={clearAllPoints} style={styles.secondaryButton}>
+            Clear All Scores
           </button>
         </div>
-
-        {/* ===== HOME ===== */}
-        {tab === "home" && (
-          <>
-            <div style={styles.panel}>
-              <h3 style={styles.sectionTitle}>Quick Links</h3>
-
-              <button style={styles.homeActionBtn} onClick={() => setTab("leaderboard")}>
-                Leaderboard
-              </button>
-
-              <button style={styles.homeActionBtn} onClick={() => setTab("events")}>
-                Events
-              </button>
-
-              <button style={styles.homeActionBtn} onClick={() => setTab("members")}>
-                Members
-              </button>
-
-              <button style={styles.homeActionBtn} onClick={() => setTab("documents")}>
-                Documents
-              </button>
-
-              <button style={styles.homeActionBtn} onClick={() => setTab("information")}>
-                Information
-              </button>
-
-              {/* UPDATED */}
-              <button style={styles.homeActionBtn} onClick={() => setTab("diary")}>
-                Office Bearers / Club Coaches
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* ===== OFFICE BEARERS / COACHES (FORMER DIARY) ===== */}
-        {tab === "diary" && (
-          <>
-            {/* NEW HEADER */}
-            <div style={styles.panel}>
-              <h3 style={styles.sectionTitle}>
-                Office Bearers / Club Coaches
-              </h3>
-            </div>
-
-            {/* OFFICE BEARERS */}
-            <div style={styles.panel}>
-              <h3 style={styles.sectionTitle}>Office Bearers</h3>
-
-              <div style={styles.grid}>
-                {sortedOfficeBearers.map((person) => (
-                  <div key={person.id} style={styles.card}>
-                    <span style={styles.badge}>{person.role}</span>
-
-                    <div style={{ fontSize: 20, fontWeight: 700 }}>
-                      {person.name}
-                    </div>
-
-                    <div style={{ marginBottom: 10 }}>
-                      {person.phone || "No phone listed"}
-                    </div>
-
-                    {person.phone && (
-                      <>
-                        <a href={`tel:${person.phone}`} style={styles.linkBtn}>
-                          Call
-                        </a>
-
-                        <a
-                          href={`https://wa.me/${normaliseUkPhoneForWhatsApp(person.phone)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{
-                            ...styles.linkBtn,
-                            background: "#25D366",
-                            marginLeft: 8,
-                          }}
-                        >
-                          WhatsApp
-                        </a>
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* CLUB COACHES */}
-            <div style={styles.panel}>
-              <h3 style={styles.sectionTitle}>Club Coaches</h3>
-              {renderPersonCards(sortedClubCoaches, "Club Coach")}
-            </div>
-          </>
-        )}
-
-        {/* ===== KEEP ALL OTHER SECTIONS EXACTLY AS YOU HAD THEM ===== */}
-        {tab === "leaderboard" && <Leaderboard members={members} />}
-        {tab === "events" && /* unchanged */ null}
-        {tab === "members" && /* unchanged */ null}
-        {tab === "documents" && /* unchanged */ null}
-        {tab === "information" && /* unchanged */ null}
-        {tab === "admin" && /* unchanged */ null}
-
       </div>
+
+      <div style={styles.panel}>
+        <h4 style={styles.sectionTitle}>Add Player To This Week</h4>
+
+        <input
+          type="text"
+          placeholder="Search member name..."
+          value={playerSearch}
+          onChange={(e) => setPlayerSearch(e.target.value)}
+          style={styles.input}
+        />
+
+        {playerSearch && searchableMembers.length > 0 && (
+          <div>
+            {searchableMembers.slice(0, 12).map((name) => (
+              <div key={name} style={styles.card}>
+                <strong>{name}</strong>
+                <button
+                  onClick={() => addPlayerToWeek(name)}
+                  style={styles.smallBtn}
+                >
+                  Add Player
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {playerSearch && searchableMembers.length === 0 && (
+          <div style={{ color: "#777" }}>No matching member found.</div>
+        )}
+      </div>
+
+      <table style={styles.adminTable}>
+        <thead>
+          <tr>
+            <th style={{ ...styles.adminTh, ...styles.stickyCol }}>Member</th>
+            <th style={styles.adminTh}>{formatShortDate(selectedDate)}</th>
+            <th style={styles.adminTh}>Total</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {displayedPlayers.length === 0 ? (
+            <tr>
+              <td colSpan="3" style={styles.adminTd}>
+                No players yet for this week. Use search above to add one.
+              </td>
+            </tr>
+          ) : (
+            displayedPlayers.map((memberName) => (
+              <tr key={memberName}>
+                <td style={{ ...styles.adminTd, ...styles.stickyColBody }}>
+                  {memberName}
+                </td>
+
+                <td style={styles.adminTd}>
+                  <input
+                    type="number"
+                    min="0"
+                    value={points[memberName]?.[selectedDate] ?? 0}
+                    onChange={(e) =>
+                      handleChange(memberName, selectedDate, e.target.value)
+                    }
+                    style={styles.pointsInput}
+                  />
+                </td>
+
+                <td style={{ ...styles.adminTd, fontWeight: 700 }}>
+                  {getTotal(memberName)}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }
