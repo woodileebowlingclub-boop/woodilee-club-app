@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import * as XLSX from "xlsx";
 import { supabase } from "./lib/supabase";
 import logo from "./assets/WBC Logo.png";
 
@@ -303,6 +304,29 @@ const styles = {
     background: "#fffdfd",
     fontSize: 14,
   },
+  stickyCol: {
+    position: "sticky",
+    left: 0,
+    zIndex: 3,
+    background: "#8b1e3f",
+  },
+  stickyColBody: {
+    position: "sticky",
+    left: 0,
+    zIndex: 2,
+    background: "#fff7f9",
+    textAlign: "left",
+    fontWeight: 700,
+    minWidth: 180,
+  },
+  pointsInput: {
+    width: 70,
+    padding: 6,
+    borderRadius: 8,
+    border: "1px solid #d7b7be",
+    textAlign: "center",
+    boxSizing: "border-box",
+  },
 };
 
 const mondayDates2026 = [
@@ -426,257 +450,304 @@ function isImageFile(url) {
 }
 
 function MondayPointsAdmin({ members = [] }) {
-  const [weeklyScores, setWeeklyScores] = useState(() => {
+  const [points, setPoints] = useState(() => {
     try {
-      const saved = localStorage.getItem("mondayPoints2026Weekly");
+      const saved = localStorage.getItem("mondayPoints2026");
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
     }
   });
 
-  const [selectedDate, setSelectedDate] = useState(mondayDates2026[0] || "");
-  const [weekForm, setWeekForm] = useState({});
+  const [selectedDate, setSelectedDate] = useState(mondayDates2026[0]);
+  const [playerSearch, setPlayerSearch] = useState("");
 
-  const sortedMembers = [...members]
-    .filter((m) => m?.name)
-    .sort((a, b) => String(a.name).localeCompare(String(b.name), "en-GB"));
-
-  const saveWeeklyScores = (updated) => {
-    setWeeklyScores(updated);
-    localStorage.setItem("mondayPoints2026Weekly", JSON.stringify(updated));
+  const savePoints = (updated) => {
+    setPoints(updated);
+    localStorage.setItem("mondayPoints2026", JSON.stringify(updated));
   };
 
-  const loadWeekIntoForm = (date) => {
-    const savedWeek = weeklyScores[date] || {};
-    const nextForm = {};
+  const currentIndex = mondayDates2026.indexOf(selectedDate);
+  const previousDate = currentIndex > 0 ? mondayDates2026[currentIndex - 1] : null;
 
-    sortedMembers.forEach((member) => {
-      nextForm[member.name] = {
-        played: savedWeek[member.name] !== undefined,
-        points:
-          savedWeek[member.name] !== undefined
-            ? String(savedWeek[member.name])
-            : "",
-      };
-    });
+  const displayedPlayers = useMemo(() => {
+    if (!previousDate) {
+      return Object.keys(points)
+        .filter((name) => points[name]?.[selectedDate] !== undefined)
+        .sort((a, b) => a.localeCompare(b, "en-GB"));
+    }
 
-    setWeekForm(nextForm);
-  };
+    return Object.keys(points)
+      .filter((name) => points[name]?.[previousDate] !== undefined)
+      .sort((a, b) => a.localeCompare(b, "en-GB"));
+  }, [points, previousDate, selectedDate]);
 
   useEffect(() => {
-    loadWeekIntoForm(selectedDate);
-  }, [selectedDate, members.length]);
+    if (!previousDate) return;
 
-  const togglePlayed = (memberName) => {
-    setWeekForm((prev) => ({
-      ...prev,
-      [memberName]: {
-        played: !prev[memberName]?.played,
-        points: !prev[memberName]?.played
-          ? prev[memberName]?.points || "0"
-          : "",
-      },
-    }));
-  };
+    const updated = { ...points };
+    let changed = false;
 
-  const changePoints = (memberName, value) => {
-    setWeekForm((prev) => ({
-      ...prev,
-      [memberName]: {
-        ...(prev[memberName] || { played: true }),
-        played: true,
-        points: value,
-      },
-    }));
-  };
+    displayedPlayers.forEach((memberName) => {
+      if (!updated[memberName]) {
+        updated[memberName] = {};
+      }
 
-  const saveThisWeek = () => {
-    const weekData = {};
-
-    Object.entries(weekForm).forEach(([memberName, data]) => {
-      if (data?.played) {
-        weekData[memberName] = Math.max(0, Number(data.points) || 0);
+      if (updated[memberName][selectedDate] === undefined) {
+        updated[memberName][selectedDate] = Number(updated[memberName][previousDate]) || 0;
+        changed = true;
       }
     });
 
+    if (changed) {
+      savePoints(updated);
+    }
+  }, [selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleChange = (memberName, date, value) => {
+    const numericValue = value === "" ? 0 : Math.max(0, Number(value));
+
     const updated = {
-      ...weeklyScores,
-      [selectedDate]: weekData,
+      ...points,
+      [memberName]: {
+        ...(points[memberName] || {}),
+        [date]: numericValue,
+      },
     };
 
-    saveWeeklyScores(updated);
-    alert("Week saved.");
+    savePoints(updated);
   };
 
-  const clearThisWeek = () => {
-    if (!window.confirm("Clear this week's scores?")) return;
+  const addPlayerToWeek = (memberName) => {
+    if (!memberName) return;
 
-    const updated = { ...weeklyScores };
-    delete updated[selectedDate];
-    saveWeeklyScores(updated);
-    loadWeekIntoForm(selectedDate);
+    const updated = {
+      ...points,
+      [memberName]: {
+        ...(points[memberName] || {}),
+        [selectedDate]: points[memberName]?.[selectedDate] ?? 0,
+      },
+    };
+
+    savePoints(updated);
+    setPlayerSearch("");
   };
 
-  const clearAllScores = () => {
-    if (!window.confirm("Clear all Monday night scores for 2026?")) return;
-    saveWeeklyScores({});
-    loadWeekIntoForm(selectedDate);
+  const clearAllPoints = () => {
+    if (!window.confirm("Clear all Monday night points for 2026?")) return;
+    savePoints({});
   };
 
-  const savedDates = mondayDates2026.filter(
-    (date) => weeklyScores[date] && Object.keys(weeklyScores[date]).length > 0
-  );
+  const getTotal = (memberName) => {
+    const memberPoints = points[memberName] || {};
+    return mondayDates2026.reduce((total, date) => {
+      return total + (Number(memberPoints[date]) || 0);
+    }, 0);
+  };
+
+  const exportToExcel = () => {
+    const allPlayers = Object.keys(points).sort((a, b) =>
+      a.localeCompare(b, "en-GB")
+    );
+
+    const rows = allPlayers.map((memberName) => {
+      const memberPoints = points[memberName] || {};
+      const row = { Member: memberName };
+
+      mondayDates2026.forEach((date) => {
+        row[date] = Number(memberPoints[date]) || 0;
+      });
+
+      row.Total = mondayDates2026.reduce(
+        (total, date) => total + (Number(memberPoints[date]) || 0),
+        0
+      );
+
+      return row;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Monday Points 2026");
+    XLSX.writeFile(workbook, "Monday-Points-2026.xlsx");
+  };
+
+  const formatShortDate = (dateStr) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+    });
+  };
+
+  const searchableMembers = members
+    .filter((m) => m?.name)
+    .map((m) => m.name)
+    .filter((name) => name.toLowerCase().includes(playerSearch.toLowerCase()))
+    .filter((name) => !displayedPlayers.includes(name))
+    .sort((a, b) => a.localeCompare(b, "en-GB"));
 
   return (
-    <>
-      <div style={styles.panel}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 10,
-            flexWrap: "wrap",
-          }}
-        >
-          <h3 style={styles.sectionTitle}>Monday Points Edit – 2026</h3>
-          <button onClick={clearAllScores} style={styles.secondaryButton}>
-            Clear All Scores
-          </button>
-        </div>
+    <div style={{ overflowX: "auto" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
+          marginBottom: 10,
+        }}
+      >
+        <h3 style={styles.sectionTitle}>Monday Night Points Edit – 2026</h3>
 
         <select
           value={selectedDate}
           onChange={(e) => setSelectedDate(e.target.value)}
-          style={styles.input}
+          style={{ ...styles.input, width: 240, marginBottom: 0 }}
         >
-          {mondayDates2026.map((date) => (
-            <option key={date} value={date}>
-              {formatDiaryDate(date)}
+          {mondayDates2026.map((d) => (
+            <option key={d} value={d}>
+              {formatDiaryDate(d)}
             </option>
           ))}
         </select>
 
-        <div style={{ marginBottom: 14, fontWeight: 700, color: "#7a2138" }}>
-          Tick only the members who played, then enter their points.
-        </div>
-
-        {sortedMembers.map((member) => {
-          const row = weekForm[member.name] || { played: false, points: "" };
-
-          return (
-            <div
-              key={member.name}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "34px 1fr 120px",
-                gap: 12,
-                alignItems: "center",
-                padding: "10px 0",
-                borderBottom: "1px solid #efd6dc",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={!!row.played}
-                onChange={() => togglePlayed(member.name)}
-                style={{ width: 18, height: 18 }}
-              />
-
-              <div style={{ fontWeight: 700 }}>{member.name}</div>
-
-              <input
-                type="number"
-                min="0"
-                placeholder="Points"
-                value={row.played ? row.points : ""}
-                disabled={!row.played}
-                onChange={(e) => changePoints(member.name, e.target.value)}
-                style={{
-                  ...styles.input,
-                  marginBottom: 0,
-                  padding: 10,
-                  opacity: row.played ? 1 : 0.5,
-                }}
-              />
-            </div>
-          );
-        })}
-
-        <div style={{ marginTop: 16 }}>
-          <button onClick={saveThisWeek} style={styles.button}>
-            Save This Week
+        <div>
+          <button onClick={exportToExcel} style={styles.button}>
+            Export to Excel
           </button>
-          <button onClick={clearThisWeek} style={styles.secondaryButton}>
-            Clear This Week
+          <button onClick={clearAllPoints} style={styles.secondaryButton}>
+            Clear All Scores
           </button>
         </div>
       </div>
 
       <div style={styles.panel}>
-        <h3 style={styles.sectionTitle}>Saved Weekly Scores</h3>
+        <h4 style={styles.sectionTitle}>Add Player To This Week</h4>
 
-        {savedDates.length === 0 ? (
-          <div style={{ color: "#777" }}>No Monday night scores entered yet.</div>
-        ) : (
-          savedDates.map((date) => (
-            <div key={date} style={{ marginBottom: 18 }}>
-              <h4 style={styles.memberSectionTitle}>{formatDiaryDate(date)}</h4>
+        <input
+          type="text"
+          placeholder="Search member name..."
+          value={playerSearch}
+          onChange={(e) => setPlayerSearch(e.target.value)}
+          style={styles.input}
+        />
 
-              {Object.entries(weeklyScores[date])
-                .sort((a, b) => a[0].localeCompare(b[0], "en-GB"))
-                .map(([memberName, points]) => (
-                  <div key={`${date}-${memberName}`} style={styles.card}>
-                    <strong>{memberName}</strong> — {points} point
-                    {Number(points) === 1 ? "" : "s"}
-                  </div>
-                ))}
-            </div>
-          ))
+        {playerSearch && searchableMembers.length > 0 && (
+          <div>
+            {searchableMembers.slice(0, 10).map((name) => (
+              <div key={name} style={styles.card}>
+                <strong>{name}</strong>
+                <button
+                  onClick={() => addPlayerToWeek(name)}
+                  style={styles.smallBtn}
+                >
+                  Add Player
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {playerSearch && searchableMembers.length === 0 && (
+          <div style={{ color: "#777" }}>No matching member found.</div>
         )}
       </div>
-    </>
+
+      <table style={styles.adminTable}>
+        <thead>
+          <tr>
+            <th style={{ ...styles.adminTh, ...styles.stickyCol }}>Member</th>
+            <th style={styles.adminTh}>{formatShortDate(selectedDate)}</th>
+            <th style={styles.adminTh}>Total</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {displayedPlayers.length === 0 ? (
+            <tr>
+              <td colSpan="3" style={styles.adminTd}>
+                No players yet for this week. Use search above to add one.
+              </td>
+            </tr>
+          ) : (
+            displayedPlayers.map((memberName) => (
+              <tr key={memberName}>
+                <td style={{ ...styles.adminTd, ...styles.stickyColBody }}>
+                  {memberName}
+                </td>
+
+                <td style={styles.adminTd}>
+                  <input
+                    type="number"
+                    min="0"
+                    value={points[memberName]?.[selectedDate] ?? 0}
+                    onChange={(e) =>
+                      handleChange(memberName, selectedDate, e.target.value)
+                    }
+                    style={styles.pointsInput}
+                  />
+                </td>
+
+                <td style={{ ...styles.adminTd, fontWeight: 700 }}>
+                  {getTotal(memberName)}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
-function Leaderboard() {
-  const [weeklyScores, setWeeklyScores] = useState({});
+function MondayPointsLeaderboard({ members = [] }) {
+  const [points, setPoints] = useState({});
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("mondayPoints2026Weekly");
-      setWeeklyScores(saved ? JSON.parse(saved) : {});
+      const saved = localStorage.getItem("mondayPoints2026");
+      setPoints(saved ? JSON.parse(saved) : {});
     } catch {
-      setWeeklyScores({});
+      setPoints({});
     }
   }, []);
 
-  const totalsMap = {};
+  const totals = members
+    .filter((m) => m?.name)
+    .map((m) => {
+      const memberPoints = points[m.name] || {};
+      const total = Object.values(memberPoints).reduce(
+        (sum, value) => sum + (Number(value) || 0),
+        0
+      );
 
-  Object.values(weeklyScores).forEach((week) => {
-    Object.entries(week || {}).forEach(([memberName, points]) => {
-      totalsMap[memberName] = (totalsMap[memberName] || 0) + (Number(points) || 0);
-    });
+      return {
+        name: m.name,
+        total,
+      };
+    })
+    .filter((m) => m.total > 0 || points[m.name]);
+
+  const sorted = [...totals].sort((a, b) => {
+    if (b.total !== a.total) return b.total - a.total;
+    return a.name.localeCompare(b.name, "en-GB");
   });
 
-  const ranked = Object.entries(totalsMap)
-    .map(([name, total]) => ({ name, total }))
-    .sort((a, b) => {
-      if (b.total !== a.total) return b.total - a.total;
-      return a.name.localeCompare(b.name, "en-GB");
-    })
-    .map((item, index, arr) => {
-      let rank = index + 1;
-      if (index > 0 && item.total === arr[index - 1].total) {
-        rank = arr[index - 1].rank;
-      }
-      return { ...item, rank };
-    });
+  let lastScore = null;
+  let lastRank = 0;
+
+  const ranked = sorted.map((member, index) => {
+    const rank = member.total === lastScore ? lastRank : index + 1;
+    lastScore = member.total;
+    lastRank = rank;
+    return { ...member, rank };
+  });
 
   return (
     <div style={styles.panel}>
-      <h3 style={styles.sectionTitle}>Leaderboard – Monday Points 2026</h3>
+      <h3 style={styles.sectionTitle}>Monday Points Leaderboard – 2026</h3>
 
       <table style={styles.adminTable}>
         <thead>
@@ -686,6 +757,7 @@ function Leaderboard() {
             <th style={styles.adminTh}>Total Points</th>
           </tr>
         </thead>
+
         <tbody>
           {ranked.length > 0 ? (
             ranked.map((member) => (
@@ -700,15 +772,13 @@ function Leaderboard() {
                     : member.rank}
                 </td>
                 <td style={styles.adminTd}>{member.name}</td>
-                <td style={{ ...styles.adminTd, fontWeight: 700 }}>
-                  {member.total}
-                </td>
+                <td style={{ ...styles.adminTd, fontWeight: 700 }}>{member.total}</td>
               </tr>
             ))
           ) : (
             <tr>
               <td colSpan="3" style={styles.adminTd}>
-                No Monday night points entered yet
+                No scores entered yet
               </td>
             </tr>
           )}
@@ -834,9 +904,7 @@ export default function App() {
     () =>
       filteredMembers
         .filter((m) => String(m.section || "").trim().toLowerCase() === "gents")
-        .sort((a, b) =>
-          String(a.name || "").localeCompare(String(b.name || ""))
-        ),
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
     [filteredMembers]
   );
 
@@ -844,21 +912,15 @@ export default function App() {
     () =>
       filteredMembers
         .filter((m) => String(m.section || "").trim().toLowerCase() === "ladies")
-        .sort((a, b) =>
-          String(a.name || "").localeCompare(String(b.name || ""))
-        ),
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
     [filteredMembers]
   );
 
   const associateMembers = useMemo(
     () =>
       filteredMembers
-        .filter(
-          (m) => String(m.section || "").trim().toLowerCase() === "associate"
-        )
-        .sort((a, b) =>
-          String(a.name || "").localeCompare(String(b.name || ""))
-        ),
+        .filter((m) => String(m.section || "").trim().toLowerCase() === "associate")
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
     [filteredMembers]
   );
 
@@ -897,7 +959,7 @@ export default function App() {
 
   const loadEntries = async () => {
     const { data, error } = await supabase.from("events").select("*");
-    if (error) return setMessage(`Could not load diary entries: ${error.message}`);
+    if (error) return setMessage(`Could not load events: ${error.message}`);
     setEntries(data || []);
   };
 
@@ -913,9 +975,7 @@ export default function App() {
       .select("*")
       .order("position", { ascending: true });
 
-    if (error) {
-      return setMessage(`Could not load office bearers: ${error.message}`);
-    }
+    if (error) return setMessage(`Could not load office bearers: ${error.message}`);
     setOfficeBearers(data || []);
   };
 
@@ -925,17 +985,13 @@ export default function App() {
       .select("*")
       .order("position", { ascending: true });
 
-    if (error) {
-      return setMessage(`Could not load club coaches: ${error.message}`);
-    }
+    if (error) return setMessage(`Could not load club coaches: ${error.message}`);
     setClubCoaches(data || []);
   };
 
   const loadPosts = async () => {
     const { data, error } = await supabase.from("information_posts").select("*");
-    if (error) {
-      return setMessage(`Could not load information posts: ${error.message}`);
-    }
+    if (error) return setMessage(`Could not load information posts: ${error.message}`);
     setPosts(data || []);
   };
 
@@ -1015,7 +1071,7 @@ export default function App() {
   };
 
   const saveEntry = async () => {
-    if (!title || !date) return setMessage("Enter diary title and date.");
+    if (!title || !date) return setMessage("Enter event title and date.");
 
     if (editingEntryId) {
       const { data, error } = await supabase
@@ -1025,9 +1081,9 @@ export default function App() {
         .select()
         .single();
 
-      if (error) return setMessage(`Could not update diary entry: ${error.message}`);
+      if (error) return setMessage(`Could not update event: ${error.message}`);
       setEntries((prev) => prev.map((x) => (x.id === editingEntryId ? data : x)));
-      setMessage("Diary entry updated.");
+      setMessage("Event updated.");
     } else {
       const { data, error } = await supabase
         .from("events")
@@ -1035,9 +1091,9 @@ export default function App() {
         .select()
         .single();
 
-      if (error) return setMessage(`Could not save diary entry: ${error.message}`);
+      if (error) return setMessage(`Could not save event: ${error.message}`);
       setEntries((prev) => [...prev, data]);
-      setMessage("Diary entry added.");
+      setMessage("Event added.");
     }
 
     clearEntryForm();
@@ -1049,16 +1105,16 @@ export default function App() {
     setDate(entry.date_text || "");
     setNote(entry.note || "");
     setTab("admin");
-    setAdminTab("diary");
+    setAdminTab("events");
   };
 
   const deleteEntry = async (id) => {
-    if (!window.confirm("Delete this diary entry?")) return;
+    if (!window.confirm("Delete this event?")) return;
 
     const { error } = await supabase.from("events").delete().eq("id", id);
-    if (error) return setMessage(`Could not delete diary entry: ${error.message}`);
+    if (error) return setMessage(`Could not delete event: ${error.message}`);
     setEntries((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Diary entry deleted.");
+    setMessage("Event deleted.");
   };
 
   const saveMember = async () => {
@@ -1132,9 +1188,7 @@ export default function App() {
         .select()
         .single();
 
-      if (error) {
-        return setMessage(`Could not update office bearer: ${error.message}`);
-      }
+      if (error) return setMessage(`Could not update office bearer: ${error.message}`);
       setOfficeBearers((prev) => prev.map((x) => (x.id === editingOfficerId ? data : x)));
       setMessage("Office bearer updated.");
     } else {
@@ -1166,9 +1220,7 @@ export default function App() {
     if (!window.confirm("Delete this office bearer?")) return;
 
     const { error } = await supabase.from("office_bearers").delete().eq("id", id);
-    if (error) {
-      return setMessage(`Could not delete office bearer: ${error.message}`);
-    }
+    if (error) return setMessage(`Could not delete office bearer: ${error.message}`);
     setOfficeBearers((prev) => prev.filter((x) => x.id !== id));
     setMessage("Office bearer deleted.");
   };
@@ -1269,9 +1321,7 @@ export default function App() {
           .select()
           .single();
 
-        if (error) {
-          return setMessage(`Could not update information post: ${error.message}`);
-        }
+        if (error) return setMessage(`Could not update information post: ${error.message}`);
         setPosts((prev) => prev.map((x) => (x.id === editingPostId ? data : x)));
         setMessage("Information post updated.");
       } else {
@@ -1281,9 +1331,7 @@ export default function App() {
           .select()
           .single();
 
-        if (error) {
-          return setMessage(`Could not save information post: ${error.message}`);
-        }
+        if (error) return setMessage(`Could not save information post: ${error.message}`);
         setPosts((prev) => [...prev, data]);
         setMessage("Information post added.");
       }
@@ -1311,9 +1359,7 @@ export default function App() {
     if (!window.confirm("Delete this information post?")) return;
 
     const { error } = await supabase.from("information_posts").delete().eq("id", id);
-    if (error) {
-      return setMessage(`Could not delete information post: ${error.message}`);
-    }
+    if (error) return setMessage(`Could not delete information post: ${error.message}`);
     setPosts((prev) => prev.filter((x) => x.id !== id));
     setMessage("Information post deleted.");
   };
@@ -1427,11 +1473,7 @@ export default function App() {
 
   const renderMemberCards = (list) => {
     if (list.length === 0) {
-      return (
-        <div style={{ color: "#777", marginBottom: 12 }}>
-          No members in this section.
-        </div>
-      );
+      return <div style={{ color: "#777", marginBottom: 12 }}>No members in this section.</div>;
     }
 
     return list.map((m) => (
@@ -1441,9 +1483,7 @@ export default function App() {
         <div style={{ marginTop: 10 }}>
           {m.phone ? (
             <>
-              <a href={`tel:${m.phone}`} style={styles.linkBtn}>
-                Call
-              </a>
+              <a href={`tel:${m.phone}`} style={styles.linkBtn}>Call</a>
               <a
                 href={`https://wa.me/${normaliseUkPhoneForWhatsApp(m.phone)}`}
                 target="_blank"
@@ -1469,17 +1509,11 @@ export default function App() {
         {list.map((person) => (
           <div key={person.id} style={styles.card}>
             <span style={styles.badge}>{badgeText}</span>
-            <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
-              {person.name}
-            </div>
-            <div style={{ marginBottom: 10, color: "#444" }}>
-              {person.phone || "No phone listed"}
-            </div>
+            <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{person.name}</div>
+            <div style={{ marginBottom: 10, color: "#444" }}>{person.phone || "No phone listed"}</div>
             {person.phone ? (
               <div>
-                <a href={`tel:${person.phone}`} style={styles.linkBtn}>
-                  Call
-                </a>
+                <a href={`tel:${person.phone}`} style={styles.linkBtn}>Call</a>
                 <a
                   href={`https://wa.me/${normaliseUkPhoneForWhatsApp(person.phone)}`}
                   target="_blank"
@@ -1500,14 +1534,8 @@ export default function App() {
     return (
       <div style={styles.page}>
         <div style={styles.loginPanel}>
-          <img
-            src={logo}
-            alt="Club Logo"
-            style={{ ...styles.logo, margin: "0 auto 12px auto" }}
-          />
-          <h1 style={{ ...styles.title, marginBottom: 14 }}>
-            Woodilee Bowling Club
-          </h1>
+          <img src={logo} alt="Club Logo" style={{ ...styles.logo, margin: "0 auto 12px auto" }} />
+          <h1 style={{ ...styles.title, marginBottom: 14 }}>Woodilee Bowling Club</h1>
           <input
             type="password"
             placeholder="Enter PIN"
@@ -1515,9 +1543,7 @@ export default function App() {
             onChange={(e) => setPin(e.target.value)}
             style={styles.input}
           />
-          <button onClick={handleLogin} style={styles.button}>
-            Enter
-          </button>
+          <button onClick={handleLogin} style={styles.button}>Enter</button>
           {message ? (
             <div style={{ marginTop: 8, color: "#8b1e3f", fontWeight: 700 }}>
               {message}
@@ -1536,9 +1562,7 @@ export default function App() {
             <img src={logo} alt="Club Logo" style={styles.logo} />
             <div>
               <h1 style={styles.title}>Woodilee Bowling Club</h1>
-              <p style={styles.subtitle}>
-                Members diary, notices and contact details
-              </p>
+              <p style={styles.subtitle}>Members diary, notices and contact details</p>
             </div>
           </div>
         </div>
@@ -1546,38 +1570,17 @@ export default function App() {
         {message && <div style={styles.message}>{message}</div>}
 
         <div style={styles.tabs}>
-          <button style={styles.tab(tab === "home")} onClick={() => setTab("home")}>
-            Home
-          </button>
+          <button style={styles.tab(tab === "home")} onClick={() => setTab("home")}>Home</button>
+          <button style={styles.tab(tab === "events")} onClick={() => setTab("events")}>Events</button>
+          <button style={styles.tab(tab === "members")} onClick={() => setTab("members")}>Members</button>
+          <button style={styles.tab(tab === "documents")} onClick={() => setTab("documents")}>Documents</button>
+          <button style={styles.tab(tab === "information")} onClick={() => setTab("information")}>Information</button>
+          <button style={styles.tab(tab === "admin")} onClick={() => setTab("admin")}>Admin</button>
           <button style={styles.tab(tab === "diary")} onClick={() => setTab("diary")}>
-            Diary
-          </button>
-          <button style={styles.tab(tab === "office")} onClick={() => setTab("office")}>
             Office Bearers / Club Coaches
           </button>
-          <button
-            style={styles.tab(tab === "leaderboard")}
-            onClick={() => setTab("leaderboard")}
-          >
-            Leaderboard
-          </button>
-          <button style={styles.tab(tab === "members")} onClick={() => setTab("members")}>
-            Members
-          </button>
-          <button
-            style={styles.tab(tab === "documents")}
-            onClick={() => setTab("documents")}
-          >
-            Documents
-          </button>
-          <button
-            style={styles.tab(tab === "information")}
-            onClick={() => setTab("information")}
-          >
-            Information
-          </button>
-          <button style={styles.tab(tab === "admin")} onClick={() => setTab("admin")}>
-            Admin
+          <button style={styles.tab(tab === "leaderboard")} onClick={() => setTab("leaderboard")}>
+            Monday Points Leaderboard
           </button>
         </div>
 
@@ -1589,38 +1592,21 @@ export default function App() {
               {nextEvent ? (
                 <>
                   <div style={styles.heroTitle}>{nextEvent.title}</div>
-                  <div style={styles.heroDate}>
-                    {formatDiaryDate(nextEvent.date_text)}
-                  </div>
+                  <div style={styles.heroDate}>{formatDiaryDate(nextEvent.date_text)}</div>
                   {nextEvent.note ? (
-                    <div
-                      style={{
-                        color: "#444",
-                        whiteSpace: "pre-wrap",
-                        marginBottom: 12,
-                      }}
-                    >
+                    <div style={{ color: "#444", whiteSpace: "pre-wrap", marginBottom: 12 }}>
                       {nextEvent.note}
                     </div>
                   ) : null}
 
                   <div>
-                    <button
-                      style={styles.homeActionBtn}
-                      onClick={() => setTab("diary")}
-                    >
-                      View Diary
+                    <button style={styles.homeActionBtn} onClick={() => setTab("events")}>
+                      View All Events
                     </button>
-                    <button
-                      style={styles.homeActionBtn}
-                      onClick={() => setTab("information")}
-                    >
+                    <button style={styles.homeActionBtn} onClick={() => setTab("information")}>
                       Club Notices
                     </button>
-                    <button
-                      style={styles.homeActionBtn}
-                      onClick={() => setTab("documents")}
-                    >
+                    <button style={styles.homeActionBtn} onClick={() => setTab("documents")}>
                       Club Documents
                     </button>
                   </div>
@@ -1628,20 +1614,15 @@ export default function App() {
               ) : (
                 <>
                   <div style={styles.heroTitle}>No upcoming events</div>
-                  <div style={{ color: "#555" }}>
-                    Add diary entries in Admin to show them here.
-                  </div>
+                  <div style={{ color: "#555" }}>Add events in Admin to show them here.</div>
                 </>
               )}
             </div>
 
             <div style={styles.homeGrid}>
               <div style={styles.homeMiniCard}>
-                <div style={styles.homeLabel}>Monday Night Leaderboard</div>
-                <button
-                  style={styles.homeActionBtn}
-                  onClick={() => setTab("leaderboard")}
-                >
+                <div style={styles.homeLabel}>Monday Points Leaderboard</div>
+                <button style={styles.homeActionBtn} onClick={() => setTab("leaderboard")}>
                   View Leaderboard
                 </button>
               </div>
@@ -1651,22 +1632,10 @@ export default function App() {
 
                 {latestPinnedPost ? (
                   <>
-                    <div
-                      style={{
-                        fontWeight: 700,
-                        fontSize: 18,
-                        marginBottom: 8,
-                      }}
-                    >
+                    <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
                       {latestPinnedPost.title}
                     </div>
-                    <div
-                      style={{
-                        color: "#555",
-                        whiteSpace: "pre-wrap",
-                        marginBottom: 10,
-                      }}
-                    >
+                    <div style={{ color: "#555", whiteSpace: "pre-wrap", marginBottom: 10 }}>
                       {latestPinnedPost.message}
                     </div>
                     {latestPinnedPost.attachment_link ? (
@@ -1701,9 +1670,7 @@ export default function App() {
                   nextTwoEvents.map((e) => (
                     <div key={e.id} style={{ marginBottom: 12 }}>
                       <div style={{ fontWeight: 700 }}>{e.title}</div>
-                      <div style={{ color: "#92400e" }}>
-                        {formatDiaryDate(e.date_text)}
-                      </div>
+                      <div style={{ color: "#92400e" }}>{formatDiaryDate(e.date_text)}</div>
                     </div>
                   ))
                 ) : (
@@ -1714,116 +1681,42 @@ export default function App() {
 
             <div style={styles.panel}>
               <h3 style={styles.sectionTitle}>Quick Links</h3>
-              <button
-                style={styles.homeActionBtn}
-                onClick={() => setTab("diary")}
-              >
-                Diary
-              </button>
-              <button
-                style={styles.homeActionBtn}
-                onClick={() => setTab("office")}
-              >
+              <button style={styles.homeActionBtn} onClick={() => setTab("events")}>Events</button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("members")}>Members</button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("documents")}>Documents</button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("information")}>Information</button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("diary")}>
                 Office Bearers / Club Coaches
               </button>
-              <button
-                style={styles.homeActionBtn}
-                onClick={() => setTab("leaderboard")}
-              >
-                Leaderboard
-              </button>
-              <button
-                style={styles.homeActionBtn}
-                onClick={() => setTab("members")}
-              >
-                Members
-              </button>
-              <button
-                style={styles.homeActionBtn}
-                onClick={() => setTab("documents")}
-              >
-                Documents
-              </button>
-              <button
-                style={styles.homeActionBtn}
-                onClick={() => setTab("information")}
-              >
-                Information
+              <button style={styles.homeActionBtn} onClick={() => setTab("leaderboard")}>
+                Monday Points Leaderboard
               </button>
             </div>
           </>
         )}
 
         {tab === "diary" && (
-          <div style={styles.panel}>
-            <h3 style={styles.sectionTitle}>Diary</h3>
-
-            <input
-              type="text"
-              placeholder="Search diary..."
-              value={eventSearch}
-              onChange={(e) => setEventSearch(e.target.value)}
-              style={styles.input}
-            />
-
-            {filteredEvents.length === 0 ? (
-              <div style={{ color: "#777" }}>No matching diary entries found.</div>
-            ) : (
-              filteredEvents.map((e) => (
-                <div key={e.id} style={styles.card}>
-                  <strong style={{ color: "#92400e" }}>
-                    {formatDiaryDate(e.date_text)}
-                  </strong>{" "}
-                  — {e.title}
-                  {e.note ? (
-                    <div
-                      style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}
-                    >
-                      {e.note}
-                    </div>
-                  ) : null}
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {tab === "office" && (
           <>
+            <div style={styles.panel}>
+              <h3 style={styles.sectionTitle}>Office Bearers / Club Coaches</h3>
+            </div>
+
             <div style={styles.panel}>
               <h3 style={styles.sectionTitle}>Office Bearers</h3>
               <div style={styles.grid}>
                 {sortedOfficeBearers.map((person) => (
                   <div key={person.id} style={styles.card}>
                     <span style={styles.badge}>{person.role}</span>
-                    <div
-                      style={{
-                        fontSize: 20,
-                        fontWeight: 700,
-                        marginBottom: 6,
-                      }}
-                    >
-                      {person.name}
-                    </div>
-                    <div style={{ marginBottom: 10, color: "#444" }}>
-                      {person.phone || "No phone listed"}
-                    </div>
+                    <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{person.name}</div>
+                    <div style={{ marginBottom: 10, color: "#444" }}>{person.phone || "No phone listed"}</div>
                     {person.phone ? (
                       <div>
-                        <a href={`tel:${person.phone}`} style={styles.linkBtn}>
-                          Call
-                        </a>
+                        <a href={`tel:${person.phone}`} style={styles.linkBtn}>Call</a>
                         <a
-                          href={`https://wa.me/${normaliseUkPhoneForWhatsApp(
-                            person.phone
-                          )}`}
+                          href={`https://wa.me/${normaliseUkPhoneForWhatsApp(person.phone)}`}
                           target="_blank"
                           rel="noreferrer"
-                          style={{
-                            ...styles.linkBtn,
-                            background: "#25D366",
-                            marginLeft: 8,
-                          }}
+                          style={{ ...styles.linkBtn, background: "#25D366", marginLeft: 8 }}
                         >
                           WhatsApp
                         </a>
@@ -1841,7 +1734,36 @@ export default function App() {
           </>
         )}
 
-        {tab === "leaderboard" && <Leaderboard />}
+        {tab === "leaderboard" && <MondayPointsLeaderboard members={members} />}
+
+        {tab === "events" && (
+          <div style={styles.panel}>
+            <h3 style={styles.sectionTitle}>Events</h3>
+
+            <input
+              type="text"
+              placeholder="Search events..."
+              value={eventSearch}
+              onChange={(e) => setEventSearch(e.target.value)}
+              style={styles.input}
+            />
+
+            {filteredEvents.length === 0 ? (
+              <div style={{ color: "#777" }}>No matching events found.</div>
+            ) : (
+              filteredEvents.map((e) => (
+                <div key={e.id} style={styles.card}>
+                  <strong style={{ color: "#92400e" }}>{formatDiaryDate(e.date_text)}</strong> — {e.title}
+                  {e.note ? (
+                    <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>
+                      {e.note}
+                    </div>
+                  ) : null}
+                </div>
+              ))
+            )}
+          </div>
+        )}
 
         {tab === "members" && (
           <div style={styles.panel}>
@@ -1882,13 +1804,9 @@ export default function App() {
               filteredDocuments.map((doc) => (
                 <div key={doc.id} style={styles.card}>
                   <div style={styles.badge}>{doc.category || "General"}</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>
-                    {doc.title}
-                  </div>
+                  <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>{doc.title}</div>
                   {doc.description ? (
-                    <div
-                      style={{ marginTop: 8, whiteSpace: "pre-wrap", color: "#555" }}
-                    >
+                    <div style={{ marginTop: 8, whiteSpace: "pre-wrap", color: "#555" }}>
                       {doc.description}
                     </div>
                   ) : null}
@@ -1898,27 +1816,13 @@ export default function App() {
 
                       {isImageFile(doc.file_url) ? (
                         <>
-                          <img
-                            src={doc.file_url}
-                            alt={doc.title}
-                            style={styles.imagePreview}
-                          />
-                          <a
-                            href={doc.file_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={styles.linkBtn}
-                          >
+                          <img src={doc.file_url} alt={doc.title} style={styles.imagePreview} />
+                          <a href={doc.file_url} target="_blank" rel="noreferrer" style={styles.linkBtn}>
                             {doc.button_text || "Open Image"}
                           </a>
                         </>
                       ) : (
-                        <a
-                          href={doc.file_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={styles.linkBtn}
-                        >
+                        <a href={doc.file_url} target="_blank" rel="noreferrer" style={styles.linkBtn}>
                           {doc.button_text || "Open Document"}
                         </a>
                       )}
@@ -1946,50 +1850,25 @@ export default function App() {
               <div style={{ color: "#777" }}>No matching information found.</div>
             ) : (
               filteredPosts.map((post) => (
-                <div
-                  key={post.id}
-                  style={{ ...styles.card, ...(post.pinned ? styles.pinnedCard : {}) }}
-                >
+                <div key={post.id} style={{ ...styles.card, ...(post.pinned ? styles.pinnedCard : {}) }}>
                   {post.pinned ? <div style={styles.badge}>📌 Pinned Notice</div> : null}
-                  <div style={{ color: "#92400e", fontWeight: 700 }}>
-                    {post.date_posted}
-                  </div>
-                  <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>
-                    {post.title}
-                  </div>
-                  <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
-                    {post.message}
-                  </div>
+                  <div style={{ color: "#92400e", fontWeight: 700 }}>{post.date_posted}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>{post.title}</div>
+                  <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{post.message}</div>
 
                   {post.attachment_link ? (
                     <div style={{ marginTop: 10 }}>
-                      <div style={styles.fileInfo}>
-                        {getFileTypeLabel(post.attachment_link)}
-                      </div>
+                      <div style={styles.fileInfo}>{getFileTypeLabel(post.attachment_link)}</div>
 
                       {isImageFile(post.attachment_link) ? (
                         <>
-                          <img
-                            src={post.attachment_link}
-                            alt={post.title}
-                            style={styles.imagePreview}
-                          />
-                          <a
-                            href={post.attachment_link}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={styles.linkBtn}
-                          >
+                          <img src={post.attachment_link} alt={post.title} style={styles.imagePreview} />
+                          <a href={post.attachment_link} target="_blank" rel="noreferrer" style={styles.linkBtn}>
                             {post.button_text || "Open Image"}
                           </a>
                         </>
                       ) : (
-                        <a
-                          href={post.attachment_link}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={styles.linkBtn}
-                        >
+                        <a href={post.attachment_link} target="_blank" rel="noreferrer" style={styles.linkBtn}>
                           {post.button_text || "Open Attachment"}
                         </a>
                       )}
@@ -2012,9 +1891,7 @@ export default function App() {
                   onChange={(e) => setAdminPin(e.target.value)}
                   style={styles.input}
                 />
-                <button onClick={handleAdminLogin} style={styles.button}>
-                  Enter
-                </button>
+                <button onClick={handleAdminLogin} style={styles.button}>Enter</button>
               </div>
             ) : (
               <>
@@ -2026,10 +1903,10 @@ export default function App() {
                     Monday Points Edit
                   </button>
                   <button
-                    onClick={() => setAdminTab("diary")}
-                    style={styles.tab(adminTab === "diary")}
+                    onClick={() => setAdminTab("events")}
+                    style={styles.tab(adminTab === "events")}
                   >
-                    Diary
+                    Events
                   </button>
                   <button
                     onClick={() => setAdminTab("officers")}
@@ -2064,28 +1941,30 @@ export default function App() {
                 </div>
 
                 {adminTab === "mondayscores" && (
-                  <MondayPointsAdmin members={members} />
+                  <div style={styles.panel}>
+                    <MondayPointsAdmin members={members} />
+                  </div>
                 )}
 
-                {adminTab === "diary" && (
+                {adminTab === "events" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>
-                        {editingEntryId ? "Edit Diary Entry" : "Add Diary Entry"}
-                      </h3>
+                      <h3 style={styles.sectionTitle}>{editingEntryId ? "Edit Event" : "Add Event"}</h3>
 
                       <input
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        placeholder="Diary title"
+                        placeholder="Event title"
                         style={styles.input}
                       />
+
                       <input
                         type="date"
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
                         style={styles.input}
                       />
+
                       <textarea
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
@@ -2094,7 +1973,7 @@ export default function App() {
                       />
 
                       <button onClick={saveEntry} style={styles.button}>
-                        {editingEntryId ? "Update Diary Entry" : "Save Diary Entry"}
+                        {editingEntryId ? "Update Event" : "Save Event"}
                       </button>
 
                       {(editingEntryId || title || date || note) && (
@@ -2105,31 +1984,18 @@ export default function App() {
                     </div>
 
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>Manage Diary</h3>
+                      <h3 style={styles.sectionTitle}>Manage Events</h3>
                       {sortedEntries.map((e) => (
                         <div key={e.id} style={styles.card}>
                           <strong>{formatDiaryDate(e.date_text)}</strong> — {e.title}
                           {e.note ? (
-                            <div
-                              style={{
-                                marginTop: 8,
-                                color: "#555",
-                                whiteSpace: "pre-wrap",
-                              }}
-                            >
+                            <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>
                               {e.note}
                             </div>
                           ) : null}
                           <div style={{ marginTop: 8 }}>
-                            <button onClick={() => editEntry(e)} style={styles.smallBtn}>
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => deleteEntry(e.id)}
-                              style={styles.smallBtn}
-                            >
-                              Delete
-                            </button>
+                            <button onClick={() => editEntry(e)} style={styles.smallBtn}>Edit</button>
+                            <button onClick={() => deleteEntry(e.id)} style={styles.smallBtn}>Delete</button>
                           </div>
                         </div>
                       ))}
@@ -2140,27 +2006,10 @@ export default function App() {
                 {adminTab === "officers" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>
-                        {editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}
-                      </h3>
-                      <input
-                        value={newRole}
-                        onChange={(e) => setNewRole(e.target.value)}
-                        placeholder="Role"
-                        style={styles.input}
-                      />
-                      <input
-                        value={newOfficerName}
-                        onChange={(e) => setNewOfficerName(e.target.value)}
-                        placeholder="Name"
-                        style={styles.input}
-                      />
-                      <input
-                        value={newOfficerPhone}
-                        onChange={(e) => setNewOfficerPhone(e.target.value)}
-                        placeholder="Phone"
-                        style={styles.input}
-                      />
+                      <h3 style={styles.sectionTitle}>{editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}</h3>
+                      <input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Role" style={styles.input} />
+                      <input value={newOfficerName} onChange={(e) => setNewOfficerName(e.target.value)} placeholder="Name" style={styles.input} />
+                      <input value={newOfficerPhone} onChange={(e) => setNewOfficerPhone(e.target.value)} placeholder="Phone" style={styles.input} />
                       <input
                         type="number"
                         value={newOfficerPosition}
@@ -2171,14 +2020,8 @@ export default function App() {
                       <button onClick={saveOfficeBearer} style={styles.button}>
                         {editingOfficerId ? "Update Office Bearer" : "Save Office Bearer"}
                       </button>
-                      {(editingOfficerId ||
-                        newRole ||
-                        newOfficerName ||
-                        newOfficerPhone ||
-                        newOfficerPosition) && (
-                        <button onClick={clearOfficerForm} style={styles.secondaryButton}>
-                          Clear
-                        </button>
+                      {(editingOfficerId || newRole || newOfficerName || newOfficerPhone || newOfficerPosition) && (
+                        <button onClick={clearOfficerForm} style={styles.secondaryButton}>Clear</button>
                       )}
                     </div>
 
@@ -2192,18 +2035,8 @@ export default function App() {
                           <div key={person.id} style={styles.card}>
                             <strong>{person.role}</strong> — {person.name}
                             <div style={{ marginTop: 8 }}>
-                              <button
-                                onClick={() => editOfficeBearer(person)}
-                                style={styles.smallBtn}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => deleteOfficeBearer(person.id)}
-                                style={styles.smallBtn}
-                              >
-                                Delete
-                              </button>
+                              <button onClick={() => editOfficeBearer(person)} style={styles.smallBtn}>Edit</button>
+                              <button onClick={() => deleteOfficeBearer(person.id)} style={styles.smallBtn}>Delete</button>
                               <button
                                 onClick={() =>
                                   canMoveUp &&
@@ -2216,11 +2049,7 @@ export default function App() {
                                     "Office bearer"
                                   )
                                 }
-                                style={
-                                  canMoveUp
-                                    ? styles.reorderBtn
-                                    : styles.disabledReorderBtn
-                                }
+                                style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
                                 type="button"
                               >
                                 ↑ Up
@@ -2237,11 +2066,7 @@ export default function App() {
                                     "Office bearer"
                                   )
                                 }
-                                style={
-                                  canMoveDown
-                                    ? styles.reorderBtn
-                                    : styles.disabledReorderBtn
-                                }
+                                style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
                                 type="button"
                               >
                                 ↓ Down
@@ -2257,21 +2082,9 @@ export default function App() {
                 {adminTab === "coaches" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>
-                        {editingCoachId ? "Edit Club Coach" : "Add Club Coach"}
-                      </h3>
-                      <input
-                        value={newCoachName}
-                        onChange={(e) => setNewCoachName(e.target.value)}
-                        placeholder="Name"
-                        style={styles.input}
-                      />
-                      <input
-                        value={newCoachPhone}
-                        onChange={(e) => setNewCoachPhone(e.target.value)}
-                        placeholder="Phone"
-                        style={styles.input}
-                      />
+                      <h3 style={styles.sectionTitle}>{editingCoachId ? "Edit Club Coach" : "Add Club Coach"}</h3>
+                      <input value={newCoachName} onChange={(e) => setNewCoachName(e.target.value)} placeholder="Name" style={styles.input} />
+                      <input value={newCoachPhone} onChange={(e) => setNewCoachPhone(e.target.value)} placeholder="Phone" style={styles.input} />
                       <input
                         type="number"
                         value={newCoachPosition}
@@ -2282,13 +2095,8 @@ export default function App() {
                       <button onClick={saveCoach} style={styles.button}>
                         {editingCoachId ? "Update Club Coach" : "Save Club Coach"}
                       </button>
-                      {(editingCoachId ||
-                        newCoachName ||
-                        newCoachPhone ||
-                        newCoachPosition) && (
-                        <button onClick={clearCoachForm} style={styles.secondaryButton}>
-                          Clear
-                        </button>
+                      {(editingCoachId || newCoachName || newCoachPhone || newCoachPosition) && (
+                        <button onClick={clearCoachForm} style={styles.secondaryButton}>Clear</button>
                       )}
                     </div>
 
@@ -2302,18 +2110,8 @@ export default function App() {
                           <div key={coach.id} style={styles.card}>
                             <strong>{coach.name}</strong> — {coach.phone || "no phone"}
                             <div style={{ marginTop: 8 }}>
-                              <button
-                                onClick={() => editCoach(coach)}
-                                style={styles.smallBtn}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => deleteCoach(coach.id)}
-                                style={styles.smallBtn}
-                              >
-                                Delete
-                              </button>
+                              <button onClick={() => editCoach(coach)} style={styles.smallBtn}>Edit</button>
+                              <button onClick={() => deleteCoach(coach.id)} style={styles.smallBtn}>Delete</button>
                               <button
                                 onClick={() =>
                                   canMoveUp &&
@@ -2326,11 +2124,7 @@ export default function App() {
                                     "Club coach"
                                   )
                                 }
-                                style={
-                                  canMoveUp
-                                    ? styles.reorderBtn
-                                    : styles.disabledReorderBtn
-                                }
+                                style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
                                 type="button"
                               >
                                 ↑ Up
@@ -2347,11 +2141,7 @@ export default function App() {
                                     "Club coach"
                                   )
                                 }
-                                style={
-                                  canMoveDown
-                                    ? styles.reorderBtn
-                                    : styles.disabledReorderBtn
-                                }
+                                style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
                                 type="button"
                               >
                                 ↓ Down
@@ -2367,37 +2157,19 @@ export default function App() {
                 {adminTab === "members" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>
-                        {editingMemberId ? "Edit Member" : "Add Member"}
-                      </h3>
-                      <input
-                        value={newMemberName}
-                        onChange={(e) => setNewMemberName(e.target.value)}
-                        placeholder="Name"
-                        style={styles.input}
-                      />
-                      <select
-                        value={newMemberSection}
-                        onChange={(e) => setNewMemberSection(e.target.value)}
-                        style={styles.input}
-                      >
+                      <h3 style={styles.sectionTitle}>{editingMemberId ? "Edit Member" : "Add Member"}</h3>
+                      <input value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="Name" style={styles.input} />
+                      <select value={newMemberSection} onChange={(e) => setNewMemberSection(e.target.value)} style={styles.input}>
                         <option>Gents</option>
                         <option>Ladies</option>
                         <option>Associate</option>
                       </select>
-                      <input
-                        value={newMemberPhone}
-                        onChange={(e) => setNewMemberPhone(e.target.value)}
-                        placeholder="Phone"
-                        style={styles.input}
-                      />
+                      <input value={newMemberPhone} onChange={(e) => setNewMemberPhone(e.target.value)} placeholder="Phone" style={styles.input} />
                       <button onClick={saveMember} style={styles.button}>
                         {editingMemberId ? "Update Member" : "Save Member"}
                       </button>
                       {(editingMemberId || newMemberName || newMemberPhone) && (
-                        <button onClick={clearMemberForm} style={styles.secondaryButton}>
-                          Clear
-                        </button>
+                        <button onClick={clearMemberForm} style={styles.secondaryButton}>Clear</button>
                       )}
                     </div>
 
@@ -2405,26 +2177,13 @@ export default function App() {
                       <h3 style={styles.sectionTitle}>Manage Members</h3>
                       {members
                         .slice()
-                        .sort((a, b) =>
-                          String(a.name || "").localeCompare(String(b.name || ""))
-                        )
+                        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
                         .map((m) => (
                           <div key={m.id} style={styles.card}>
-                            <strong>{m.name}</strong> — {m.section} —{" "}
-                            {m.phone || "no phone"}
+                            <strong>{m.name}</strong> — {m.section} — {m.phone || "no phone"}
                             <div style={{ marginTop: 8 }}>
-                              <button
-                                onClick={() => editMember(m)}
-                                style={styles.smallBtn}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => deleteMember(m.id)}
-                                style={styles.smallBtn}
-                              >
-                                Delete
-                              </button>
+                              <button onClick={() => editMember(m)} style={styles.smallBtn}>Edit</button>
+                              <button onClick={() => deleteMember(m.id)} style={styles.smallBtn}>Delete</button>
                             </div>
                           </div>
                         ))}
@@ -2435,9 +2194,7 @@ export default function App() {
                 {adminTab === "documents" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>
-                        {editingDocumentId ? "Edit Document" : "Add Document"}
-                      </h3>
+                      <h3 style={styles.sectionTitle}>{editingDocumentId ? "Edit Document" : "Add Document"}</h3>
 
                       <input
                         value={documentTitle}
@@ -2486,11 +2243,7 @@ export default function App() {
                           accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx,application/pdf,image/png,image/jpeg,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                           onChange={(e) => setDocumentFile(e.target.files?.[0] || null)}
                         />
-                        {documentFile ? (
-                          <div style={styles.fileInfo}>
-                            Selected file: {documentFile.name}
-                          </div>
-                        ) : null}
+                        {documentFile ? <div style={styles.fileInfo}>Selected file: {documentFile.name}</div> : null}
                       </div>
 
                       <button onClick={saveDocument} style={styles.button}>
@@ -2504,12 +2257,7 @@ export default function App() {
                         documentLink ||
                         documentButtonText ||
                         documentFile) && (
-                        <button
-                          onClick={clearDocumentForm}
-                          style={styles.secondaryButton}
-                        >
-                          Clear
-                        </button>
+                        <button onClick={clearDocumentForm} style={styles.secondaryButton}>Clear</button>
                       )}
                     </div>
 
@@ -2527,18 +2275,8 @@ export default function App() {
                               </div>
                             ) : null}
                             <div style={{ marginTop: 8 }}>
-                              <button
-                                onClick={() => editDocument(doc)}
-                                style={styles.smallBtn}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => deleteDocument(doc.id)}
-                                style={styles.smallBtn}
-                              >
-                                Delete
-                              </button>
+                              <button onClick={() => editDocument(doc)} style={styles.smallBtn}>Edit</button>
+                              <button onClick={() => deleteDocument(doc.id)} style={styles.smallBtn}>Delete</button>
                             </div>
                           </div>
                         ))
@@ -2553,36 +2291,11 @@ export default function App() {
                       <h3 style={styles.sectionTitle}>
                         {editingPostId ? "Edit Information Post" : "Add Information Post"}
                       </h3>
-                      <input
-                        value={postTitle}
-                        onChange={(e) => setPostTitle(e.target.value)}
-                        placeholder="Title"
-                        style={styles.input}
-                      />
-                      <textarea
-                        value={postMessage}
-                        onChange={(e) => setPostMessage(e.target.value)}
-                        placeholder="Message"
-                        style={styles.textarea}
-                      />
-                      <input
-                        type="date"
-                        value={postDate}
-                        onChange={(e) => setPostDate(e.target.value)}
-                        style={styles.input}
-                      />
-                      <input
-                        value={postLink}
-                        onChange={(e) => setPostLink(e.target.value)}
-                        placeholder="Attachment link (optional if uploading file)"
-                        style={styles.input}
-                      />
-                      <input
-                        value={postButtonText}
-                        onChange={(e) => setPostButtonText(e.target.value)}
-                        placeholder="Button text"
-                        style={styles.input}
-                      />
+                      <input value={postTitle} onChange={(e) => setPostTitle(e.target.value)} placeholder="Title" style={styles.input} />
+                      <textarea value={postMessage} onChange={(e) => setPostMessage(e.target.value)} placeholder="Message" style={styles.textarea} />
+                      <input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} style={styles.input} />
+                      <input value={postLink} onChange={(e) => setPostLink(e.target.value)} placeholder="Attachment link (optional if uploading file)" style={styles.input} />
+                      <input value={postButtonText} onChange={(e) => setPostButtonText(e.target.value)} placeholder="Button text" style={styles.input} />
 
                       <div style={{ marginBottom: 10 }}>
                         <input
@@ -2590,11 +2303,7 @@ export default function App() {
                           accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx,application/pdf,image/png,image/jpeg,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                           onChange={(e) => setPostFile(e.target.files?.[0] || null)}
                         />
-                        {postFile ? (
-                          <div style={styles.fileInfo}>
-                            Selected file: {postFile.name}
-                          </div>
-                        ) : null}
+                        {postFile ? <div style={styles.fileInfo}>Selected file: {postFile.name}</div> : null}
                       </div>
 
                       <label style={{ display: "block", marginBottom: 10 }}>
@@ -2608,9 +2317,7 @@ export default function App() {
                       </label>
 
                       <button onClick={savePost} style={styles.button}>
-                        {editingPostId
-                          ? "Update Information Post"
-                          : "Save Information Post"}
+                        {editingPostId ? "Update Information Post" : "Save Information Post"}
                       </button>
 
                       {(editingPostId ||
@@ -2621,9 +2328,7 @@ export default function App() {
                         postButtonText ||
                         postPinned ||
                         postFile) && (
-                        <button onClick={clearPostForm} style={styles.secondaryButton}>
-                          Clear
-                        </button>
+                        <button onClick={clearPostForm} style={styles.secondaryButton}>Clear</button>
                       )}
                     </div>
 
@@ -2631,26 +2336,15 @@ export default function App() {
                       <h3 style={styles.sectionTitle}>Manage Information Posts</h3>
                       {sortedPosts.map((post) => (
                         <div key={post.id} style={styles.card}>
-                          <strong>{post.date_posted}</strong> — {post.title}{" "}
-                          {post.pinned ? "• PINNED" : ""}
+                          <strong>{post.date_posted}</strong> — {post.title} {post.pinned ? "• PINNED" : ""}
                           {post.attachment_link ? (
                             <div style={{ marginTop: 6, color: "#666" }}>
                               {getFileTypeLabel(post.attachment_link)}
                             </div>
                           ) : null}
                           <div style={{ marginTop: 8 }}>
-                            <button
-                              onClick={() => editPost(post)}
-                              style={styles.smallBtn}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => deletePost(post.id)}
-                              style={styles.smallBtn}
-                            >
-                              Delete
-                            </button>
+                            <button onClick={() => editPost(post)} style={styles.smallBtn}>Edit</button>
+                            <button onClick={() => deletePost(post.id)} style={styles.smallBtn}>Delete</button>
                           </div>
                         </div>
                       ))}
