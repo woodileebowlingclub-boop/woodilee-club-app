@@ -1,153 +1,194 @@
-import React, { useEffect, useState } from "react";
+  const uploadFileToBucket = async (file, folder) => {
+    if (!file) return null;
 
-const mondayDates2026 = [
-  "2026-04-20","2026-04-27","2026-05-04","2026-05-11",
-  "2026-05-18","2026-05-25","2026-06-01","2026-06-08",
-];
+    const fileName = `${Date.now()}-${file.name.replace(/\s+/g, "-")}`;
+    const filePath = `${folder}/${fileName}`;
 
-export default function App() {
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(filePath, file);
 
-  const [points, setPoints] = useState(() => {
-    const saved = localStorage.getItem("points2026");
-    return saved ? JSON.parse(saved) : {};
-  });
+    if (uploadError) throw uploadError;
 
-  const [selectedDate, setSelectedDate] = useState(mondayDates2026[0]);
-  const [newPlayer, setNewPlayer] = useState("");
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
+    return data.publicUrl;
+  };
 
-  useEffect(() => {
-    localStorage.setItem("points2026", JSON.stringify(points));
-  }, [points]);
+  const savePost = async () => {
+    if (!postTitle || !postMessage || !postDate) {
+      return setMessage("Enter post title, message and date.");
+    }
 
-  // ✅ THIS IS THE FIX (ZERO EACH NEW WEEK)
-  useEffect(() => {
-    const updated = { ...points };
+    try {
+      const finalLink = postFile
+        ? await uploadFileToBucket(postFile, "information")
+        : postLink || null;
 
-    Object.keys(updated).forEach((player) => {
-      if (updated[player][selectedDate] === undefined) {
-        updated[player][selectedDate] = 0; // ALWAYS ZERO
+      const payload = {
+        title: postTitle,
+        message: postMessage,
+        date_posted: postDate,
+        attachment_link: finalLink,
+        button_text: postButtonText || null,
+        pinned: postPinned,
+      };
+
+      if (editingPostId) {
+        const { data, error } = await supabase
+          .from("information_posts")
+          .update(payload)
+          .eq("id", editingPostId)
+          .select()
+          .single();
+
+        if (error) return setMessage(error.message);
+        setPosts((prev) => prev.map((x) => (x.id === editingPostId ? data : x)));
+      } else {
+        const { data, error } = await supabase
+          .from("information_posts")
+          .insert([payload])
+          .select()
+          .single();
+
+        if (error) return setMessage(error.message);
+        setPosts((prev) => [...prev, data]);
       }
-    });
 
-    setPoints(updated);
-  }, [selectedDate]);
-
-  const addPlayer = () => {
-    if (!newPlayer) return;
-
-    setPoints({
-      ...points,
-      [newPlayer]: {
-        ...(points[newPlayer] || {}),
-        [selectedDate]: 0,
-      },
-    });
-
-    setNewPlayer("");
+      clearPostForm();
+    } catch (err) {
+      setMessage(err.message);
+    }
   };
 
-  const updateScore = (player, value) => {
-    setPoints({
-      ...points,
-      [player]: {
-        ...points[player],
-        [selectedDate]: Number(value),
-      },
-    });
+  const saveDocument = async () => {
+    if (!documentTitle) return setMessage("Enter document title.");
+
+    try {
+      const finalLink = documentFile
+        ? await uploadFileToBucket(documentFile, "documents")
+        : documentLink || null;
+
+      const payload = {
+        title: documentTitle,
+        description: documentDescription,
+        file_url: finalLink,
+        button_text: documentButtonText,
+        category: documentCategory,
+      };
+
+      if (editingDocumentId) {
+        const { data, error } = await supabase
+          .from("documents")
+          .update(payload)
+          .eq("id", editingDocumentId)
+          .select()
+          .single();
+
+        if (error) return setMessage(error.message);
+        setDocuments((prev) => prev.map((x) => (x.id === editingDocumentId ? data : x)));
+      } else {
+        const { data, error } = await supabase
+          .from("documents")
+          .insert([payload])
+          .select()
+          .single();
+
+        if (error) return setMessage(error.message);
+        setDocuments((prev) => [...prev, data]);
+      }
+
+      clearDocumentForm();
+    } catch (err) {
+      setMessage(err.message);
+    }
   };
 
-  const getTotal = (player) => {
-    return Object.values(points[player] || {}).reduce(
-      (sum, v) => sum + Number(v || 0),
-      0
+  if (!loggedIn) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.loginPanel}>
+          <img src={logo} style={styles.logo} />
+          <h1>Woodilee Bowling Club</h1>
+          <input
+            type="password"
+            placeholder="Enter PIN"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            style={styles.input}
+          />
+          <button onClick={handleLogin} style={styles.button}>
+            Enter
+          </button>
+          {message && <div>{message}</div>}
+        </div>
+      </div>
     );
-  };
-
-  const leaderboard = Object.keys(points)
-    .map((p) => ({
-      name: p,
-      total: getTotal(p),
-    }))
-    .sort((a, b) => b.total - a.total);
+  }
 
   return (
-    <div style={{ padding: 20, fontFamily: "Arial" }}>
+    <div style={styles.page}>
+      <div style={styles.wrap}>
+        <div style={styles.header}>
+          <div style={styles.headerRow}>
+            <img src={logo} style={styles.logo} />
+            <div>
+              <h1 style={styles.title}>Woodilee Bowling Club</h1>
+              <p style={styles.subtitle}>Club App</p>
+            </div>
+          </div>
+        </div>
 
-      <h2>Monday Night Points – 2026</h2>
+        <div style={styles.tabs}>
+          <button style={styles.tab(tab==="home")} onClick={()=>setTab("home")}>Home</button>
+          <button style={styles.tab(tab==="leaderboard")} onClick={()=>setTab("leaderboard")}>Monday Points</button>
+          <button style={styles.tab(tab==="members")} onClick={()=>setTab("members")}>Members</button>
+          <button style={styles.tab(tab==="admin")} onClick={()=>setTab("admin")}>Admin</button>
+        </div>
 
-      <select
-        value={selectedDate}
-        onChange={(e) => setSelectedDate(e.target.value)}
-      >
-        {mondayDates2026.map((d) => (
-          <option key={d}>{d}</option>
-        ))}
-      </select>
+        {tab === "leaderboard" && (
+          <MondayPointsLeaderboard members={members} />
+        )}
 
-      <h3>Add Player</h3>
+        {tab === "members" && (
+          <div style={styles.panel}>
+            <h3>Members</h3>
 
-      <input
-        value={newPlayer}
-        onChange={(e) => setNewPlayer(e.target.value)}
-        placeholder="Enter player name"
-      />
+            <h4>Gents</h4>
+            {members.filter(m=>m.section==="Gents").map(m=>(
+              <div key={m.id}>{m.name}</div>
+            ))}
 
-      <button onClick={addPlayer}>Add</button>
+            <h4>Ladies</h4>
+            {members.filter(m=>m.section==="Ladies").map(m=>(
+              <div key={m.id}>{m.name}</div>
+            ))}
+          </div>
+        )}
 
-      <h3>This Week</h3>
-
-      <table border="1" cellPadding="8">
-        <thead>
-          <tr>
-            <th>Player</th>
-            <th>Points</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {Object.keys(points).map((player) => (
-            <tr key={player}>
-              <td>{player}</td>
-
-              <td>
+        {tab === "admin" && (
+          <div style={styles.panel}>
+            {!adminUnlocked ? (
+              <>
+                <h3>Admin Login</h3>
                 <input
-                  type="number"
-                  value={points[player]?.[selectedDate] ?? 0}
-                  onChange={(e) =>
-                    updateScore(player, e.target.value)
-                  }
+                  type="password"
+                  value={adminPin}
+                  onChange={(e) => setAdminPin(e.target.value)}
+                  style={styles.input}
                 />
-              </td>
-
-              <td>{getTotal(player)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <h2>Monday Points Leaderboard</h2>
-
-      <table border="1" cellPadding="8">
-        <thead>
-          <tr>
-            <th>Rank</th>
-            <th>Name</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {leaderboard.map((p, i) => (
-            <tr key={p.name}>
-              <td>{i + 1}</td>
-              <td>{p.name}</td>
-              <td>{p.total}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
+                <button onClick={handleAdminLogin} style={styles.button}>
+                  Enter
+                </button>
+              </>
+            ) : (
+              <>
+                <h3>Monday Points Admin</h3>
+                <MondayPointsAdmin members={members} />
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
