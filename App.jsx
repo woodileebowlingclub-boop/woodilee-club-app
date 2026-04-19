@@ -138,6 +138,26 @@ const styles = {
     color: "#5b1d2a",
     fontWeight: 700,
   },
+  reorderBtn: {
+    padding: "8px 10px",
+    background: "#dbeafe",
+    border: "1px solid #93c5fd",
+    borderRadius: 10,
+    cursor: "pointer",
+    marginLeft: 8,
+    color: "#1d4ed8",
+    fontWeight: 700,
+  },
+  disabledReorderBtn: {
+    padding: "8px 10px",
+    background: "#e5e7eb",
+    border: "1px solid #d1d5db",
+    borderRadius: 10,
+    cursor: "not-allowed",
+    marginLeft: 8,
+    color: "#9ca3af",
+    fontWeight: 700,
+  },
   card: {
     border: "1px solid #ead7dc",
     borderRadius: 14,
@@ -526,6 +546,7 @@ export default function App() {
       .from("office_bearers")
       .select("*")
       .order("position", { ascending: true });
+
     if (error) return setMessage(`Could not load office bearers: ${error.message}`);
     setOfficeBearers(data || []);
   };
@@ -535,6 +556,7 @@ export default function App() {
       .from("club_coaches")
       .select("*")
       .order("position", { ascending: true });
+
     if (error) return setMessage(`Could not load club coaches: ${error.message}`);
     setClubCoaches(data || []);
   };
@@ -547,7 +569,7 @@ export default function App() {
 
   const loadDocuments = async () => {
     const { data, error } = await supabase.from("documents").select("*");
-    if (error) return setMessage(`Could not load documents: ${error.message}`);
+    if (error) return setMessage(`Could not load games info: ${error.message}`);
     setDocuments(data || []);
   };
 
@@ -660,6 +682,7 @@ export default function App() {
 
   const deleteEntry = async (id) => {
     if (!window.confirm("Delete this event?")) return;
+
     const { error } = await supabase.from("events").delete().eq("id", id);
     if (error) return setMessage(`Could not delete event: ${error.message}`);
     setEntries((prev) => prev.filter((x) => x.id !== id));
@@ -712,6 +735,7 @@ export default function App() {
 
   const deleteMember = async (id) => {
     if (!window.confirm("Delete this member?")) return;
+
     const { error } = await supabase.from("members").delete().eq("id", id);
     if (error) return setMessage(`Could not delete member: ${error.message}`);
     setMembers((prev) => prev.filter((x) => x.id !== id));
@@ -766,6 +790,7 @@ export default function App() {
 
   const deleteOfficeBearer = async (id) => {
     if (!window.confirm("Delete this office bearer?")) return;
+
     const { error } = await supabase.from("office_bearers").delete().eq("id", id);
     if (error) return setMessage(`Could not delete office bearer: ${error.message}`);
     setOfficeBearers((prev) => prev.filter((x) => x.id !== id));
@@ -818,6 +843,7 @@ export default function App() {
 
   const deleteCoach = async (id) => {
     if (!window.confirm("Delete this club coach?")) return;
+
     const { error } = await supabase.from("club_coaches").delete().eq("id", id);
     if (error) return setMessage(`Could not delete club coach: ${error.message}`);
     setClubCoaches((prev) => prev.filter((x) => x.id !== id));
@@ -826,6 +852,7 @@ export default function App() {
 
   const uploadFileToBucket = async (file, folder) => {
     if (!file) return null;
+
     const fileName = `${Date.now()}-${file.name.replace(/\s+/g, "-")}`;
     const filePath = `${folder}/${fileName}`;
 
@@ -845,7 +872,9 @@ export default function App() {
     }
 
     try {
-      const finalLink = postFile ? await uploadFileToBucket(postFile, "information") : postLink || null;
+      const finalLink = postFile
+        ? await uploadFileToBucket(postFile, "information")
+        : postLink || null;
 
       const payload = {
         title: postTitle,
@@ -899,6 +928,7 @@ export default function App() {
 
   const deletePost = async (id) => {
     if (!window.confirm("Delete this information post?")) return;
+
     const { error } = await supabase.from("information_posts").delete().eq("id", id);
     if (error) return setMessage(`Could not delete information post: ${error.message}`);
     setPosts((prev) => prev.filter((x) => x.id !== id));
@@ -906,10 +936,12 @@ export default function App() {
   };
 
   const saveDocument = async () => {
-    if (!documentTitle) return setMessage("Enter a document title.");
+    if (!documentTitle) return setMessage("Enter a games info title.");
 
     try {
-      const finalLink = documentFile ? await uploadFileToBucket(documentFile, "documents") : documentLink || null;
+      const finalLink = documentFile
+        ? await uploadFileToBucket(documentFile, "documents")
+        : documentLink || null;
 
       const payload = {
         title: documentTitle,
@@ -927,7 +959,7 @@ export default function App() {
           .select()
           .single();
 
-        if (error) return setMessage(`Could not update document: ${error.message}`);
+        if (error) return setMessage(`Could not update games info: ${error.message}`);
         setDocuments((prev) => prev.map((x) => (x.id === editingDocumentId ? data : x)));
       } else {
         const { data, error } = await supabase
@@ -936,14 +968,14 @@ export default function App() {
           .select()
           .single();
 
-        if (error) return setMessage(`Could not save document: ${error.message}`);
+        if (error) return setMessage(`Could not save games info: ${error.message}`);
         setDocuments((prev) => [...prev, data]);
       }
 
-      setMessage("Document saved.");
+      setMessage("Games info saved.");
       clearDocumentForm();
     } catch (err) {
-      setMessage(`Could not upload document: ${err.message}`);
+      setMessage(`Could not upload games info: ${err.message}`);
     }
   };
 
@@ -956,15 +988,57 @@ export default function App() {
     setDocumentLink(doc.file_url || "");
     setDocumentFile(null);
     setTab("admin");
-    setAdminTab("documents");
+    setAdminTab("gamesinfo");
   };
 
   const deleteDocument = async (id) => {
-    if (!window.confirm("Delete this document?")) return;
+    if (!window.confirm("Delete this games info item?")) return;
+
     const { error } = await supabase.from("documents").delete().eq("id", id);
-    if (error) return setMessage(`Could not delete document: ${error.message}`);
+    if (error) return setMessage(`Could not delete games info: ${error.message}`);
     setDocuments((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Document deleted.");
+    setMessage("Games info deleted.");
+  };
+
+  const moveItem = async (table, items, onItemsUpdated, id, direction, label) => {
+    const currentList = sortByPositionThenName(items);
+    const currentIndex = currentList.findIndex((item) => item.id === id);
+    if (currentIndex === -1) return;
+
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= currentList.length) return;
+
+    const currentItem = currentList[currentIndex];
+    const targetItem = currentList[targetIndex];
+
+    const currentPos = Number.isFinite(Number(currentItem.position))
+      ? Number(currentItem.position)
+      : currentIndex + 1;
+
+    const targetPos = Number.isFinite(Number(targetItem.position))
+      ? Number(targetItem.position)
+      : targetIndex + 1;
+
+    const { error: error1 } = await supabase
+      .from(table)
+      .update({ position: targetPos })
+      .eq("id", currentItem.id);
+    if (error1) return setMessage(`Could not move ${label}: ${error1.message}`);
+
+    const { error: error2 } = await supabase
+      .from(table)
+      .update({ position: currentPos })
+      .eq("id", targetItem.id);
+    if (error2) return setMessage(`Could not move ${label}: ${error2.message}`);
+
+    const updatedList = items.map((item) => {
+      if (item.id === currentItem.id) return { ...item, position: targetPos };
+      if (item.id === targetItem.id) return { ...item, position: currentPos };
+      return item;
+    });
+
+    onItemsUpdated(updatedList);
+    setMessage(`${label} order updated.`);
   };
 
   const renderMemberCards = (list) => {
@@ -1040,7 +1114,11 @@ export default function App() {
             style={styles.input}
           />
           <button onClick={handleLogin} style={styles.button}>Enter</button>
-          {message ? <div style={{ marginTop: 8, color: "#8b1e3f", fontWeight: 700 }}>{message}</div> : null}
+          {message ? (
+            <div style={{ marginTop: 8, color: "#8b1e3f", fontWeight: 700 }}>
+              {message}
+            </div>
+          ) : null}
         </div>
       </div>
     );
@@ -1065,7 +1143,7 @@ export default function App() {
           <button style={styles.tab(tab === "home")} onClick={() => setTab("home")}>Home</button>
           <button style={styles.tab(tab === "events")} onClick={() => setTab("events")}>Events</button>
           <button style={styles.tab(tab === "members")} onClick={() => setTab("members")}>Members</button>
-          <button style={styles.tab(tab === "documents")} onClick={() => setTab("documents")}>Documents</button>
+          <button style={styles.tab(tab === "gamesinfo")} onClick={() => setTab("gamesinfo")}>Games Info</button>
           <button style={styles.tab(tab === "information")} onClick={() => setTab("information")}>Information</button>
           <button style={styles.tab(tab === "office")} onClick={() => setTab("office")}>Office Bearers / Coaches</button>
           <button style={styles.tab(tab === "admin")} onClick={() => setTab("admin")}>Admin</button>
@@ -1075,15 +1153,27 @@ export default function App() {
           <>
             <div style={styles.heroCard}>
               <div style={styles.homeLabel}>Next Club Event</div>
+
               {nextEvent ? (
                 <>
                   <div style={styles.heroTitle}>{nextEvent.title}</div>
                   <div style={styles.heroDate}>{formatDiaryDate(nextEvent.date_text)}</div>
-                  {nextEvent.note ? <div style={{ color: "#444", whiteSpace: "pre-wrap", marginBottom: 12 }}>{nextEvent.note}</div> : null}
+                  {nextEvent.note ? (
+                    <div style={{ color: "#444", whiteSpace: "pre-wrap", marginBottom: 12 }}>
+                      {nextEvent.note}
+                    </div>
+                  ) : null}
+
                   <div>
-                    <button style={styles.homeActionBtn} onClick={() => setTab("events")}>View All Events</button>
-                    <button style={styles.homeActionBtn} onClick={() => setTab("information")}>Club Notices</button>
-                    <button style={styles.homeActionBtn} onClick={() => setTab("documents")}>Club Documents</button>
+                    <button style={styles.homeActionBtn} onClick={() => setTab("events")}>
+                      View All Events
+                    </button>
+                    <button style={styles.homeActionBtn} onClick={() => setTab("information")}>
+                      Club Notices
+                    </button>
+                    <button style={styles.homeActionBtn} onClick={() => setTab("gamesinfo")}>
+                      Games Info
+                    </button>
                   </div>
                 </>
               ) : (
@@ -1097,16 +1187,30 @@ export default function App() {
             <div style={styles.homeGrid}>
               <div style={styles.homeMiniCard}>
                 <div style={styles.homeLabel}>Pinned Notice</div>
+
                 {latestPinnedPost ? (
                   <>
-                    <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>{latestPinnedPost.title}</div>
-                    <div style={{ color: "#555", whiteSpace: "pre-wrap", marginBottom: 10 }}>{latestPinnedPost.message}</div>
+                    <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
+                      {latestPinnedPost.title}
+                    </div>
+                    <div style={{ color: "#555", whiteSpace: "pre-wrap", marginBottom: 10 }}>
+                      {latestPinnedPost.message}
+                    </div>
                     {latestPinnedPost.attachment_link ? (
                       <>
                         {isImageFile(latestPinnedPost.attachment_link) ? (
-                          <img src={latestPinnedPost.attachment_link} alt={latestPinnedPost.title} style={styles.imagePreview} />
+                          <img
+                            src={latestPinnedPost.attachment_link}
+                            alt={latestPinnedPost.title}
+                            style={styles.imagePreview}
+                          />
                         ) : null}
-                        <a href={latestPinnedPost.attachment_link} target="_blank" rel="noreferrer" style={styles.linkBtn}>
+                        <a
+                          href={latestPinnedPost.attachment_link}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={styles.linkBtn}
+                        >
                           {latestPinnedPost.button_text || "Open Notice"}
                         </a>
                       </>
@@ -1119,6 +1223,7 @@ export default function App() {
 
               <div style={styles.homeMiniCard}>
                 <div style={styles.homeLabel}>Coming Up</div>
+
                 {nextTwoEvents.length > 0 ? (
                   nextTwoEvents.map((e) => (
                     <div key={e.id} style={{ marginBottom: 12 }}>
@@ -1136,7 +1241,7 @@ export default function App() {
               <h3 style={styles.sectionTitle}>Quick Links</h3>
               <button style={styles.homeActionBtn} onClick={() => setTab("events")}>Events</button>
               <button style={styles.homeActionBtn} onClick={() => setTab("members")}>Members</button>
-              <button style={styles.homeActionBtn} onClick={() => setTab("documents")}>Documents</button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("gamesinfo")}>Games Info</button>
               <button style={styles.homeActionBtn} onClick={() => setTab("information")}>Information</button>
               <button style={styles.homeActionBtn} onClick={() => setTab("office")}>Office Bearers / Coaches</button>
             </div>
@@ -1181,6 +1286,7 @@ export default function App() {
         {tab === "events" && (
           <div style={styles.panel}>
             <h3 style={styles.sectionTitle}>Events</h3>
+
             <input
               type="text"
               placeholder="Search events..."
@@ -1188,13 +1294,18 @@ export default function App() {
               onChange={(e) => setEventSearch(e.target.value)}
               style={styles.input}
             />
+
             {filteredEvents.length === 0 ? (
               <div style={{ color: "#777" }}>No matching events found.</div>
             ) : (
               filteredEvents.map((e) => (
                 <div key={e.id} style={styles.card}>
                   <strong style={{ color: "#92400e" }}>{formatDiaryDate(e.date_text)}</strong> — {e.title}
-                  {e.note ? <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>{e.note}</div> : null}
+                  {e.note ? (
+                    <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>
+                      {e.note}
+                    </div>
+                  ) : null}
                 </div>
               ))
             )}
@@ -1210,36 +1321,46 @@ export default function App() {
               onChange={(e) => setSearch(e.target.value)}
               style={styles.input}
             />
+
             <h4 style={styles.memberSectionTitle}>Gents</h4>
             {renderMemberCards(gentsMembers)}
+
             <h4 style={styles.memberSectionTitle}>Ladies</h4>
             {renderMemberCards(ladiesMembers)}
+
             <h4 style={styles.memberSectionTitle}>Associate</h4>
             {renderMemberCards(associateMembers)}
           </div>
         )}
 
-        {tab === "documents" && (
+        {tab === "gamesinfo" && (
           <div style={styles.panel}>
-            <h3 style={styles.sectionTitle}>Documents</h3>
+            <h3 style={styles.sectionTitle}>Games Info</h3>
+
             <input
               type="text"
-              placeholder="Search documents..."
+              placeholder="Search games info..."
               value={documentSearch}
               onChange={(e) => setDocumentSearch(e.target.value)}
               style={styles.input}
             />
+
             {filteredDocuments.length === 0 ? (
-              <div style={{ color: "#777" }}>No matching documents found.</div>
+              <div style={{ color: "#777" }}>No matching games info found.</div>
             ) : (
               filteredDocuments.map((doc) => (
                 <div key={doc.id} style={styles.card}>
                   <div style={styles.badge}>{doc.category || "General"}</div>
                   <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>{doc.title}</div>
-                  {doc.description ? <div style={{ marginTop: 8, whiteSpace: "pre-wrap", color: "#555" }}>{doc.description}</div> : null}
+                  {doc.description ? (
+                    <div style={{ marginTop: 8, whiteSpace: "pre-wrap", color: "#555" }}>
+                      {doc.description}
+                    </div>
+                  ) : null}
                   {doc.file_url ? (
                     <div style={{ marginTop: 10 }}>
                       <div style={styles.fileInfo}>{getFileTypeLabel(doc.file_url)}</div>
+
                       {isImageFile(doc.file_url) ? (
                         <>
                           <img src={doc.file_url} alt={doc.title} style={styles.imagePreview} />
@@ -1249,7 +1370,7 @@ export default function App() {
                         </>
                       ) : (
                         <a href={doc.file_url} target="_blank" rel="noreferrer" style={styles.linkBtn}>
-                          {doc.button_text || "Open Document"}
+                          {doc.button_text || "Open File"}
                         </a>
                       )}
                     </div>
@@ -1263,6 +1384,7 @@ export default function App() {
         {tab === "information" && (
           <div style={styles.panel}>
             <h3 style={styles.sectionTitle}>General Information</h3>
+
             <input
               type="text"
               placeholder="Search information..."
@@ -1270,6 +1392,7 @@ export default function App() {
               onChange={(e) => setInfoSearch(e.target.value)}
               style={styles.input}
             />
+
             {filteredPosts.length === 0 ? (
               <div style={{ color: "#777" }}>No matching information found.</div>
             ) : (
@@ -1279,9 +1402,11 @@ export default function App() {
                   <div style={{ color: "#92400e", fontWeight: 700 }}>{post.date_posted}</div>
                   <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>{post.title}</div>
                   <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{post.message}</div>
+
                   {post.attachment_link ? (
                     <div style={{ marginTop: 10 }}>
                       <div style={styles.fileInfo}>{getFileTypeLabel(post.attachment_link)}</div>
+
                       {isImageFile(post.attachment_link) ? (
                         <>
                           <img src={post.attachment_link} alt={post.title} style={styles.imagePreview} />
@@ -1318,26 +1443,60 @@ export default function App() {
             ) : (
               <>
                 <div style={styles.tabs}>
-                  <button onClick={() => setAdminTab("events")} style={styles.tab(adminTab === "events")}>Events</button>
-                  <button onClick={() => setAdminTab("officers")} style={styles.tab(adminTab === "officers")}>Office Bearers</button>
-                  <button onClick={() => setAdminTab("coaches")} style={styles.tab(adminTab === "coaches")}>Coaches</button>
-                  <button onClick={() => setAdminTab("members")} style={styles.tab(adminTab === "members")}>Members</button>
-                  <button onClick={() => setAdminTab("documents")} style={styles.tab(adminTab === "documents")}>Documents</button>
-                  <button onClick={() => setAdminTab("info")} style={styles.tab(adminTab === "info")}>Information</button>
+                  <button onClick={() => setAdminTab("events")} style={styles.tab(adminTab === "events")}>
+                    Events
+                  </button>
+                  <button onClick={() => setAdminTab("officers")} style={styles.tab(adminTab === "officers")}>
+                    Office Bearers
+                  </button>
+                  <button onClick={() => setAdminTab("coaches")} style={styles.tab(adminTab === "coaches")}>
+                    Coaches
+                  </button>
+                  <button onClick={() => setAdminTab("members")} style={styles.tab(adminTab === "members")}>
+                    Members
+                  </button>
+                  <button onClick={() => setAdminTab("gamesinfo")} style={styles.tab(adminTab === "gamesinfo")}>
+                    Games Info
+                  </button>
+                  <button onClick={() => setAdminTab("info")} style={styles.tab(adminTab === "info")}>
+                    Information
+                  </button>
                 </div>
 
                 {adminTab === "events" && (
                   <>
                     <div style={styles.panel}>
                       <h3 style={styles.sectionTitle}>{editingEntryId ? "Edit Event" : "Add Event"}</h3>
-                      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" style={styles.input} />
-                      <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={styles.input} />
-                      <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional note" style={styles.textarea} />
+
+                      <input
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder="Event title"
+                        style={styles.input}
+                      />
+
+                      <input
+                        type="date"
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                        style={styles.input}
+                      />
+
+                      <textarea
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="Optional note"
+                        style={styles.textarea}
+                      />
+
                       <button onClick={saveEntry} style={styles.button}>
                         {editingEntryId ? "Update Event" : "Save Event"}
                       </button>
+
                       {(editingEntryId || title || date || note) && (
-                        <button onClick={clearEntryForm} style={styles.secondaryButton}>Clear</button>
+                        <button onClick={clearEntryForm} style={styles.secondaryButton}>
+                          Clear
+                        </button>
                       )}
                     </div>
 
@@ -1346,7 +1505,11 @@ export default function App() {
                       {sortedEntries.map((e) => (
                         <div key={e.id} style={styles.card}>
                           <strong>{formatDiaryDate(e.date_text)}</strong> — {e.title}
-                          {e.note ? <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>{e.note}</div> : null}
+                          {e.note ? (
+                            <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>
+                              {e.note}
+                            </div>
+                          ) : null}
                           <div style={{ marginTop: 8 }}>
                             <button onClick={() => editEntry(e)} style={styles.smallBtn}>Edit</button>
                             <button onClick={() => deleteEntry(e.id)} style={styles.smallBtn}>Delete</button>
@@ -1360,11 +1523,19 @@ export default function App() {
                 {adminTab === "officers" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>{editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}</h3>
+                      <h3 style={styles.sectionTitle}>
+                        {editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}
+                      </h3>
                       <input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Role" style={styles.input} />
                       <input value={newOfficerName} onChange={(e) => setNewOfficerName(e.target.value)} placeholder="Name" style={styles.input} />
                       <input value={newOfficerPhone} onChange={(e) => setNewOfficerPhone(e.target.value)} placeholder="Phone" style={styles.input} />
-                      <input type="number" value={newOfficerPosition} onChange={(e) => setNewOfficerPosition(e.target.value)} placeholder="Position order" style={styles.input} />
+                      <input
+                        type="number"
+                        value={newOfficerPosition}
+                        onChange={(e) => setNewOfficerPosition(e.target.value)}
+                        placeholder="Position order"
+                        style={styles.input}
+                      />
                       <button onClick={saveOfficeBearer} style={styles.button}>
                         {editingOfficerId ? "Update Office Bearer" : "Save Office Bearer"}
                       </button>
@@ -1375,15 +1546,54 @@ export default function App() {
 
                     <div style={styles.panel}>
                       <h3 style={styles.sectionTitle}>Manage Office Bearers</h3>
-                      {sortedOfficeBearers.map((person) => (
-                        <div key={person.id} style={styles.card}>
-                          <strong>{person.role}</strong> — {person.name}
-                          <div style={{ marginTop: 8 }}>
-                            <button onClick={() => editOfficeBearer(person)} style={styles.smallBtn}>Edit</button>
-                            <button onClick={() => deleteOfficeBearer(person.id)} style={styles.smallBtn}>Delete</button>
+                      {sortedOfficeBearers.map((person, index) => {
+                        const canMoveUp = index > 0;
+                        const canMoveDown = index < sortedOfficeBearers.length - 1;
+
+                        return (
+                          <div key={person.id} style={styles.card}>
+                            <strong>{person.role}</strong> — {person.name}
+                            <div style={{ marginTop: 8 }}>
+                              <button onClick={() => editOfficeBearer(person)} style={styles.smallBtn}>Edit</button>
+                              <button onClick={() => deleteOfficeBearer(person.id)} style={styles.smallBtn}>Delete</button>
+                              <button
+                                onClick={() =>
+                                  canMoveUp &&
+                                  moveItem(
+                                    "office_bearers",
+                                    officeBearers,
+                                    (updated) => setOfficeBearers(updated),
+                                    person.id,
+                                    "up",
+                                    "Office bearer"
+                                  )
+                                }
+                                style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
+                                type="button"
+                              >
+                                ↑ Up
+                              </button>
+                              <button
+                                onClick={() =>
+                                  canMoveDown &&
+                                  moveItem(
+                                    "office_bearers",
+                                    officeBearers,
+                                    (updated) => setOfficeBearers(updated),
+                                    person.id,
+                                    "down",
+                                    "Office bearer"
+                                  )
+                                }
+                                style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
+                                type="button"
+                              >
+                                ↓ Down
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </>
                 )}
@@ -1394,7 +1604,13 @@ export default function App() {
                       <h3 style={styles.sectionTitle}>{editingCoachId ? "Edit Club Coach" : "Add Club Coach"}</h3>
                       <input value={newCoachName} onChange={(e) => setNewCoachName(e.target.value)} placeholder="Name" style={styles.input} />
                       <input value={newCoachPhone} onChange={(e) => setNewCoachPhone(e.target.value)} placeholder="Phone" style={styles.input} />
-                      <input type="number" value={newCoachPosition} onChange={(e) => setNewCoachPosition(e.target.value)} placeholder="Position order" style={styles.input} />
+                      <input
+                        type="number"
+                        value={newCoachPosition}
+                        onChange={(e) => setNewCoachPosition(e.target.value)}
+                        placeholder="Position order"
+                        style={styles.input}
+                      />
                       <button onClick={saveCoach} style={styles.button}>
                         {editingCoachId ? "Update Club Coach" : "Save Club Coach"}
                       </button>
@@ -1405,15 +1621,54 @@ export default function App() {
 
                     <div style={styles.panel}>
                       <h3 style={styles.sectionTitle}>Manage Club Coaches</h3>
-                      {sortedClubCoaches.map((coach) => (
-                        <div key={coach.id} style={styles.card}>
-                          <strong>{coach.name}</strong> — {coach.phone || "no phone"}
-                          <div style={{ marginTop: 8 }}>
-                            <button onClick={() => editCoach(coach)} style={styles.smallBtn}>Edit</button>
-                            <button onClick={() => deleteCoach(coach.id)} style={styles.smallBtn}>Delete</button>
+                      {sortedClubCoaches.map((coach, index) => {
+                        const canMoveUp = index > 0;
+                        const canMoveDown = index < sortedClubCoaches.length - 1;
+
+                        return (
+                          <div key={coach.id} style={styles.card}>
+                            <strong>{coach.name}</strong> — {coach.phone || "no phone"}
+                            <div style={{ marginTop: 8 }}>
+                              <button onClick={() => editCoach(coach)} style={styles.smallBtn}>Edit</button>
+                              <button onClick={() => deleteCoach(coach.id)} style={styles.smallBtn}>Delete</button>
+                              <button
+                                onClick={() =>
+                                  canMoveUp &&
+                                  moveItem(
+                                    "club_coaches",
+                                    clubCoaches,
+                                    (updated) => setClubCoaches(updated),
+                                    coach.id,
+                                    "up",
+                                    "Club coach"
+                                  )
+                                }
+                                style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
+                                type="button"
+                              >
+                                ↑ Up
+                              </button>
+                              <button
+                                onClick={() =>
+                                  canMoveDown &&
+                                  moveItem(
+                                    "club_coaches",
+                                    clubCoaches,
+                                    (updated) => setClubCoaches(updated),
+                                    coach.id,
+                                    "down",
+                                    "Club coach"
+                                  )
+                                }
+                                style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
+                                type="button"
+                              >
+                                ↓ Down
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </>
                 )}
@@ -1455,22 +1710,52 @@ export default function App() {
                   </>
                 )}
 
-                {adminTab === "documents" && (
+                {adminTab === "gamesinfo" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>{editingDocumentId ? "Edit Document" : "Add Document"}</h3>
-                      <input value={documentTitle} onChange={(e) => setDocumentTitle(e.target.value)} placeholder="Document title" style={styles.input} />
-                      <textarea value={documentDescription} onChange={(e) => setDocumentDescription(e.target.value)} placeholder="Description" style={styles.textarea} />
-                      <select value={documentCategory} onChange={(e) => setDocumentCategory(e.target.value)} style={styles.input}>
+                      <h3 style={styles.sectionTitle}>{editingDocumentId ? "Edit Games Info" : "Add Games Info"}</h3>
+
+                      <input
+                        value={documentTitle}
+                        onChange={(e) => setDocumentTitle(e.target.value)}
+                        placeholder="Games info title"
+                        style={styles.input}
+                      />
+
+                      <textarea
+                        value={documentDescription}
+                        onChange={(e) => setDocumentDescription(e.target.value)}
+                        placeholder="Description"
+                        style={styles.textarea}
+                      />
+
+                      <select
+                        value={documentCategory}
+                        onChange={(e) => setDocumentCategory(e.target.value)}
+                        style={styles.input}
+                      >
                         <option>General</option>
-                        <option>Forms</option>
-                        <option>Guides</option>
+                        <option>Fixtures</option>
                         <option>Competitions</option>
-                        <option>Minutes</option>
                         <option>Results</option>
+                        <option>Rules</option>
+                        <option>Forms</option>
                       </select>
-                      <input value={documentLink} onChange={(e) => setDocumentLink(e.target.value)} placeholder="Attachment link (optional if uploading file)" style={styles.input} />
-                      <input value={documentButtonText} onChange={(e) => setDocumentButtonText(e.target.value)} placeholder="Button text" style={styles.input} />
+
+                      <input
+                        value={documentLink}
+                        onChange={(e) => setDocumentLink(e.target.value)}
+                        placeholder="Attachment link (optional if uploading file)"
+                        style={styles.input}
+                      />
+
+                      <input
+                        value={documentButtonText}
+                        onChange={(e) => setDocumentButtonText(e.target.value)}
+                        placeholder="Button text"
+                        style={styles.input}
+                      />
+
                       <div style={{ marginBottom: 10 }}>
                         <input
                           type="file"
@@ -1479,25 +1764,42 @@ export default function App() {
                         />
                         {documentFile ? <div style={styles.fileInfo}>Selected file: {documentFile.name}</div> : null}
                       </div>
+
                       <button onClick={saveDocument} style={styles.button}>
-                        {editingDocumentId ? "Update Document" : "Save Document"}
+                        {editingDocumentId ? "Update Games Info" : "Save Games Info"}
                       </button>
-                      {(editingDocumentId || documentTitle || documentDescription || documentCategory || documentLink || documentButtonText || documentFile) && (
+
+                      {(editingDocumentId ||
+                        documentTitle ||
+                        documentDescription ||
+                        documentCategory ||
+                        documentLink ||
+                        documentButtonText ||
+                        documentFile) && (
                         <button onClick={clearDocumentForm} style={styles.secondaryButton}>Clear</button>
                       )}
                     </div>
 
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>Manage Documents</h3>
-                      {sortedDocuments.map((doc) => (
-                        <div key={doc.id} style={styles.card}>
-                          <strong>{doc.title}</strong> — {doc.category || "General"}
-                          <div style={{ marginTop: 8 }}>
-                            <button onClick={() => editDocument(doc)} style={styles.smallBtn}>Edit</button>
-                            <button onClick={() => deleteDocument(doc.id)} style={styles.smallBtn}>Delete</button>
+                      <h3 style={styles.sectionTitle}>Manage Games Info</h3>
+                      {sortedDocuments.length === 0 ? (
+                        <div style={{ color: "#777" }}>No games info yet.</div>
+                      ) : (
+                        sortedDocuments.map((doc) => (
+                          <div key={doc.id} style={styles.card}>
+                            <strong>{doc.title}</strong> — {doc.category || "General"}
+                            {doc.file_url ? (
+                              <div style={{ marginTop: 6, color: "#666" }}>
+                                {getFileTypeLabel(doc.file_url)}
+                              </div>
+                            ) : null}
+                            <div style={{ marginTop: 8 }}>
+                              <button onClick={() => editDocument(doc)} style={styles.smallBtn}>Edit</button>
+                              <button onClick={() => deleteDocument(doc.id)} style={styles.smallBtn}>Delete</button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
                   </>
                 )}
@@ -1505,12 +1807,15 @@ export default function App() {
                 {adminTab === "info" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>{editingPostId ? "Edit Information Post" : "Add Information Post"}</h3>
+                      <h3 style={styles.sectionTitle}>
+                        {editingPostId ? "Edit Information Post" : "Add Information Post"}
+                      </h3>
                       <input value={postTitle} onChange={(e) => setPostTitle(e.target.value)} placeholder="Title" style={styles.input} />
                       <textarea value={postMessage} onChange={(e) => setPostMessage(e.target.value)} placeholder="Message" style={styles.textarea} />
                       <input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} style={styles.input} />
                       <input value={postLink} onChange={(e) => setPostLink(e.target.value)} placeholder="Attachment link (optional if uploading file)" style={styles.input} />
                       <input value={postButtonText} onChange={(e) => setPostButtonText(e.target.value)} placeholder="Button text" style={styles.input} />
+
                       <div style={{ marginBottom: 10 }}>
                         <input
                           type="file"
@@ -1519,6 +1824,7 @@ export default function App() {
                         />
                         {postFile ? <div style={styles.fileInfo}>Selected file: {postFile.name}</div> : null}
                       </div>
+
                       <label style={{ display: "block", marginBottom: 10 }}>
                         <input
                           type="checkbox"
@@ -1528,10 +1834,19 @@ export default function App() {
                         />
                         Pin this post to the top
                       </label>
+
                       <button onClick={savePost} style={styles.button}>
                         {editingPostId ? "Update Information Post" : "Save Information Post"}
                       </button>
-                      {(editingPostId || postTitle || postMessage || postDate || postLink || postButtonText || postPinned || postFile) && (
+
+                      {(editingPostId ||
+                        postTitle ||
+                        postMessage ||
+                        postDate ||
+                        postLink ||
+                        postButtonText ||
+                        postPinned ||
+                        postFile) && (
                         <button onClick={clearPostForm} style={styles.secondaryButton}>Clear</button>
                       )}
                     </div>
@@ -1541,6 +1856,11 @@ export default function App() {
                       {sortedPosts.map((post) => (
                         <div key={post.id} style={styles.card}>
                           <strong>{post.date_posted}</strong> — {post.title} {post.pinned ? "• PINNED" : ""}
+                          {post.attachment_link ? (
+                            <div style={{ marginTop: 6, color: "#666" }}>
+                              {getFileTypeLabel(post.attachment_link)}
+                            </div>
+                          ) : null}
                           <div style={{ marginTop: 8 }}>
                             <button onClick={() => editPost(post)} style={styles.smallBtn}>Edit</button>
                             <button onClick={() => deletePost(post.id)} style={styles.smallBtn}>Delete</button>
