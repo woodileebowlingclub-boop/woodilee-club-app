@@ -1,95 +1,73 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
 const mondayDates2026 = [
   "2026-04-20","2026-04-27","2026-05-04","2026-05-11",
   "2026-05-18","2026-05-25","2026-06-01","2026-06-08",
-  "2026-06-15","2026-06-22","2026-06-29"
 ];
 
 export default function App() {
 
-  const [members, setMembers] = useState([
-    { name: "Alan Kuhlwilm", section: "Gents" },
-    { name: "William McIntyre", section: "Gents" },
-    { name: "Willie Brown", section: "Gents" },
-    { name: "Alan Gill", section: "Gents" },
-    { name: "Frank Devlin", section: "Gents" }
-  ]);
-
   const [points, setPoints] = useState(() => {
-    const saved = localStorage.getItem("points");
+    const saved = localStorage.getItem("points2026");
     return saved ? JSON.parse(saved) : {};
   });
 
   const [selectedDate, setSelectedDate] = useState(mondayDates2026[0]);
-  const [search, setSearch] = useState("");
+  const [newPlayer, setNewPlayer] = useState("");
 
   useEffect(() => {
-    localStorage.setItem("points", JSON.stringify(points));
+    localStorage.setItem("points2026", JSON.stringify(points));
   }, [points]);
 
-  // ✅ AUTO CREATE NEW WEEK (ALL PLAYERS ZERO)
+  // ✅ THIS IS THE FIX (ZERO EACH NEW WEEK)
   useEffect(() => {
-    const prevIndex = mondayDates2026.indexOf(selectedDate) - 1;
-    const prevDate = mondayDates2026[prevIndex];
+    const updated = { ...points };
 
-    let updated = { ...points };
-
-    Object.keys(points).forEach(player => {
-      if (!updated[player]) updated[player] = {};
-
-      // if not exists → set ZERO (NOT previous score)
+    Object.keys(updated).forEach((player) => {
       if (updated[player][selectedDate] === undefined) {
-        updated[player][selectedDate] = 0;
+        updated[player][selectedDate] = 0; // ALWAYS ZERO
       }
     });
 
     setPoints(updated);
-
   }, [selectedDate]);
 
-  // ➕ ADD PLAYER
-  const addPlayer = (name) => {
-    if (!points[name]) {
-      setPoints({
-        ...points,
-        [name]: { [selectedDate]: 0 }
-      });
-    } else {
-      setPoints({
-        ...points,
-        [name]: {
-          ...points[name],
-          [selectedDate]: 0
-        }
-      });
-    }
-  };
+  const addPlayer = () => {
+    if (!newPlayer) return;
 
-  // ✏ UPDATE SCORE
-  const updateScore = (name, value) => {
     setPoints({
       ...points,
-      [name]: {
-        ...points[name],
-        [selectedDate]: Number(value)
-      }
+      [newPlayer]: {
+        ...(points[newPlayer] || {}),
+        [selectedDate]: 0,
+      },
+    });
+
+    setNewPlayer("");
+  };
+
+  const updateScore = (player, value) => {
+    setPoints({
+      ...points,
+      [player]: {
+        ...points[player],
+        [selectedDate]: Number(value),
+      },
     });
   };
 
-  // 📊 TOTAL = SUM OF ALL WEEKS
-  const getTotal = (name) => {
-    return Object.values(points[name] || {}).reduce(
-      (a, b) => a + Number(b || 0), 0
+  const getTotal = (player) => {
+    return Object.values(points[player] || {}).reduce(
+      (sum, v) => sum + Number(v || 0),
+      0
     );
   };
 
-  // 🎯 PLAYERS ONLY (NO ASSOCIATES)
-  const players = Object.keys(points);
-
-  // 🏆 LEADERBOARD
-  const leaderboard = players
-    .map(p => ({ name: p, total: getTotal(p) }))
+  const leaderboard = Object.keys(points)
+    .map((p) => ({
+      name: p,
+      total: getTotal(p),
+    }))
     .sort((a, b) => b.total - a.total);
 
   return (
@@ -101,7 +79,7 @@ export default function App() {
         value={selectedDate}
         onChange={(e) => setSelectedDate(e.target.value)}
       >
-        {mondayDates2026.map(d => (
+        {mondayDates2026.map((d) => (
           <option key={d}>{d}</option>
         ))}
       </select>
@@ -109,26 +87,16 @@ export default function App() {
       <h3>Add Player</h3>
 
       <input
-        placeholder="Search member..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        value={newPlayer}
+        onChange={(e) => setNewPlayer(e.target.value)}
+        placeholder="Enter player name"
       />
 
-      {members
-        .filter(m =>
-          m.section === "Gents" &&
-          m.name.toLowerCase().includes(search.toLowerCase())
-        )
-        .map(m => (
-          <div key={m.name}>
-            {m.name}
-            <button onClick={() => addPlayer(m.name)}>Add</button>
-          </div>
-        ))}
+      <button onClick={addPlayer}>Add</button>
 
       <h3>This Week</h3>
 
-      <table border="1" cellPadding="6">
+      <table border="1" cellPadding="8">
         <thead>
           <tr>
             <th>Player</th>
@@ -138,19 +106,21 @@ export default function App() {
         </thead>
 
         <tbody>
-          {players.map(p => (
-            <tr key={p}>
-              <td>{p}</td>
+          {Object.keys(points).map((player) => (
+            <tr key={player}>
+              <td>{player}</td>
 
               <td>
                 <input
                   type="number"
-                  value={points[p]?.[selectedDate] ?? 0}
-                  onChange={(e) => updateScore(p, e.target.value)}
+                  value={points[player]?.[selectedDate] ?? 0}
+                  onChange={(e) =>
+                    updateScore(player, e.target.value)
+                  }
                 />
               </td>
 
-              <td>{getTotal(p)}</td>
+              <td>{getTotal(player)}</td>
             </tr>
           ))}
         </tbody>
@@ -158,7 +128,7 @@ export default function App() {
 
       <h2>Monday Points Leaderboard</h2>
 
-      <table border="1" cellPadding="6">
+      <table border="1" cellPadding="8">
         <thead>
           <tr>
             <th>Rank</th>
