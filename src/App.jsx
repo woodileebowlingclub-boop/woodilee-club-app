@@ -6,32 +6,6 @@ const CLUB_PIN = "1911";
 const ADMIN_PIN = "1954";
 const BUCKET = "club-files";
 
-const mondayDates2026 = [
-  "2026-04-20",
-  "2026-04-27",
-  "2026-05-04",
-  "2026-05-11",
-  "2026-05-18",
-  "2026-05-25",
-  "2026-06-01",
-  "2026-06-08",
-  "2026-06-15",
-  "2026-06-22",
-  "2026-06-29",
-  "2026-07-06",
-  "2026-07-13",
-  "2026-07-20",
-  "2026-07-27",
-  "2026-08-03",
-  "2026-08-10",
-  "2026-08-17",
-  "2026-08-24",
-  "2026-08-31",
-  "2026-09-07",
-  "2026-09-14",
-  "2026-09-21",
-];
-
 const styles = {
   page: {
     padding: 16,
@@ -305,62 +279,6 @@ const styles = {
     border: "1px solid #e5c8cf",
     display: "block",
   },
-  adminTable: {
-    width: "100%",
-    borderCollapse: "collapse",
-    background: "#fff",
-    border: "1px solid #e5c8cf",
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-  adminTh: {
-    background: "#8b1e3f",
-    color: "#fff",
-    padding: 10,
-    border: "1px solid #d9b7c0",
-    textAlign: "center",
-    fontSize: 14,
-    whiteSpace: "nowrap",
-  },
-  adminTd: {
-    padding: 10,
-    border: "1px solid #ead7dc",
-    textAlign: "center",
-    background: "#fffdfd",
-    fontSize: 14,
-  },
-  stickyCol: {
-    position: "sticky",
-    left: 0,
-    zIndex: 3,
-    background: "#8b1e3f",
-  },
-  stickyColBody: {
-    position: "sticky",
-    left: 0,
-    zIndex: 2,
-    background: "#fff7f9",
-    textAlign: "left",
-    fontWeight: 700,
-    minWidth: 180,
-  },
-  pointsInput: {
-    width: 70,
-    padding: 6,
-    borderRadius: 8,
-    border: "1px solid #d7b7be",
-    textAlign: "center",
-    boxSizing: "border-box",
-  },
-  prizeRow1: {
-    background: "#fff7cc",
-  },
-  prizeRow2: {
-    background: "#edf2f7",
-  },
-  prizeRow3: {
-    background: "#fbe4d5",
-  },
 };
 
 function sortEventsChronologically(list) {
@@ -423,25 +341,19 @@ function getFileTypeLabel(url) {
     lower.endsWith(".jpeg") ||
     lower.includes(".jpg?") ||
     lower.includes(".jpeg?")
-  ) {
-    return "JPEG image";
-  }
+  ) return "JPEG image";
   if (
     lower.endsWith(".xls") ||
     lower.endsWith(".xlsx") ||
     lower.includes(".xls?") ||
     lower.includes(".xlsx?")
-  ) {
-    return "Excel file";
-  }
+  ) return "Excel file";
   if (
     lower.endsWith(".doc") ||
     lower.endsWith(".docx") ||
     lower.includes(".doc?") ||
     lower.includes(".docx?")
-  ) {
-    return "Word document";
-  }
+  ) return "Word document";
   return "Attachment";
 }
 
@@ -457,345 +369,6 @@ function isImageFile(url) {
   );
 }
 
-function MondayPointsAdmin({ members = [] }) {
-  const [points, setPoints] = useState(() => {
-    try {
-      const saved = localStorage.getItem("mondayPoints2026");
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
-
-  const [selectedDate, setSelectedDate] = useState(mondayDates2026[0]);
-  const [playerSearch, setPlayerSearch] = useState("");
-
-  const savePoints = (updated) => {
-    setPoints(updated);
-    localStorage.setItem("mondayPoints2026", JSON.stringify(updated));
-  };
-
-  const currentIndex = mondayDates2026.indexOf(selectedDate);
-  const previousDate = currentIndex > 0 ? mondayDates2026[currentIndex - 1] : null;
-
-  const displayedPlayers = useMemo(() => {
-    if (!previousDate) {
-      return Object.keys(points)
-        .filter((name) => points[name]?.[selectedDate] !== undefined)
-        .sort((a, b) => a.localeCompare(b, "en-GB"));
-    }
-
-    return Object.keys(points)
-      .filter((name) => points[name]?.[previousDate] !== undefined)
-      .sort((a, b) => a.localeCompare(b, "en-GB"));
-  }, [points, previousDate, selectedDate]);
-
-  useEffect(() => {
-    if (!previousDate) return;
-
-    const updated = { ...points };
-    let changed = false;
-
-    displayedPlayers.forEach((memberName) => {
-      if (!updated[memberName]) {
-        updated[memberName] = {};
-      }
-      if (updated[memberName][selectedDate] === undefined) {
-        updated[memberName][selectedDate] = Number(updated[memberName][previousDate]) || 0;
-        changed = true;
-      }
-    });
-
-    if (changed) {
-      savePoints(updated);
-    }
-  }, [selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleChange = (memberName, date, value) => {
-    const numericValue = value === "" ? 0 : Math.max(0, Number(value));
-
-    const updated = {
-      ...points,
-      [memberName]: {
-        ...(points[memberName] || {}),
-        [date]: numericValue,
-      },
-    };
-
-    savePoints(updated);
-  };
-
-  const addPlayerToWeek = (memberName) => {
-    if (!memberName) return;
-
-    const updated = {
-      ...points,
-      [memberName]: {
-        ...(points[memberName] || {}),
-        [selectedDate]: points[memberName]?.[selectedDate] ?? 0,
-      },
-    };
-
-    savePoints(updated);
-    setPlayerSearch("");
-  };
-
-  const clearAllPoints = () => {
-    if (!window.confirm("Clear all Monday night points for 2026?")) return;
-    savePoints({});
-  };
-
-  const getTotal = (memberName) => {
-    const memberPoints = points[memberName] || {};
-    return mondayDates2026.reduce((total, date) => {
-      return total + (Number(memberPoints[date]) || 0);
-    }, 0);
-  };
-
-  const formatShortDate = (dateStr) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-    });
-  };
-
-  const nonAssociateMembers = members
-    .filter(
-      (m) =>
-        m?.name &&
-        String(m.section || "").trim().toLowerCase() !== "associate"
-    )
-    .map((m) => m.name)
-    .sort((a, b) => a.localeCompare(b, "en-GB"));
-
-  const searchableMembers = nonAssociateMembers
-    .filter((name) => name.toLowerCase().includes(playerSearch.toLowerCase()))
-    .filter((name) => !displayedPlayers.includes(name));
-
-  return (
-    <div style={{ overflowX: "auto" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 10,
-          flexWrap: "wrap",
-          marginBottom: 10,
-        }}
-      >
-        <h3 style={styles.sectionTitle}>Monday Night Points Edit – 2026</h3>
-
-        <select
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
-          style={{ ...styles.input, width: 240, marginBottom: 0 }}
-        >
-          {mondayDates2026.map((d) => (
-            <option key={d} value={d}>
-              {formatDiaryDate(d)}
-            </option>
-          ))}
-        </select>
-
-        <div>
-          <button onClick={clearAllPoints} style={styles.secondaryButton}>
-            Clear All Scores
-          </button>
-        </div>
-      </div>
-
-      <div style={styles.panel}>
-        <h4 style={styles.sectionTitle}>Add Player To This Week</h4>
-
-        <input
-          type="text"
-          placeholder="Search member name..."
-          value={playerSearch}
-          onChange={(e) => setPlayerSearch(e.target.value)}
-          style={styles.input}
-        />
-
-        {playerSearch && searchableMembers.length > 0 && (
-          <div>
-            {searchableMembers.slice(0, 12).map((name) => (
-              <div key={name} style={styles.card}>
-                <strong>{name}</strong>
-                <button
-                  onClick={() => addPlayerToWeek(name)}
-                  style={styles.smallBtn}
-                >
-                  Add Player
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {playerSearch && searchableMembers.length === 0 && (
-          <div style={{ color: "#777" }}>No matching member found.</div>
-        )}
-      </div>
-
-      <table style={styles.adminTable}>
-        <thead>
-          <tr>
-            <th style={{ ...styles.adminTh, ...styles.stickyCol }}>Member</th>
-            <th style={styles.adminTh}>{formatShortDate(selectedDate)}</th>
-            <th style={styles.adminTh}>Total</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {displayedPlayers.length === 0 ? (
-            <tr>
-              <td colSpan="3" style={styles.adminTd}>
-                No players yet for this week. Use search above to add one.
-              </td>
-            </tr>
-          ) : (
-            displayedPlayers.map((memberName) => (
-              <tr key={memberName}>
-                <td style={{ ...styles.adminTd, ...styles.stickyColBody }}>
-                  {memberName}
-                </td>
-
-                <td style={styles.adminTd}>
-                  <input
-                    type="number"
-                    min="0"
-                    value={points[memberName]?.[selectedDate] ?? 0}
-                    onChange={(e) =>
-                      handleChange(memberName, selectedDate, e.target.value)
-                    }
-                    style={styles.pointsInput}
-                  />
-                </td>
-
-                <td style={{ ...styles.adminTd, fontWeight: 700 }}>
-                  {getTotal(memberName)}
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function MondayPointsLeaderboard({ members = [] }) {
-  const [points, setPoints] = useState({});
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("mondayPoints2026");
-      setPoints(saved ? JSON.parse(saved) : {});
-    } catch {
-      setPoints({});
-    }
-  }, []);
-
-  const ranked = useMemo(() => {
-    const totals = members
-      .filter((m) => m?.name)
-      .map((m) => {
-        const memberPoints = points[m.name] || {};
-        const total = Object.values(memberPoints).reduce(
-          (sum, value) => sum + (Number(value) || 0),
-          0
-        );
-
-        return {
-          name: m.name,
-          total,
-        };
-      })
-      .filter((m) => m.total > 0 || points[m.name]);
-
-    const sorted = [...totals].sort((a, b) => {
-      if (b.total !== a.total) return b.total - a.total;
-      return a.name.localeCompare(b.name, "en-GB");
-    });
-
-    let lastScore = null;
-    let lastRank = 0;
-
-    return sorted.map((member, index) => {
-      const rank = member.total === lastScore ? lastRank : index + 1;
-      lastScore = member.total;
-      lastRank = rank;
-      return { ...member, rank };
-    });
-  }, [members, points]);
-
-  const prizeStyle = (rank) => {
-    if (rank === 1) return styles.prizeRow1;
-    if (rank === 2) return styles.prizeRow2;
-    if (rank === 3) return styles.prizeRow3;
-    return {};
-  };
-
-  return (
-    <div style={styles.panel}>
-      <h3 style={styles.sectionTitle}>Monday Points Leaderboard – 2026</h3>
-
-      <table style={styles.adminTable}>
-        <thead>
-          <tr>
-            <th style={styles.adminTh}>Rank</th>
-            <th style={styles.adminTh}>Member</th>
-            <th style={styles.adminTh}>Total Points</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {ranked.length > 0 ? (
-            ranked.map((member) => (
-              <tr key={member.name} style={prizeStyle(member.rank)}>
-                <td style={{ ...styles.adminTd, ...prizeStyle(member.rank) }}>
-                  {member.rank === 1
-                    ? "🥇 1"
-                    : member.rank === 2
-                    ? "🥈 2"
-                    : member.rank === 3
-                    ? "🥉 3"
-                    : member.rank}
-                </td>
-                <td
-                  style={{
-                    ...styles.adminTd,
-                    ...prizeStyle(member.rank),
-                    fontWeight: member.rank <= 3 ? 700 : 400,
-                  }}
-                >
-                  {member.name}
-                </td>
-                <td
-                  style={{
-                    ...styles.adminTd,
-                    ...prizeStyle(member.rank),
-                    fontWeight: 700,
-                  }}
-                >
-                  {member.total}
-                </td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan="3" style={styles.adminTd}>
-                No scores entered yet
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 export default function App() {
   const [pin, setPin] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
@@ -804,7 +377,7 @@ export default function App() {
   const [adminPin, setAdminPin] = useState("");
   const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [message, setMessage] = useState("");
-  const [adminTab, setAdminTab] = useState("mondayscores");
+  const [adminTab, setAdminTab] = useState("events");
 
   const [entries, setEntries] = useState([]);
   const [members, setMembers] = useState([]);
@@ -859,14 +432,8 @@ export default function App() {
 
   const sortedEntries = useMemo(() => sortEventsChronologically(entries), [entries]);
   const sortedPosts = useMemo(() => sortPosts(posts), [posts]);
-  const sortedOfficeBearers = useMemo(
-    () => sortByPositionThenName(officeBearers),
-    [officeBearers]
-  );
-  const sortedClubCoaches = useMemo(
-    () => sortByPositionThenName(clubCoaches),
-    [clubCoaches]
-  );
+  const sortedOfficeBearers = useMemo(() => sortByPositionThenName(officeBearers), [officeBearers]);
+  const sortedClubCoaches = useMemo(() => sortByPositionThenName(clubCoaches), [clubCoaches]);
   const sortedDocuments = useMemo(() => sortDocuments(documents), [documents]);
 
   const filteredEvents = useMemo(() => {
@@ -944,10 +511,7 @@ export default function App() {
 
   const nextEvent = useMemo(() => upcomingEvents[0] || null, [upcomingEvents]);
   const nextTwoEvents = useMemo(() => upcomingEvents.slice(1, 3), [upcomingEvents]);
-  const latestPinnedPost = useMemo(
-    () => sortedPosts.find((p) => p.pinned) || null,
-    [sortedPosts]
-  );
+  const latestPinnedPost = useMemo(() => sortedPosts.find((p) => p.pinned) || null, [sortedPosts]);
 
   useEffect(() => {
     if (!loggedIn) return;
@@ -1005,7 +569,7 @@ export default function App() {
 
   const loadDocuments = async () => {
     const { data, error } = await supabase.from("documents").select("*");
-    if (error) return setMessage(`Could not load documents: ${error.message}`);
+    if (error) return setMessage(`Could not load games info: ${error.message}`);
     setDocuments(data || []);
   };
 
@@ -1022,7 +586,7 @@ export default function App() {
     if (adminPin === ADMIN_PIN) {
       setAdminUnlocked(true);
       setMessage("");
-      setAdminTab("mondayscores");
+      setAdminTab("events");
     } else {
       setMessage("Incorrect admin PIN.");
     }
@@ -1331,7 +895,6 @@ export default function App() {
 
         if (error) return setMessage(`Could not update information post: ${error.message}`);
         setPosts((prev) => prev.map((x) => (x.id === editingPostId ? data : x)));
-        setMessage("Information post updated.");
       } else {
         const { data, error } = await supabase
           .from("information_posts")
@@ -1341,9 +904,9 @@ export default function App() {
 
         if (error) return setMessage(`Could not save information post: ${error.message}`);
         setPosts((prev) => [...prev, data]);
-        setMessage("Information post added.");
       }
 
+      setMessage("Information post saved.");
       clearPostForm();
     } catch (err) {
       setMessage(`Could not upload file: ${err.message}`);
@@ -1373,7 +936,7 @@ export default function App() {
   };
 
   const saveDocument = async () => {
-    if (!documentTitle) return setMessage("Enter a document title.");
+    if (!documentTitle) return setMessage("Enter a games info title.");
 
     try {
       const finalLink = documentFile
@@ -1396,9 +959,8 @@ export default function App() {
           .select()
           .single();
 
-        if (error) return setMessage(`Could not update document: ${error.message}`);
+        if (error) return setMessage(`Could not update games info: ${error.message}`);
         setDocuments((prev) => prev.map((x) => (x.id === editingDocumentId ? data : x)));
-        setMessage("Document updated.");
       } else {
         const { data, error } = await supabase
           .from("documents")
@@ -1406,14 +968,14 @@ export default function App() {
           .select()
           .single();
 
-        if (error) return setMessage(`Could not save document: ${error.message}`);
+        if (error) return setMessage(`Could not save games info: ${error.message}`);
         setDocuments((prev) => [...prev, data]);
-        setMessage("Document added.");
       }
 
+      setMessage("Games info saved.");
       clearDocumentForm();
     } catch (err) {
-      setMessage(`Could not upload document: ${err.message}`);
+      setMessage(`Could not upload games info: ${err.message}`);
     }
   };
 
@@ -1426,16 +988,16 @@ export default function App() {
     setDocumentLink(doc.file_url || "");
     setDocumentFile(null);
     setTab("admin");
-    setAdminTab("documents");
+    setAdminTab("gamesinfo");
   };
 
   const deleteDocument = async (id) => {
-    if (!window.confirm("Delete this document?")) return;
+    if (!window.confirm("Delete this games info item?")) return;
 
     const { error } = await supabase.from("documents").delete().eq("id", id);
-    if (error) return setMessage(`Could not delete document: ${error.message}`);
+    if (error) return setMessage(`Could not delete games info: ${error.message}`);
     setDocuments((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Document deleted.");
+    setMessage("Games info deleted.");
   };
 
   const moveItem = async (table, items, onItemsUpdated, id, direction, label) => {
@@ -1581,15 +1143,10 @@ export default function App() {
           <button style={styles.tab(tab === "home")} onClick={() => setTab("home")}>Home</button>
           <button style={styles.tab(tab === "events")} onClick={() => setTab("events")}>Events</button>
           <button style={styles.tab(tab === "members")} onClick={() => setTab("members")}>Members</button>
-          <button style={styles.tab(tab === "documents")} onClick={() => setTab("documents")}>Documents</button>
+          <button style={styles.tab(tab === "gamesinfo")} onClick={() => setTab("gamesinfo")}>Games Info</button>
           <button style={styles.tab(tab === "information")} onClick={() => setTab("information")}>Information</button>
+          <button style={styles.tab(tab === "office")} onClick={() => setTab("office")}>Office Bearers / Coaches</button>
           <button style={styles.tab(tab === "admin")} onClick={() => setTab("admin")}>Admin</button>
-          <button style={styles.tab(tab === "office")} onClick={() => setTab("office")}>
-            Office Bearers / Coaches
-          </button>
-          <button style={styles.tab(tab === "leaderboard")} onClick={() => setTab("leaderboard")}>
-            Monday Points Leaderboard
-          </button>
         </div>
 
         {tab === "home" && (
@@ -1614,8 +1171,8 @@ export default function App() {
                     <button style={styles.homeActionBtn} onClick={() => setTab("information")}>
                       Club Notices
                     </button>
-                    <button style={styles.homeActionBtn} onClick={() => setTab("documents")}>
-                      Club Documents
+                    <button style={styles.homeActionBtn} onClick={() => setTab("gamesinfo")}>
+                      Games Info
                     </button>
                   </div>
                 </>
@@ -1628,13 +1185,6 @@ export default function App() {
             </div>
 
             <div style={styles.homeGrid}>
-              <div style={styles.homeMiniCard}>
-                <div style={styles.homeLabel}>Monday Points Leaderboard</div>
-                <button style={styles.homeActionBtn} onClick={() => setTab("leaderboard")}>
-                  View Leaderboard
-                </button>
-              </div>
-
               <div style={styles.homeMiniCard}>
                 <div style={styles.homeLabel}>Pinned Notice</div>
 
@@ -1691,24 +1241,15 @@ export default function App() {
               <h3 style={styles.sectionTitle}>Quick Links</h3>
               <button style={styles.homeActionBtn} onClick={() => setTab("events")}>Events</button>
               <button style={styles.homeActionBtn} onClick={() => setTab("members")}>Members</button>
-              <button style={styles.homeActionBtn} onClick={() => setTab("documents")}>Documents</button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("gamesinfo")}>Games Info</button>
               <button style={styles.homeActionBtn} onClick={() => setTab("information")}>Information</button>
-              <button style={styles.homeActionBtn} onClick={() => setTab("office")}>
-                Office Bearers / Coaches
-              </button>
-              <button style={styles.homeActionBtn} onClick={() => setTab("leaderboard")}>
-                Monday Points Leaderboard
-              </button>
+              <button style={styles.homeActionBtn} onClick={() => setTab("office")}>Office Bearers / Coaches</button>
             </div>
           </>
         )}
 
         {tab === "office" && (
           <>
-            <div style={styles.panel}>
-              <h3 style={styles.sectionTitle}>Office Bearers / Coaches</h3>
-            </div>
-
             <div style={styles.panel}>
               <h3 style={styles.sectionTitle}>Office Bearers</h3>
               <div style={styles.grid}>
@@ -1741,8 +1282,6 @@ export default function App() {
             </div>
           </>
         )}
-
-        {tab === "leaderboard" && <MondayPointsLeaderboard members={members} />}
 
         {tab === "events" && (
           <div style={styles.panel}>
@@ -1794,20 +1333,20 @@ export default function App() {
           </div>
         )}
 
-        {tab === "documents" && (
+        {tab === "gamesinfo" && (
           <div style={styles.panel}>
-            <h3 style={styles.sectionTitle}>Documents</h3>
+            <h3 style={styles.sectionTitle}>Games Info</h3>
 
             <input
               type="text"
-              placeholder="Search documents..."
+              placeholder="Search games info..."
               value={documentSearch}
               onChange={(e) => setDocumentSearch(e.target.value)}
               style={styles.input}
             />
 
             {filteredDocuments.length === 0 ? (
-              <div style={{ color: "#777" }}>No matching documents found.</div>
+              <div style={{ color: "#777" }}>No matching games info found.</div>
             ) : (
               filteredDocuments.map((doc) => (
                 <div key={doc.id} style={styles.card}>
@@ -1831,7 +1370,7 @@ export default function App() {
                         </>
                       ) : (
                         <a href={doc.file_url} target="_blank" rel="noreferrer" style={styles.linkBtn}>
-                          {doc.button_text || "Open Document"}
+                          {doc.button_text || "Open File"}
                         </a>
                       )}
                     </div>
@@ -1904,55 +1443,25 @@ export default function App() {
             ) : (
               <>
                 <div style={styles.tabs}>
-                  <button
-                    onClick={() => setAdminTab("mondayscores")}
-                    style={styles.tab(adminTab === "mondayscores")}
-                  >
-                    Monday Points Edit
-                  </button>
-                  <button
-                    onClick={() => setAdminTab("events")}
-                    style={styles.tab(adminTab === "events")}
-                  >
+                  <button onClick={() => setAdminTab("events")} style={styles.tab(adminTab === "events")}>
                     Events
                   </button>
-                  <button
-                    onClick={() => setAdminTab("officers")}
-                    style={styles.tab(adminTab === "officers")}
-                  >
+                  <button onClick={() => setAdminTab("officers")} style={styles.tab(adminTab === "officers")}>
                     Office Bearers
                   </button>
-                  <button
-                    onClick={() => setAdminTab("coaches")}
-                    style={styles.tab(adminTab === "coaches")}
-                  >
+                  <button onClick={() => setAdminTab("coaches")} style={styles.tab(adminTab === "coaches")}>
                     Coaches
                   </button>
-                  <button
-                    onClick={() => setAdminTab("members")}
-                    style={styles.tab(adminTab === "members")}
-                  >
+                  <button onClick={() => setAdminTab("members")} style={styles.tab(adminTab === "members")}>
                     Members
                   </button>
-                  <button
-                    onClick={() => setAdminTab("documents")}
-                    style={styles.tab(adminTab === "documents")}
-                  >
-                    Documents
+                  <button onClick={() => setAdminTab("gamesinfo")} style={styles.tab(adminTab === "gamesinfo")}>
+                    Games Info
                   </button>
-                  <button
-                    onClick={() => setAdminTab("info")}
-                    style={styles.tab(adminTab === "info")}
-                  >
+                  <button onClick={() => setAdminTab("info")} style={styles.tab(adminTab === "info")}>
                     Information
                   </button>
                 </div>
-
-                {adminTab === "mondayscores" && (
-                  <div style={styles.panel}>
-                    <MondayPointsAdmin members={members} />
-                  </div>
-                )}
 
                 {adminTab === "events" && (
                   <>
@@ -2201,15 +1710,15 @@ export default function App() {
                   </>
                 )}
 
-                {adminTab === "documents" && (
+                {adminTab === "gamesinfo" && (
                   <>
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>{editingDocumentId ? "Edit Document" : "Add Document"}</h3>
+                      <h3 style={styles.sectionTitle}>{editingDocumentId ? "Edit Games Info" : "Add Games Info"}</h3>
 
                       <input
                         value={documentTitle}
                         onChange={(e) => setDocumentTitle(e.target.value)}
-                        placeholder="Document title"
+                        placeholder="Games info title"
                         style={styles.input}
                       />
 
@@ -2226,11 +1735,11 @@ export default function App() {
                         style={styles.input}
                       >
                         <option>General</option>
-                        <option>Forms</option>
-                        <option>Guides</option>
+                        <option>Fixtures</option>
                         <option>Competitions</option>
-                        <option>Minutes</option>
                         <option>Results</option>
+                        <option>Rules</option>
+                        <option>Forms</option>
                       </select>
 
                       <input
@@ -2250,14 +1759,14 @@ export default function App() {
                       <div style={{ marginBottom: 10 }}>
                         <input
                           type="file"
-                          accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx,application/pdf,image/png,image/jpeg,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                          accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx"
                           onChange={(e) => setDocumentFile(e.target.files?.[0] || null)}
                         />
                         {documentFile ? <div style={styles.fileInfo}>Selected file: {documentFile.name}</div> : null}
                       </div>
 
                       <button onClick={saveDocument} style={styles.button}>
-                        {editingDocumentId ? "Update Document" : "Save Document"}
+                        {editingDocumentId ? "Update Games Info" : "Save Games Info"}
                       </button>
 
                       {(editingDocumentId ||
@@ -2272,9 +1781,9 @@ export default function App() {
                     </div>
 
                     <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>Manage Documents</h3>
+                      <h3 style={styles.sectionTitle}>Manage Games Info</h3>
                       {sortedDocuments.length === 0 ? (
-                        <div style={{ color: "#777" }}>No documents yet.</div>
+                        <div style={{ color: "#777" }}>No games info yet.</div>
                       ) : (
                         sortedDocuments.map((doc) => (
                           <div key={doc.id} style={styles.card}>
@@ -2310,7 +1819,7 @@ export default function App() {
                       <div style={{ marginBottom: 10 }}>
                         <input
                           type="file"
-                          accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx,application/pdf,image/png,image/jpeg,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                          accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx"
                           onChange={(e) => setPostFile(e.target.files?.[0] || null)}
                         />
                         {postFile ? <div style={styles.fileInfo}>Selected file: {postFile.name}</div> : null}
