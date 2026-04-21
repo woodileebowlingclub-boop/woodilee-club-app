@@ -44,24 +44,15 @@ function formatDate(dateStr) {
 function formatTime(timeStr) {
   if (!timeStr) return "";
   const raw = safeString(timeStr).trim();
+  if (!raw) return "";
 
-  if (/^\d{1,2}:\d{2}$/.test(raw)) {
-    const [h, m] = raw.split(":").map(Number);
-    const temp = new Date();
-    temp.setHours(h, m, 0, 0);
-    return temp.toLocaleTimeString("en-GB", {
+  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(raw)) {
+    const [h, m] = raw.split(":");
+    const dt = new Date();
+    dt.setHours(Number(h), Number(m), 0, 0);
+    return dt.toLocaleTimeString("en-GB", {
       hour: "numeric",
       minute: "2-digit",
-      hour12: true,
-    });
-  }
-
-  const parsed = new Date(`2000-01-01T${raw}`);
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toLocaleTimeString("en-GB", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
     });
   }
 
@@ -110,80 +101,186 @@ async function tryReadTable(tableNames, queryBuilder) {
   return { table: null, data: [] };
 }
 
+async function tryInsert(tableNames, payloads) {
+  const payloadList = Array.isArray(payloads) ? payloads : [payloads];
+  for (const table of tableNames) {
+    for (const payload of payloadList) {
+      try {
+        const { error } = await supabase.from(table).insert(payload);
+        if (!error) return { ok: true, table };
+      } catch (err) {
+        // try next payload/table
+      }
+    }
+  }
+  return { ok: false };
+}
+
+async function tryUpdate(tableNames, idFieldNames, idValue, payloads) {
+  const payloadList = Array.isArray(payloads) ? payloads : [payloads];
+  for (const table of tableNames) {
+    for (const idField of idFieldNames) {
+      for (const payload of payloadList) {
+        try {
+          const { error } = await supabase.from(table).update(payload).eq(idField, idValue);
+          if (!error) return { ok: true, table, idField };
+        } catch (err) {
+          // try next combination
+        }
+      }
+    }
+  }
+  return { ok: false };
+}
+
+async function tryDelete(tableNames, idFieldNames, idValue) {
+  for (const table of tableNames) {
+    for (const idField of idFieldNames) {
+      try {
+        const { error } = await supabase.from(table).delete().eq(idField, idValue);
+        if (!error) return { ok: true, table, idField };
+      } catch (err) {
+        // try next combination
+      }
+    }
+  }
+  return { ok: false };
+}
+
 function normaliseDiaryRow(row) {
   return {
     id: row.id ?? row.event_id ?? Math.random().toString(36),
-    title: safeString(row.title || row.name || row.event || row.heading || "Untitled event"),
-    date: safeString(row.date || row.event_date || row.diary_date || row.start_date || ""),
-    time: safeString(row.time || row.event_time || row.start_time || ""),
-    venue: safeString(row.venue || row.location || row.place || ""),
-    details: safeString(row.details || row.description || row.notes || ""),
-    sortDate:
-      row.date || row.event_date || row.diary_date || row.start_date || "",
+    title: safeString(row.title || row.name || row.heading),
+    details: safeString(row.details || row.description || row.note || row.notes),
+    date: safeString(row.date || row.event_date || row.date_text),
+    time: safeString(row.time || row.time_text || row.event_time),
   };
 }
 
 function normaliseNoticeRow(row) {
   return {
-    id: row.id ?? row.notice_id ?? Math.random().toString(36),
-    title: safeString(row.title || row.heading || row.notice || "Notice"),
-    body: safeString(row.body || row.content || row.message || row.details || ""),
-    date: safeString(row.date || row.notice_date || row.created_at || row.posted_at || ""),
-    pinned: Boolean(row.pinned || row.is_pinned || row.featured),
+    id: row.id ?? Math.random().toString(36),
+    title: safeString(row.title || row.heading || row.subject),
+    body: safeString(row.body || row.content || row.details || row.description || row.note),
+    date: safeString(row.date || row.created_at || row.posted_at),
   };
 }
 
 function normaliseMemberRow(row) {
-  const name =
-    safeString(
-      row.name ||
-        row.member_name ||
-        [row.first_name, row.last_name].filter(Boolean).join(" ") ||
-        row.full_name
-    ).trim() || "Unnamed member";
-
   return {
-    id: row.id ?? row.member_id ?? Math.random().toString(36),
-    name,
-    phone: safeString(row.phone || row.mobile || row.telephone || ""),
-    whatsapp: safeString(row.whatsapp || row.phone || row.mobile || ""),
-    email: safeString(row.email || ""),
-    section: safeString(row.section || row.category || row.group || "Members"),
+    id: row.id ?? Math.random().toString(36),
+    name: safeString(row.name),
+    phone: safeString(row.phone || row.mobile || row.telephone),
+    email: safeString(row.email),
+    section: safeString(row.section || row.category || "Members"),
+    notes: safeString(row.notes || row.note),
   };
 }
 
 function normaliseOfficeRow(row) {
   return {
     id: row.id ?? Math.random().toString(36),
-    role: safeString(row.role || row.position || row.title || "Role"),
-    name: safeString(row.name || row.person || row.member_name || ""),
-    phone: safeString(row.phone || row.mobile || ""),
-    whatsapp: safeString(row.whatsapp || row.phone || row.mobile || ""),
-    email: safeString(row.email || ""),
-    sort_order: Number(row.sort_order ?? row.display_order ?? row.order_no ?? 9999),
+    role: safeString(row.role || row.title),
+    name: safeString(row.name),
+    phone: safeString(row.phone || row.mobile),
+    email: safeString(row.email),
+    sort_order: Number(row.sort_order ?? row.display_order ?? 9999),
   };
 }
 
 function normaliseCoachRow(row) {
   return {
     id: row.id ?? Math.random().toString(36),
-    name: safeString(row.name || row.coach || row.member_name || ""),
-    phone: safeString(row.phone || row.mobile || ""),
-    whatsapp: safeString(row.whatsapp || row.phone || row.mobile || ""),
-    email: safeString(row.email || ""),
-    details: safeString(row.details || row.notes || row.description || ""),
-    sort_order: Number(row.sort_order ?? row.display_order ?? row.order_no ?? 9999),
+    name: safeString(row.name),
+    phone: safeString(row.phone || row.mobile),
+    email: safeString(row.email),
+    notes: safeString(row.notes || row.note),
+    sort_order: Number(row.sort_order ?? row.display_order ?? 9999),
   };
 }
 
 function normaliseDocumentRow(row) {
   return {
     id: row.id ?? Math.random().toString(36),
-    title: safeString(row.title || row.name || row.document || row.filename || "Document"),
-    description: safeString(row.description || row.details || row.notes || ""),
+    title: safeString(row.title || row.name || row.filename),
     url: getPublicFileUrl(row),
-    date: safeString(row.date || row.created_at || row.uploaded_at || ""),
+    description: safeString(row.description || row.note || row.notes),
   };
+}
+
+function emptyDiaryForm() {
+  return {
+    id: "",
+    title: "",
+    details: "",
+    date: "",
+    time: "",
+    repeatType: "none",
+    repeatUntil: "",
+    repeatCount: "8",
+  };
+}
+
+function emptyNoticeForm() {
+  return { id: "", title: "", body: "", date: "" };
+}
+
+function emptyMemberForm() {
+  return { id: "", name: "", phone: "", email: "", section: "Members", notes: "" };
+}
+
+function emptyOfficeForm() {
+  return { id: "", role: "", name: "", phone: "", email: "", sort_order: "" };
+}
+
+function emptyCoachForm() {
+  return { id: "", name: "", phone: "", email: "", notes: "", sort_order: "" };
+}
+
+function emptyDocumentForm() {
+  return { id: "", title: "", url: "", description: "", file: null };
+}
+
+function addDays(dateString, days) {
+  const d = new Date(dateString);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function addMonths(dateString, months) {
+  const d = new Date(dateString);
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+
+function buildRecurringEvents(form) {
+  const title = safeString(form.title).trim();
+  const details = safeString(form.details).trim();
+  const date = safeString(form.date).trim();
+  const time = safeString(form.time).trim();
+
+  if (!title || !date) return [];
+
+  const base = { title, details, date, time };
+  if (form.repeatType === "none") return [base];
+
+  const results = [base];
+  const repeatCount = Math.max(1, Number(form.repeatCount || 1));
+  const repeatUntil = safeString(form.repeatUntil).trim();
+
+  let currentDate = date;
+  for (let i = 1; i < repeatCount; i += 1) {
+    currentDate =
+      form.repeatType === "monthly"
+        ? addMonths(currentDate, 1)
+        : addDays(currentDate, 7);
+
+    if (repeatUntil && currentDate > repeatUntil) break;
+
+    results.push({ ...base, date: currentDate });
+  }
+
+  return results;
 }
 
 export default function App() {
@@ -192,6 +289,7 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [statusMessage, setStatusMessage] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const [diaryRows, setDiaryRows] = useState([]);
   const [noticeRows, setNoticeRows] = useState([]);
@@ -200,23 +298,30 @@ export default function App() {
   const [coachRows, setCoachRows] = useState([]);
   const [documentRows, setDocumentRows] = useState([]);
 
+  const [diaryForm, setDiaryForm] = useState(emptyDiaryForm());
+  const [noticeForm, setNoticeForm] = useState(emptyNoticeForm());
+  const [memberForm, setMemberForm] = useState(emptyMemberForm());
+  const [officeForm, setOfficeForm] = useState(emptyOfficeForm());
+  const [coachForm, setCoachForm] = useState(emptyCoachForm());
+  const [documentForm, setDocumentForm] = useState(emptyDocumentForm());
+
   async function loadAllData() {
     setLoading(true);
     setStatusMessage("");
 
     const diaryPromise = tryReadTable(
       ["diary", "events", "fixtures"],
-      (t) => t.select("*").order("date", { ascending: true }).limit(200)
+      (t) => t.select("*").order("date", { ascending: true }).limit(500)
     );
 
     const noticesPromise = tryReadTable(
-      ["notices", "noticeboard", "news"],
-      (t) => t.select("*").order("date", { ascending: false }).limit(200)
+      ["notices", "noticeboard", "information_posts", "news"],
+      (t) => t.select("*").order("date", { ascending: false }).limit(300)
     );
 
     const membersPromise = tryReadTable(
       ["members", "club_members"],
-      (t) => t.select("*").order("name", { ascending: true }).limit(500)
+      (t) => t.select("*").order("name", { ascending: true }).limit(1000)
     );
 
     const officePromise = tryReadTable(
@@ -229,76 +334,27 @@ export default function App() {
       (t) => t.select("*").order("sort_order", { ascending: true }).limit(100)
     );
 
-    const docsPromise = tryReadTable(
-      ["documents", "docs", "files"],
-      (t) => t.select("*").order("date", { ascending: false }).limit(200)
+    const documentsPromise = tryReadTable(
+      ["documents", "club_documents"],
+      (t) => t.select("*").order("created_at", { ascending: false }).limit(200)
     );
 
-    const [
-      diaryRes,
-      noticesRes,
-      membersRes,
-      officeRes,
-      coachesRes,
-      docsRes,
-    ] = await Promise.all([
-      diaryPromise,
-      noticesPromise,
-      membersPromise,
-      officePromise,
-      coachesPromise,
-      docsPromise,
-    ]);
+    const [diaryRes, noticesRes, membersRes, officeRes, coachesRes, documentsRes] =
+      await Promise.all([
+        diaryPromise,
+        noticesPromise,
+        membersPromise,
+        officePromise,
+        coachesPromise,
+        documentsPromise,
+      ]);
 
-    const diary = (diaryRes.data || []).map(normaliseDiaryRow);
-    const notices = (noticesRes.data || []).map(normaliseNoticeRow);
-    const members = (membersRes.data || []).map(normaliseMemberRow);
-    const office = (officeRes.data || []).map(normaliseOfficeRow);
-    const coaches = (coachesRes.data || []).map(normaliseCoachRow);
-    const docs = (docsRes.data || []).map(normaliseDocumentRow);
-
-    setDiaryRows(
-      diary.sort((a, b) => {
-        const aa = new Date(`${a.date || "9999-12-31"}T${a.time || "23:59"}`).getTime();
-        const bb = new Date(`${b.date || "9999-12-31"}T${b.time || "23:59"}`).getTime();
-        return aa - bb;
-      })
-    );
-
-    setNoticeRows(
-      notices.sort((a, b) => {
-        if (a.pinned && !b.pinned) return -1;
-        if (!a.pinned && b.pinned) return 1;
-        return new Date(b.date || 0) - new Date(a.date || 0);
-      })
-    );
-
-    setMemberRows(
-      members.sort((a, b) => a.name.localeCompare(b.name, "en-GB"))
-    );
-
-    setOfficeRows(
-      office.sort((a, b) => a.sort_order - b.sort_order)
-    );
-
-    setCoachRows(
-      coaches.sort((a, b) => a.sort_order - b.sort_order)
-    );
-
-    setDocumentRows(docs);
-
-    if (
-      !diaryRes.table &&
-      !noticesRes.table &&
-      !membersRes.table &&
-      !officeRes.table &&
-      !coachesRes.table &&
-      !docsRes.table
-    ) {
-      setStatusMessage(
-        "No data tables were found. Check your Supabase table names and read permissions."
-      );
-    }
+    setDiaryRows((diaryRes.data || []).map(normaliseDiaryRow));
+    setNoticeRows((noticesRes.data || []).map(normaliseNoticeRow));
+    setMemberRows((membersRes.data || []).map(normaliseMemberRow));
+    setOfficeRows((officeRes.data || []).map(normaliseOfficeRow));
+    setCoachRows((coachesRes.data || []).map(normaliseCoachRow));
+    setDocumentRows((documentsRes.data || []).map(normaliseDocumentRow));
 
     setLoading(false);
   }
@@ -308,417 +364,627 @@ export default function App() {
   }, []);
 
   const upcomingDiary = useMemo(() => {
-    const now = new Date();
-    const future = diaryRows.filter((row) => {
-      const when = new Date(`${row.date || "9999-12-31"}T${row.time || "23:59"}`);
-      return !Number.isNaN(when.getTime()) && when >= now;
-    });
-    return future.slice(0, 5);
+    const today = new Date().toISOString().slice(0, 10);
+    const sorted = [...diaryRows].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+    return sorted.find((row) => row.date >= today) || sorted[0] || null;
   }, [diaryRows]);
 
-  const latestNotices = useMemo(() => noticeRows.slice(0, 5), [noticeRows]);
-
-  const membersBySection = useMemo(() => {
-    const grouped = {
-      Gents: [],
-      Ladies: [],
-      Associate: [],
-      Members: [],
-      Other: [],
-    };
-
-    memberRows.forEach((m) => {
-      const s = m.section.toLowerCase();
-      if (s.includes("gent")) grouped.Gents.push(m);
-      else if (s.includes("lad")) grouped.Ladies.push(m);
-      else if (s.includes("assoc")) grouped.Associate.push(m);
-      else if (s.includes("member")) grouped.Members.push(m);
-      else grouped.Other.push(m);
+  const latestNotices = useMemo(() => noticeRows.slice(0, 3), [noticeRows]);
+  const groupedMembers = useMemo(() => {
+    const groups = { Gents: [], Ladies: [], Associate: [], Members: [] };
+    memberRows.forEach((row) => {
+      const label = safeString(row.section, "Members");
+      if (/gent/i.test(label)) groups.Gents.push(row);
+      else if (/lad/i.test(label)) groups.Ladies.push(row);
+      else if (/assoc/i.test(label)) groups.Associate.push(row);
+      else groups.Members.push(row);
     });
-
-    return grouped;
+    return groups;
   }, [memberRows]);
 
-  function handleAdminLogin(e) {
-    e.preventDefault();
+  function handleAdminLogin() {
     if (adminPin === ADMIN_PIN) {
       setIsAdmin(true);
+      setStatusMessage("Admin logged in.");
       setAdminPin("");
-    } else {
-      alert("Incorrect admin PIN");
+      return;
+    }
+    setStatusMessage("Incorrect admin PIN.");
+  }
+
+  function handleLogout() {
+    setIsAdmin(false);
+    setStatusMessage("Logged out.");
+  }
+
+  function startEditDiary(row) {
+    setDiaryForm({
+      id: row.id,
+      title: row.title,
+      details: row.details,
+      date: row.date,
+      time: row.time,
+      repeatType: "none",
+      repeatUntil: "",
+      repeatCount: "8",
+    });
+    setActiveTab("diary");
+  }
+
+  function startEditNotice(row) {
+    setNoticeForm({ id: row.id, title: row.title, body: row.body, date: row.date?.slice?.(0, 10) || "" });
+    setActiveTab("notices");
+  }
+
+  function startEditMember(row) {
+    setMemberForm({
+      id: row.id,
+      name: row.name,
+      phone: row.phone,
+      email: row.email,
+      section: row.section,
+      notes: row.notes,
+    });
+    setActiveTab("members");
+  }
+
+  function startEditOffice(row) {
+    setOfficeForm({
+      id: row.id,
+      role: row.role,
+      name: row.name,
+      phone: row.phone,
+      email: row.email,
+      sort_order: safeString(row.sort_order),
+    });
+    setActiveTab("office");
+  }
+
+  function startEditCoach(row) {
+    setCoachForm({
+      id: row.id,
+      name: row.name,
+      phone: row.phone,
+      email: row.email,
+      notes: row.notes,
+      sort_order: safeString(row.sort_order),
+    });
+    setActiveTab("coaches");
+  }
+
+  function startEditDocument(row) {
+    setDocumentForm({
+      id: row.id,
+      title: row.title,
+      url: row.url,
+      description: row.description,
+      file: null,
+    });
+    setActiveTab("documents");
+  }
+
+  async function saveDiary() {
+    setSaving(true);
+    setStatusMessage("");
+    const eventsToSave = buildRecurringEvents(diaryForm);
+
+    if (diaryForm.id) {
+      const payloads = [
+        { title: diaryForm.title, details: diaryForm.details, date: diaryForm.date, date_text: diaryForm.date, time_text: diaryForm.time },
+        { title: diaryForm.title, note: diaryForm.details, event_date: diaryForm.date, date_text: diaryForm.date, time_text: diaryForm.time },
+        { title: diaryForm.title, details: diaryForm.details, event_date: diaryForm.date, event_time: diaryForm.time },
+      ];
+      const res = await tryUpdate(["events", "diary", "fixtures"], ["id", "event_id"], diaryForm.id, payloads);
+      setSaving(false);
+      setStatusMessage(res.ok ? "Diary entry updated." : "Could not update diary entry.");
+      if (res.ok) {
+        setDiaryForm(emptyDiaryForm());
+        loadAllData();
+      }
+      return;
+    }
+
+    let ok = true;
+    for (const item of eventsToSave) {
+      const payloads = [
+        { title: item.title, details: item.details, date: item.date, date_text: item.date, time_text: item.time },
+        { title: item.title, note: item.details, event_date: item.date, date_text: item.date, time_text: item.time },
+        { title: item.title, details: item.details, event_date: item.date, event_time: item.time },
+      ];
+      const res = await tryInsert(["events", "diary", "fixtures"], payloads);
+      if (!res.ok) ok = false;
+    }
+
+    setSaving(false);
+    setStatusMessage(ok ? "Diary entry saved." : "Could not save one or more diary entries.");
+    if (ok) {
+      setDiaryForm(emptyDiaryForm());
+      loadAllData();
     }
   }
 
-  function handleAdminLogout() {
-    setIsAdmin(false);
+  async function saveNotice() {
+    setSaving(true);
+    const payloads = [
+      { title: noticeForm.title, body: noticeForm.body, date: noticeForm.date || null },
+      { heading: noticeForm.title, content: noticeForm.body, date: noticeForm.date || null },
+      { title: noticeForm.title, description: noticeForm.body, posted_at: noticeForm.date || null },
+    ];
+
+    const res = noticeForm.id
+      ? await tryUpdate(["information_posts", "notices", "noticeboard", "news"], ["id"], noticeForm.id, payloads)
+      : await tryInsert(["information_posts", "notices", "noticeboard", "news"], payloads);
+
+    setSaving(false);
+    setStatusMessage(res.ok ? `Notice ${noticeForm.id ? "updated" : "saved"}.` : `Could not ${noticeForm.id ? "update" : "save"} notice.`);
+    if (res.ok) {
+      setNoticeForm(emptyNoticeForm());
+      loadAllData();
+    }
   }
 
-  function ContactLinks({ phone, whatsapp, email }) {
-    const displayPhone = formatPhoneForDisplay(phone);
-    const telPhone = cleanPhone(phone);
-    const waPhone = cleanPhone(whatsapp);
+  async function saveMember() {
+    setSaving(true);
+    const payloads = [
+      { name: memberForm.name, phone: memberForm.phone, email: memberForm.email, section: memberForm.section, notes: memberForm.notes },
+      { name: memberForm.name, mobile: memberForm.phone, email: memberForm.email, category: memberForm.section, note: memberForm.notes },
+    ];
 
-    return (
-      <div style={styles.contactRow}>
-        {displayPhone ? (
-          <a href={`tel:${telPhone}`} style={styles.contactLink}>
-            Call
-          </a>
-        ) : null}
-        {waPhone ? (
-          <a
-            href={`https://wa.me/${waPhone.replace(/^\+/, "")}`}
-            target="_blank"
-            rel="noreferrer"
-            style={styles.contactLink}
-          >
-            WhatsApp
-          </a>
-        ) : null}
-        {email ? (
-          <a href={`mailto:${email}`} style={styles.contactLink}>
-            Email
-          </a>
-        ) : null}
-      </div>
-    );
+    const res = memberForm.id
+      ? await tryUpdate(["members", "club_members"], ["id"], memberForm.id, payloads)
+      : await tryInsert(["members", "club_members"], payloads);
+
+    setSaving(false);
+    setStatusMessage(res.ok ? `Member ${memberForm.id ? "updated" : "saved"}.` : `Could not ${memberForm.id ? "update" : "save"} member.`);
+    if (res.ok) {
+      setMemberForm(emptyMemberForm());
+      loadAllData();
+    }
   }
 
-  function SectionTitle({ children, rightSide = null }) {
+  async function saveOffice() {
+    setSaving(true);
+    const payloads = [
+      {
+        role: officeForm.role,
+        name: officeForm.name,
+        phone: officeForm.phone,
+        email: officeForm.email,
+        sort_order: Number(officeForm.sort_order || 999),
+      },
+      {
+        role: officeForm.role,
+        name: officeForm.name,
+        phone: officeForm.phone,
+        email: officeForm.email,
+        display_order: Number(officeForm.sort_order || 999),
+      },
+    ];
+
+    const res = officeForm.id
+      ? await tryUpdate(["office_bearers", "officebearers", "office"], ["id"], officeForm.id, payloads)
+      : await tryInsert(["office_bearers", "officebearers", "office"], payloads);
+
+    setSaving(false);
+    setStatusMessage(res.ok ? `Office bearer ${officeForm.id ? "updated" : "saved"}.` : `Could not ${officeForm.id ? "update" : "save"} office bearer.`);
+    if (res.ok) {
+      setOfficeForm(emptyOfficeForm());
+      loadAllData();
+    }
+  }
+
+  async function saveCoach() {
+    setSaving(true);
+    const payloads = [
+      {
+        name: coachForm.name,
+        phone: coachForm.phone,
+        email: coachForm.email,
+        notes: coachForm.notes,
+        sort_order: Number(coachForm.sort_order || 999),
+      },
+      {
+        name: coachForm.name,
+        phone: coachForm.phone,
+        email: coachForm.email,
+        note: coachForm.notes,
+        display_order: Number(coachForm.sort_order || 999),
+      },
+    ];
+
+    const res = coachForm.id
+      ? await tryUpdate(["club_coaches", "coaches"], ["id"], coachForm.id, payloads)
+      : await tryInsert(["club_coaches", "coaches"], payloads);
+
+    setSaving(false);
+    setStatusMessage(res.ok ? `Coach ${coachForm.id ? "updated" : "saved"}.` : `Could not ${coachForm.id ? "update" : "save"} coach.`);
+    if (res.ok) {
+      setCoachForm(emptyCoachForm());
+      loadAllData();
+    }
+  }
+
+  async function saveDocument() {
+    setSaving(true);
+    let finalUrl = safeString(documentForm.url).trim();
+    let filePath = "";
+
+    if (documentForm.file) {
+      const filename = `${Date.now()}-${documentForm.file.name}`;
+      filePath = `documents/${filename}`;
+      const uploadRes = await supabase.storage.from(BUCKET).upload(filePath, documentForm.file, { upsert: true });
+      if (!uploadRes.error) {
+        const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
+        finalUrl = data?.publicUrl || finalUrl;
+      }
+    }
+
+    const payloads = [
+      { title: documentForm.title, url: finalUrl, description: documentForm.description, file_path: filePath || null },
+      { title: documentForm.title, public_url: finalUrl, description: documentForm.description, filename: filePath || null },
+      { title: documentForm.title, link: finalUrl, notes: documentForm.description, path: filePath || null },
+    ];
+
+    const res = documentForm.id
+      ? await tryUpdate(["documents", "club_documents"], ["id"], documentForm.id, payloads)
+      : await tryInsert(["documents", "club_documents"], payloads);
+
+    setSaving(false);
+    setStatusMessage(res.ok ? `Document ${documentForm.id ? "updated" : "saved"}.` : `Could not ${documentForm.id ? "update" : "save"} document.`);
+    if (res.ok) {
+      setDocumentForm(emptyDocumentForm());
+      loadAllData();
+    }
+  }
+
+  async function handleDelete(section, id) {
+    if (!window.confirm("Delete this item?")) return;
+
+    setSaving(true);
+    let res = { ok: false };
+
+    if (section === "diary") {
+      res = await tryDelete(["events", "diary", "fixtures"], ["id", "event_id"], id);
+    } else if (section === "notices") {
+      res = await tryDelete(["information_posts", "notices", "noticeboard", "news"], ["id"], id);
+    } else if (section === "members") {
+      res = await tryDelete(["members", "club_members"], ["id"], id);
+    } else if (section === "office") {
+      res = await tryDelete(["office_bearers", "officebearers", "office"], ["id"], id);
+    } else if (section === "coaches") {
+      res = await tryDelete(["club_coaches", "coaches"], ["id"], id);
+    } else if (section === "documents") {
+      res = await tryDelete(["documents", "club_documents"], ["id"], id);
+    }
+
+    setSaving(false);
+    setStatusMessage(res.ok ? "Deleted." : "Could not delete item.");
+    if (res.ok) loadAllData();
+  }
+
+  function renderAdminBar(onSave, onClear) {
+    if (!isAdmin) return null;
     return (
-      <div style={styles.sectionTitleRow}>
-        <h2 style={styles.sectionTitle}>{children}</h2>
-        {rightSide}
+      <div style={styles.adminActionRow}>
+        <button style={styles.saveButton} onClick={onSave} disabled={saving}>
+          {saving ? "Saving..." : "Save"}
+        </button>
+        <button style={styles.secondaryButton} onClick={onClear}>
+          Clear
+        </button>
       </div>
     );
   }
 
   function renderHome() {
-    const nextEvent = upcomingDiary[0];
-
     return (
-      <>
-        <div style={styles.grid2}>
-          <div style={styles.card}>
-            <SectionTitle>Next Event</SectionTitle>
-            {nextEvent ? (
-              <div>
-                <div style={styles.itemTitle}>{nextEvent.title}</div>
-                <div style={styles.metaText}>
-                  {formatDateTime(nextEvent.date, nextEvent.time)}
-                </div>
-                {nextEvent.venue ? (
-                  <div style={styles.metaText}>Venue: {nextEvent.venue}</div>
-                ) : null}
-                {nextEvent.details ? (
-                  <p style={styles.bodyText}>{nextEvent.details}</p>
-                ) : null}
-              </div>
-            ) : (
-              <p style={styles.emptyText}>No upcoming events</p>
-            )}
-          </div>
-
-          <div style={styles.card}>
-            <SectionTitle>Admin</SectionTitle>
-            {isAdmin ? (
-              <div>
-                <div style={styles.adminBadge}>Admin logged in</div>
-                <div style={styles.buttonRow}>
-                  <button style={styles.secondaryBtn} onClick={loadAllData}>
-                    Refresh Data
-                  </button>
-                  <button style={styles.logoutBtn} onClick={handleAdminLogout}>
-                    Logout
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <p style={styles.bodyText}>
-                Members can use the app without logging in. Admin login is only for management access.
-              </p>
-            )}
-          </div>
-        </div>
-
+      <div style={styles.sectionGrid}>
         <div style={styles.card}>
-          <SectionTitle>Latest Notices</SectionTitle>
-          {latestNotices.length ? (
-            latestNotices.map((notice) => (
-              <div key={notice.id} style={styles.listItem}>
-                <div style={styles.itemTitle}>
-                  {notice.pinned ? "📌 " : ""}
-                  {notice.title}
-                </div>
-                {notice.date ? (
-                  <div style={styles.metaText}>{formatDate(notice.date)}</div>
-                ) : null}
-                {notice.body ? <p style={styles.bodyText}>{notice.body}</p> : null}
-              </div>
-            ))
+          <h2 style={styles.cardTitle}>Next Event</h2>
+          {upcomingDiary ? (
+            <>
+              <div style={styles.bigTitle}>{upcomingDiary.title}</div>
+              <div style={styles.cardText}>{formatDateTime(upcomingDiary.date, upcomingDiary.time)}</div>
+              <div style={styles.cardText}>{upcomingDiary.details || "No details provided"}</div>
+            </>
           ) : (
-            <p style={styles.emptyText}>No notices available</p>
+            <div style={styles.cardText}>No diary entries available</div>
           )}
         </div>
-      </>
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>Admin</h2>
+          <div style={styles.adminBadge}>{isAdmin ? "Admin logged in" : "Admin not logged in"}</div>
+          <div style={styles.buttonRow}>
+            <button style={styles.primaryButton} onClick={loadAllData}>Refresh Data</button>
+            {isAdmin ? <button style={styles.secondaryButton} onClick={handleLogout}>Logout</button> : null}
+          </div>
+        </div>
+        <div style={{ ...styles.card, gridColumn: "1 / -1" }}>
+          <h2 style={styles.cardTitle}>Latest Notices</h2>
+          {latestNotices.length ? latestNotices.map((row) => (
+            <div key={row.id} style={styles.listItemCompact}>
+              <div style={styles.itemTitle}>{row.title}</div>
+              <div style={styles.cardText}>{row.body}</div>
+            </div>
+          )) : <div style={styles.cardText}>No notices available</div>}
+        </div>
+      </div>
     );
   }
 
   function renderDiary() {
     return (
-      <div style={styles.card}>
-        <SectionTitle
-          rightSide={
-            <span style={styles.countBadge}>{diaryRows.length} entries</span>
-          }
-        >
-          Diary
-        </SectionTitle>
+      <div style={styles.cardLarge}>
+        <div style={styles.sectionHeaderRow}>
+          <h2 style={styles.cardTitle}>Diary</h2>
+          <div style={styles.pill}>{diaryRows.length} entries</div>
+        </div>
 
-        {diaryRows.length ? (
-          diaryRows.map((item) => (
-            <div key={item.id} style={styles.listItem}>
-              <div style={styles.itemTitle}>{item.title}</div>
-              <div style={styles.metaText}>
-                {formatDateTime(item.date, item.time)}
-              </div>
-              {item.venue ? (
-                <div style={styles.metaText}>Venue: {item.venue}</div>
-              ) : null}
-              {item.details ? <p style={styles.bodyText}>{item.details}</p> : null}
+        {isAdmin ? (
+          <div style={styles.formBox}>
+            <h3 style={styles.formTitle}>{diaryForm.id ? "Edit diary entry" : "Add diary entry"}</h3>
+            <div style={styles.formGrid2}>
+              <input style={styles.input} placeholder="Title" value={diaryForm.title} onChange={(e) => setDiaryForm({ ...diaryForm, title: e.target.value })} />
+              <input style={styles.input} type="date" value={diaryForm.date} onChange={(e) => setDiaryForm({ ...diaryForm, date: e.target.value })} />
+              <input style={styles.input} type="time" value={diaryForm.time} onChange={(e) => setDiaryForm({ ...diaryForm, time: e.target.value })} />
+              <select style={styles.input} value={diaryForm.repeatType} onChange={(e) => setDiaryForm({ ...diaryForm, repeatType: e.target.value })}>
+                <option value="none">No repeat</option>
+                <option value="weekly">Repeat weekly (same day)</option>
+                <option value="monthly">Repeat monthly (same date)</option>
+              </select>
+              <input style={styles.input} type="date" value={diaryForm.repeatUntil} onChange={(e) => setDiaryForm({ ...diaryForm, repeatUntil: e.target.value })} placeholder="Repeat until" />
+              <input style={styles.input} type="number" min="1" max="52" value={diaryForm.repeatCount} onChange={(e) => setDiaryForm({ ...diaryForm, repeatCount: e.target.value })} placeholder="How many times" />
             </div>
-          ))
-        ) : (
-          <p style={styles.emptyText}>No diary entries found</p>
-        )}
+            <textarea style={styles.textarea} placeholder="Details" value={diaryForm.details} onChange={(e) => setDiaryForm({ ...diaryForm, details: e.target.value })} />
+            {renderAdminBar(saveDiary, () => setDiaryForm(emptyDiaryForm()))}
+            <div style={styles.helpText}>For every Monday, pick a Monday start date and choose “Repeat weekly”.</div>
+          </div>
+        ) : null}
+
+        {diaryRows.length ? diaryRows.map((row) => (
+          <div key={row.id} style={styles.listItem}>
+            <div>
+              <div style={styles.itemTitle}>{row.title}</div>
+              <div style={styles.itemText}>{formatDateTime(row.date, row.time)}</div>
+              {row.details ? <div style={styles.itemText}>{row.details}</div> : null}
+            </div>
+            {isAdmin ? (
+              <div style={styles.itemButtons}>
+                <button style={styles.smallButton} onClick={() => startEditDiary(row)}>Edit</button>
+                <button style={styles.smallDeleteButton} onClick={() => handleDelete("diary", row.id)}>Delete</button>
+              </div>
+            ) : null}
+          </div>
+        )) : <div style={styles.emptyText}>No diary entries found</div>}
       </div>
     );
   }
 
   function renderNotices() {
     return (
-      <div style={styles.card}>
-        <SectionTitle
-          rightSide={
-            <span style={styles.countBadge}>{noticeRows.length} notices</span>
-          }
-        >
-          Noticeboard
-        </SectionTitle>
-
-        {noticeRows.length ? (
-          noticeRows.map((notice) => (
-            <div key={notice.id} style={styles.listItem}>
-              <div style={styles.itemTitle}>
-                {notice.pinned ? "📌 " : ""}
-                {notice.title}
-              </div>
-              {notice.date ? (
-                <div style={styles.metaText}>{formatDate(notice.date)}</div>
-              ) : null}
-              {notice.body ? <p style={styles.bodyText}>{notice.body}</p> : null}
-            </div>
-          ))
-        ) : (
-          <p style={styles.emptyText}>No notices found</p>
-        )}
-      </div>
-    );
-  }
-
-  function renderMemberSection(title, rows) {
-    if (!rows.length) return null;
-
-    return (
-      <div style={styles.card} key={title}>
-        <SectionTitle
-          rightSide={<span style={styles.countBadge}>{rows.length}</span>}
-        >
-          {title}
-        </SectionTitle>
-
-        <div style={styles.peopleGrid}>
-          {rows.map((member) => (
-            <div key={member.id} style={styles.personCard}>
-              <div style={styles.personName}>{member.name}</div>
-              {member.phone ? (
-                <div style={styles.metaText}>Phone: {member.phone}</div>
-              ) : null}
-              {member.email ? (
-                <div style={styles.metaText}>Email: {member.email}</div>
-              ) : null}
-              <ContactLinks
-                phone={member.phone}
-                whatsapp={member.whatsapp}
-                email={member.email}
-              />
-            </div>
-          ))}
+      <div style={styles.cardLarge}>
+        <div style={styles.sectionHeaderRow}>
+          <h2 style={styles.cardTitle}>Noticeboard</h2>
+          <div style={styles.pill}>{noticeRows.length} notices</div>
         </div>
+
+        {isAdmin ? (
+          <div style={styles.formBox}>
+            <h3 style={styles.formTitle}>{noticeForm.id ? "Edit notice" : "Add notice"}</h3>
+            <input style={styles.input} placeholder="Title" value={noticeForm.title} onChange={(e) => setNoticeForm({ ...noticeForm, title: e.target.value })} />
+            <input style={styles.input} type="date" value={noticeForm.date} onChange={(e) => setNoticeForm({ ...noticeForm, date: e.target.value })} />
+            <textarea style={styles.textarea} placeholder="Notice text" value={noticeForm.body} onChange={(e) => setNoticeForm({ ...noticeForm, body: e.target.value })} />
+            {renderAdminBar(saveNotice, () => setNoticeForm(emptyNoticeForm()))}
+          </div>
+        ) : null}
+
+        {noticeRows.length ? noticeRows.map((row) => (
+          <div key={row.id} style={styles.listItem}>
+            <div>
+              <div style={styles.itemTitle}>{row.title}</div>
+              {row.date ? <div style={styles.itemText}>{formatDate(row.date)}</div> : null}
+              <div style={styles.itemText}>{row.body}</div>
+            </div>
+            {isAdmin ? (
+              <div style={styles.itemButtons}>
+                <button style={styles.smallButton} onClick={() => startEditNotice(row)}>Edit</button>
+                <button style={styles.smallDeleteButton} onClick={() => handleDelete("notices", row.id)}>Delete</button>
+              </div>
+            ) : null}
+          </div>
+        )) : <div style={styles.emptyText}>No notices found</div>}
       </div>
     );
   }
 
   function renderMembers() {
+    const order = ["Gents", "Ladies", "Associate", "Members"];
     return (
-      <>
-        {renderMemberSection("Gents", membersBySection.Gents)}
-        {renderMemberSection("Ladies", membersBySection.Ladies)}
-        {renderMemberSection("Associate", membersBySection.Associate)}
-        {renderMemberSection("Members", membersBySection.Members)}
-        {renderMemberSection("Other", membersBySection.Other)}
+      <div style={styles.cardLarge}>
+        <div style={styles.sectionHeaderRow}>
+          <h2 style={styles.cardTitle}>Members</h2>
+          <div style={styles.pill}>{memberRows.length} members</div>
+        </div>
 
-        {!memberRows.length ? (
-          <div style={styles.card}>
-            <p style={styles.emptyText}>No members found</p>
+        {isAdmin ? (
+          <div style={styles.formBox}>
+            <h3 style={styles.formTitle}>{memberForm.id ? "Edit member" : "Add member"}</h3>
+            <div style={styles.formGrid2}>
+              <input style={styles.input} placeholder="Name" value={memberForm.name} onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })} />
+              <select style={styles.input} value={memberForm.section} onChange={(e) => setMemberForm({ ...memberForm, section: e.target.value })}>
+                <option>Members</option>
+                <option>Gents</option>
+                <option>Ladies</option>
+                <option>Associate</option>
+              </select>
+              <input style={styles.input} placeholder="Phone" value={memberForm.phone} onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })} />
+              <input style={styles.input} placeholder="Email" value={memberForm.email} onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })} />
+            </div>
+            <textarea style={styles.textarea} placeholder="Notes" value={memberForm.notes} onChange={(e) => setMemberForm({ ...memberForm, notes: e.target.value })} />
+            {renderAdminBar(saveMember, () => setMemberForm(emptyMemberForm()))}
           </div>
         ) : null}
-      </>
+
+        {order.map((section) => (
+          groupedMembers[section]?.length ? (
+            <div key={section} style={styles.memberGroup}>
+              <h3 style={styles.subHeading}>{section}</h3>
+              {groupedMembers[section].map((row) => (
+                <div key={row.id} style={styles.listItem}>
+                  <div>
+                    <div style={styles.itemTitle}>{row.name}</div>
+                    {row.phone ? <div style={styles.itemText}>Phone: {formatPhoneForDisplay(row.phone)}</div> : null}
+                    {row.email ? <div style={styles.itemText}>Email: {row.email}</div> : null}
+                    {row.notes ? <div style={styles.itemText}>{row.notes}</div> : null}
+                  </div>
+                  <div style={styles.itemButtons}>
+                    {row.phone ? <a style={styles.whatsAppButton} href={`https://wa.me/${cleanPhone(row.phone)}`} target="_blank" rel="noreferrer">WhatsApp</a> : null}
+                    {isAdmin ? <button style={styles.smallButton} onClick={() => startEditMember(row)}>Edit</button> : null}
+                    {isAdmin ? <button style={styles.smallDeleteButton} onClick={() => handleDelete("members", row.id)}>Delete</button> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null
+        ))}
+
+        {!memberRows.length ? <div style={styles.emptyText}>No members found</div> : null}
+      </div>
     );
   }
 
   function renderOffice() {
+    const sortedRows = [...officeRows].sort((a, b) => a.sort_order - b.sort_order);
     return (
-      <div style={styles.card}>
-        <SectionTitle
-          rightSide={<span style={styles.countBadge}>{officeRows.length}</span>}
-        >
-          Office Bearers
-        </SectionTitle>
+      <div style={styles.cardLarge}>
+        <div style={styles.sectionHeaderRow}>
+          <h2 style={styles.cardTitle}>Office Bearers</h2>
+          <div style={styles.pill}>{officeRows.length}</div>
+        </div>
 
-        {officeRows.length ? (
-          <div style={styles.peopleGrid}>
-            {officeRows.map((person) => (
-              <div key={person.id} style={styles.personCard}>
-                <div style={styles.personRole}>{person.role}</div>
-                <div style={styles.personName}>{person.name}</div>
-                {person.phone ? (
-                  <div style={styles.metaText}>Phone: {person.phone}</div>
-                ) : null}
-                {person.email ? (
-                  <div style={styles.metaText}>Email: {person.email}</div>
-                ) : null}
-                <ContactLinks
-                  phone={person.phone}
-                  whatsapp={person.whatsapp}
-                  email={person.email}
-                />
-              </div>
-            ))}
+        {isAdmin ? (
+          <div style={styles.formBox}>
+            <h3 style={styles.formTitle}>{officeForm.id ? "Edit office bearer" : "Add office bearer"}</h3>
+            <div style={styles.formGrid2}>
+              <input style={styles.input} placeholder="Role" value={officeForm.role} onChange={(e) => setOfficeForm({ ...officeForm, role: e.target.value })} />
+              <input style={styles.input} placeholder="Name" value={officeForm.name} onChange={(e) => setOfficeForm({ ...officeForm, name: e.target.value })} />
+              <input style={styles.input} placeholder="Phone" value={officeForm.phone} onChange={(e) => setOfficeForm({ ...officeForm, phone: e.target.value })} />
+              <input style={styles.input} placeholder="Email" value={officeForm.email} onChange={(e) => setOfficeForm({ ...officeForm, email: e.target.value })} />
+              <input style={styles.input} placeholder="Display order" type="number" value={officeForm.sort_order} onChange={(e) => setOfficeForm({ ...officeForm, sort_order: e.target.value })} />
+            </div>
+            {renderAdminBar(saveOffice, () => setOfficeForm(emptyOfficeForm()))}
           </div>
-        ) : (
-          <p style={styles.emptyText}>No office bearers found</p>
-        )}
+        ) : null}
+
+        {sortedRows.length ? sortedRows.map((row) => (
+          <div key={row.id} style={styles.listItem}>
+            <div>
+              <div style={styles.itemTitle}>{row.role}</div>
+              <div style={styles.itemText}>{row.name}</div>
+              {row.phone ? <div style={styles.itemText}>Phone: {formatPhoneForDisplay(row.phone)}</div> : null}
+              {row.email ? <div style={styles.itemText}>Email: {row.email}</div> : null}
+            </div>
+            <div style={styles.itemButtons}>
+              {row.phone ? <a style={styles.whatsAppButton} href={`https://wa.me/${cleanPhone(row.phone)}`} target="_blank" rel="noreferrer">WhatsApp</a> : null}
+              {isAdmin ? <button style={styles.smallButton} onClick={() => startEditOffice(row)}>Edit</button> : null}
+              {isAdmin ? <button style={styles.smallDeleteButton} onClick={() => handleDelete("office", row.id)}>Delete</button> : null}
+            </div>
+          </div>
+        )) : <div style={styles.emptyText}>No office bearers found</div>}
       </div>
     );
   }
 
   function renderCoaches() {
+    const sortedRows = [...coachRows].sort((a, b) => a.sort_order - b.sort_order);
     return (
-      <div style={styles.card}>
-        <SectionTitle
-          rightSide={<span style={styles.countBadge}>{coachRows.length}</span>}
-        >
-          Club Coaches
-        </SectionTitle>
+      <div style={styles.cardLarge}>
+        <div style={styles.sectionHeaderRow}>
+          <h2 style={styles.cardTitle}>Club Coaches</h2>
+          <div style={styles.pill}>{coachRows.length}</div>
+        </div>
 
-        {coachRows.length ? (
-          <div style={styles.peopleGrid}>
-            {coachRows.map((coach) => (
-              <div key={coach.id} style={styles.personCard}>
-                <div style={styles.personName}>{coach.name}</div>
-                {coach.phone ? (
-                  <div style={styles.metaText}>Phone: {coach.phone}</div>
-                ) : null}
-                {coach.email ? (
-                  <div style={styles.metaText}>Email: {coach.email}</div>
-                ) : null}
-                {coach.details ? (
-                  <p style={styles.bodyText}>{coach.details}</p>
-                ) : null}
-                <ContactLinks
-                  phone={coach.phone}
-                  whatsapp={coach.whatsapp}
-                  email={coach.email}
-                />
-              </div>
-            ))}
+        {isAdmin ? (
+          <div style={styles.formBox}>
+            <h3 style={styles.formTitle}>{coachForm.id ? "Edit coach" : "Add coach"}</h3>
+            <div style={styles.formGrid2}>
+              <input style={styles.input} placeholder="Name" value={coachForm.name} onChange={(e) => setCoachForm({ ...coachForm, name: e.target.value })} />
+              <input style={styles.input} placeholder="Phone" value={coachForm.phone} onChange={(e) => setCoachForm({ ...coachForm, phone: e.target.value })} />
+              <input style={styles.input} placeholder="Email" value={coachForm.email} onChange={(e) => setCoachForm({ ...coachForm, email: e.target.value })} />
+              <input style={styles.input} placeholder="Display order" type="number" value={coachForm.sort_order} onChange={(e) => setCoachForm({ ...coachForm, sort_order: e.target.value })} />
+            </div>
+            <textarea style={styles.textarea} placeholder="Notes" value={coachForm.notes} onChange={(e) => setCoachForm({ ...coachForm, notes: e.target.value })} />
+            {renderAdminBar(saveCoach, () => setCoachForm(emptyCoachForm()))}
           </div>
-        ) : (
-          <p style={styles.emptyText}>No coaches found</p>
-        )}
+        ) : null}
+
+        {sortedRows.length ? sortedRows.map((row) => (
+          <div key={row.id} style={styles.listItem}>
+            <div>
+              <div style={styles.itemTitle}>{row.name}</div>
+              {row.phone ? <div style={styles.itemText}>Phone: {formatPhoneForDisplay(row.phone)}</div> : null}
+              {row.email ? <div style={styles.itemText}>Email: {row.email}</div> : null}
+              {row.notes ? <div style={styles.itemText}>{row.notes}</div> : null}
+            </div>
+            <div style={styles.itemButtons}>
+              {row.phone ? <a style={styles.whatsAppButton} href={`https://wa.me/${cleanPhone(row.phone)}`} target="_blank" rel="noreferrer">WhatsApp</a> : null}
+              {isAdmin ? <button style={styles.smallButton} onClick={() => startEditCoach(row)}>Edit</button> : null}
+              {isAdmin ? <button style={styles.smallDeleteButton} onClick={() => handleDelete("coaches", row.id)}>Delete</button> : null}
+            </div>
+          </div>
+        )) : <div style={styles.emptyText}>No coaches found</div>}
       </div>
     );
   }
 
   function renderDocuments() {
     return (
-      <div style={styles.card}>
-        <SectionTitle
-          rightSide={
-            <span style={styles.countBadge}>{documentRows.length} files</span>
-          }
-        >
-          Documents
-        </SectionTitle>
+      <div style={styles.cardLarge}>
+        <div style={styles.sectionHeaderRow}>
+          <h2 style={styles.cardTitle}>Documents</h2>
+          <div style={styles.pill}>{documentRows.length} files</div>
+        </div>
 
-        {documentRows.length ? (
-          documentRows.map((doc) => (
-            <div key={doc.id} style={styles.listItem}>
-              <div style={styles.itemTitle}>{doc.title}</div>
-              {doc.date ? (
-                <div style={styles.metaText}>{formatDate(doc.date)}</div>
-              ) : null}
-              {doc.description ? (
-                <p style={styles.bodyText}>{doc.description}</p>
-              ) : null}
-              {doc.url ? (
-                <a
-                  href={doc.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={styles.docLink}
-                >
-                  Open document
-                </a>
-              ) : (
-                <div style={styles.metaText}>No link available</div>
-              )}
+        {isAdmin ? (
+          <div style={styles.formBox}>
+            <h3 style={styles.formTitle}>{documentForm.id ? "Edit document" : "Add document"}</h3>
+            <input style={styles.input} placeholder="Title" value={documentForm.title} onChange={(e) => setDocumentForm({ ...documentForm, title: e.target.value })} />
+            <input style={styles.input} placeholder="Paste document URL here" value={documentForm.url} onChange={(e) => setDocumentForm({ ...documentForm, url: e.target.value })} />
+            <textarea style={styles.textarea} placeholder="Description (optional)" value={documentForm.description} onChange={(e) => setDocumentForm({ ...documentForm, description: e.target.value })} />
+            <input style={styles.input} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={(e) => setDocumentForm({ ...documentForm, file: e.target.files?.[0] || null })} />
+            {renderAdminBar(saveDocument, () => setDocumentForm(emptyDocumentForm()))}
+            <div style={styles.helpText}>You can paste a public URL or upload a file directly.</div>
+          </div>
+        ) : null}
+
+        {documentRows.length ? documentRows.map((row) => (
+          <div key={row.id} style={styles.listItem}>
+            <div>
+              <div style={styles.itemTitle}>{row.title}</div>
+              {row.description ? <div style={styles.itemText}>{row.description}</div> : null}
             </div>
-          ))
-        ) : (
-          <p style={styles.emptyText}>No documents found</p>
-        )}
+            <div style={styles.itemButtons}>
+              {row.url ? <a style={styles.primaryButton} href={row.url} target="_blank" rel="noreferrer">Open</a> : null}
+              {isAdmin ? <button style={styles.smallButton} onClick={() => startEditDocument(row)}>Edit</button> : null}
+              {isAdmin ? <button style={styles.smallDeleteButton} onClick={() => handleDelete("documents", row.id)}>Delete</button> : null}
+            </div>
+          </div>
+        )) : <div style={styles.emptyText}>No documents found</div>}
       </div>
     );
   }
 
-  function renderActiveTab() {
-    if (loading) {
-      return (
-        <div style={styles.card}>
-          <p style={styles.bodyText}>Loading club information...</p>
-        </div>
-      );
-    }
-
+  function renderTab() {
+    if (loading) return <div style={styles.cardLarge}>Loading...</div>;
     switch (activeTab) {
-      case "home":
-        return renderHome();
-      case "diary":
-        return renderDiary();
-      case "notices":
-        return renderNotices();
-      case "members":
-        return renderMembers();
-      case "office":
-        return renderOffice();
-      case "coaches":
-        return renderCoaches();
-      case "documents":
-        return renderDocuments();
-      default:
-        return renderHome();
+      case "home": return renderHome();
+      case "diary": return renderDiary();
+      case "notices": return renderNotices();
+      case "members": return renderMembers();
+      case "office": return renderOffice();
+      case "coaches": return renderCoaches();
+      case "documents": return renderDocuments();
+      default: return renderHome();
     }
   }
 
@@ -730,58 +996,43 @@ export default function App() {
             <img src={logo} alt="Club logo" style={styles.logo} />
             <div>
               <h1 style={styles.title}>{CLUB_NAME}</h1>
-              <p style={styles.subtitle}>{CLUB_SUBTITLE}</p>
+              <div style={styles.subtitle}>{CLUB_SUBTITLE}</div>
             </div>
           </div>
-
           <div style={styles.headerRight}>
-            {!isAdmin ? (
-              <form onSubmit={handleAdminLogin} style={styles.loginForm}>
+            {isAdmin ? <div style={styles.adminBadge}>Admin logged in</div> : (
+              <>
                 <input
+                  style={styles.inputPin}
                   type="password"
                   placeholder="Admin PIN"
                   value={adminPin}
                   onChange={(e) => setAdminPin(e.target.value)}
-                  style={styles.input}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAdminLogin(); }}
                 />
-                <button type="submit" style={styles.loginBtn}>
-                  Login
-                </button>
-              </form>
-            ) : (
-              <div style={styles.buttonRow}>
-                <span style={styles.adminBadge}>Admin logged in</span>
-                <button style={styles.secondaryBtn} onClick={loadAllData}>
-                  Refresh
-                </button>
-                <button style={styles.logoutBtn} onClick={handleAdminLogout}>
-                  Logout
-                </button>
-              </div>
+                <button style={styles.primaryButton} onClick={handleAdminLogin}>Login</button>
+              </>
             )}
+            <button style={styles.primaryButton} onClick={loadAllData}>Refresh</button>
+            {isAdmin ? <button style={styles.secondaryButton} onClick={handleLogout}>Logout</button> : null}
           </div>
         </div>
 
-        <div style={styles.tabs}>
+        <div style={styles.tabsWrap}>
           {TABS.map((tab) => (
             <button
               key={tab.key}
+              style={activeTab === tab.key ? styles.tabActive : styles.tab}
               onClick={() => setActiveTab(tab.key)}
-              style={{
-                ...styles.tab,
-                ...(activeTab === tab.key ? styles.activeTab : {}),
-              }}
             >
               {tab.label}
             </button>
           ))}
         </div>
 
-        {statusMessage ? (
-          <div style={styles.warningBox}>{statusMessage}</div>
-        ) : null}
+        {statusMessage ? <div style={styles.statusMessage}>{statusMessage}</div> : null}
 
-        <div style={styles.content}>{renderActiveTab()}</div>
+        {renderTab()}
       </div>
     </div>
   );
@@ -790,269 +1041,215 @@ export default function App() {
 const styles = {
   page: {
     minHeight: "100vh",
-    background:
-      "linear-gradient(180deg, #78162a 0%, #8d1730 42%, #a41d39 100%)",
+    background: "linear-gradient(180deg, #8b102b 0%, #b11233 100%)",
     padding: 16,
     fontFamily: "Arial, sans-serif",
-    color: "#1f1f1f",
-    boxSizing: "border-box",
   },
-  wrap: {
-    maxWidth: 1300,
-    margin: "0 auto",
-  },
+  wrap: { maxWidth: 1260, margin: "0 auto" },
   header: {
     background: "#efefef",
-    borderRadius: 28,
+    borderRadius: 36,
     padding: 26,
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     gap: 20,
     flexWrap: "wrap",
-    boxShadow: "0 10px 28px rgba(0,0,0,0.18)",
-    border: "1px solid rgba(255,255,255,0.5)",
+    marginBottom: 20,
   },
-  headerLeft: {
-    display: "flex",
-    alignItems: "center",
-    gap: 24,
-    minWidth: 280,
-    flex: 1,
-  },
-  headerRight: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    flex: 1,
-    minWidth: 280,
-  },
-  logo: {
-    width: 104,
-    height: 104,
-    objectFit: "contain",
+  headerLeft: { display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" },
+  headerRight: { display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" },
+  logo: { width: 150, height: 150, objectFit: "contain" },
+  title: { fontSize: 64, lineHeight: 1, margin: 0, color: "#17233d", fontWeight: 800 },
+  subtitle: { fontSize: 28, color: "#17233d", marginTop: 14, maxWidth: 420 },
+  inputPin: {
+    height: 56,
     borderRadius: 18,
-    background: "transparent",
-    flexShrink: 0,
-  },
-  title: {
-    margin: 0,
-    fontSize: "clamp(2rem, 3.2vw, 3.2rem)",
-    fontWeight: 800,
-    lineHeight: 1.1,
-    color: "#1f2430",
-  },
-  subtitle: {
-    margin: "12px 0 0 0",
-    fontSize: "clamp(1.1rem, 1.8vw, 1.8rem)",
-    color: "#20242a",
-  },
-  loginForm: {
-    display: "flex",
-    gap: 10,
-    flexWrap: "wrap",
-    alignItems: "center",
-    justifyContent: "flex-end",
-  },
-  input: {
-    width: 220,
-    maxWidth: "100%",
-    padding: "14px 16px",
+    border: "1px solid #ccc",
+    padding: "0 18px",
     fontSize: 22,
-    borderRadius: 12,
-    border: "1px solid #b7b7b7",
-    outline: "none",
-    boxSizing: "border-box",
+    minWidth: 220,
   },
-  loginBtn: {
-    padding: "14px 18px",
-    fontSize: 22,
-    borderRadius: 12,
-    border: "none",
-    cursor: "pointer",
-    background: "#7f1730",
-    color: "#fff",
-    fontWeight: 700,
-  },
-  logoutBtn: {
-    padding: "11px 14px",
-    fontSize: 16,
-    borderRadius: 10,
-    border: "none",
-    cursor: "pointer",
-    background: "#4b5563",
-    color: "#fff",
-    fontWeight: 700,
-  },
-  secondaryBtn: {
-    padding: "11px 14px",
-    fontSize: 16,
-    borderRadius: 10,
-    border: "none",
-    cursor: "pointer",
-    background: "#8b1e35",
-    color: "#fff",
-    fontWeight: 700,
-  },
-  buttonRow: {
-    display: "flex",
-    gap: 10,
-    alignItems: "center",
-    flexWrap: "wrap",
-  },
-  adminBadge: {
-    background: "#e8f6ed",
-    color: "#15643a",
-    padding: "10px 12px",
-    borderRadius: 999,
-    fontWeight: 700,
-    fontSize: 15,
-  },
-  tabs: {
-    display: "flex",
-    gap: 10,
-    flexWrap: "wrap",
-    marginTop: 18,
-    marginBottom: 18,
-  },
+  tabsWrap: { display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 20 },
   tab: {
-    padding: "12px 18px",
-    fontSize: 20,
-    borderRadius: 14,
     border: "none",
-    background: "#f5f5f5",
-    color: "#1f1f1f",
-    cursor: "pointer",
+    borderRadius: 20,
+    background: "#f2f2f2",
+    color: "#17233d",
+    fontSize: 22,
     fontWeight: 700,
-    boxShadow: "0 4px 10px rgba(0,0,0,0.12)",
+    padding: "18px 28px",
+    cursor: "pointer",
   },
-  activeTab: {
-    background: "#f2c94c",
-  },
-  content: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 18,
+  tabActive: {
+    border: "none",
+    borderRadius: 20,
+    background: "#f0c841",
+    color: "#17233d",
+    fontSize: 22,
+    fontWeight: 800,
+    padding: "18px 28px",
+    cursor: "pointer",
   },
   card: {
-    background: "#f4f4f4",
-    borderRadius: 22,
-    padding: 22,
-    boxShadow: "0 8px 22px rgba(0,0,0,0.14)",
+    background: "#efefef",
+    borderRadius: 28,
+    padding: 28,
+    minHeight: 180,
   },
-  grid2: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-    gap: 18,
+  cardLarge: {
+    background: "#efefef",
+    borderRadius: 28,
+    padding: 32,
   },
-  sectionTitleRow: {
+  sectionGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 },
+  sectionHeaderRow: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap" },
+  cardTitle: { margin: 0, fontSize: 46, color: "#17233d", fontWeight: 800 },
+  subHeading: { margin: "12px 0", fontSize: 30, color: "#17233d" },
+  bigTitle: { fontSize: 34, fontWeight: 800, color: "#17233d", marginBottom: 12 },
+  cardText: { fontSize: 22, color: "#334", marginTop: 8 },
+  itemTitle: { fontSize: 28, fontWeight: 800, color: "#17233d" },
+  itemText: { fontSize: 20, color: "#334", marginTop: 6, whiteSpace: "pre-wrap" },
+  listItem: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
+    gap: 18,
+    padding: "18px 0",
+    borderBottom: "1px solid #d5d5d5",
+    alignItems: "flex-start",
     flexWrap: "wrap",
-    marginBottom: 16,
   },
-  sectionTitle: {
-    margin: 0,
-    fontSize: "clamp(1.6rem, 2.3vw, 2.3rem)",
-    color: "#1f2430",
-    fontWeight: 800,
+  listItemCompact: { padding: "12px 0", borderBottom: "1px solid #d5d5d5" },
+  itemButtons: { display: "flex", gap: 10, flexWrap: "wrap" },
+  buttonRow: { display: "flex", gap: 12, flexWrap: "wrap", marginTop: 18 },
+  primaryButton: {
+    border: "none",
+    borderRadius: 18,
+    background: "#9f1435",
+    color: "white",
+    fontSize: 18,
+    fontWeight: 700,
+    padding: "14px 22px",
+    cursor: "pointer",
+    textDecoration: "none",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  countBadge: {
-    background: "#8b1e35",
-    color: "#fff",
-    padding: "8px 12px",
+  secondaryButton: {
+    border: "none",
+    borderRadius: 18,
+    background: "#596579",
+    color: "white",
+    fontSize: 18,
+    fontWeight: 700,
+    padding: "14px 22px",
+    cursor: "pointer",
+  },
+  saveButton: {
+    border: "none",
+    borderRadius: 18,
+    background: "#14814d",
+    color: "white",
+    fontSize: 18,
+    fontWeight: 700,
+    padding: "14px 22px",
+    cursor: "pointer",
+  },
+  smallButton: {
+    border: "none",
+    borderRadius: 14,
+    background: "#e7edf8",
+    color: "#17233d",
+    fontSize: 16,
+    fontWeight: 700,
+    padding: "10px 14px",
+    cursor: "pointer",
+  },
+  smallDeleteButton: {
+    border: "none",
+    borderRadius: 14,
+    background: "#cc3b4b",
+    color: "white",
+    fontSize: 16,
+    fontWeight: 700,
+    padding: "10px 14px",
+    cursor: "pointer",
+  },
+  whatsAppButton: {
+    border: "none",
+    borderRadius: 14,
+    background: "#25D366",
+    color: "white",
+    fontSize: 16,
+    fontWeight: 700,
+    padding: "10px 14px",
+    cursor: "pointer",
+    textDecoration: "none",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  adminBadge: {
+    background: "#dfeadf",
+    color: "#0d6b3e",
     borderRadius: 999,
-    fontSize: 14,
+    padding: "14px 20px",
+    fontSize: 18,
     fontWeight: 700,
   },
-  listItem: {
-    padding: "14px 0",
-    borderBottom: "1px solid #d9d9d9",
-  },
-  itemTitle: {
-    fontSize: 24,
-    fontWeight: 800,
-    color: "#1f2430",
-    marginBottom: 6,
-  },
-  metaText: {
-    fontSize: 17,
-    color: "#444",
-    marginBottom: 4,
-    wordBreak: "break-word",
-  },
-  bodyText: {
-    margin: "8px 0 0 0",
+  pill: {
+    background: "#9f1435",
+    color: "white",
+    borderRadius: 999,
+    padding: "12px 18px",
     fontSize: 18,
-    lineHeight: 1.5,
-    color: "#232323",
+    fontWeight: 700,
   },
-  emptyText: {
-    margin: 0,
-    fontSize: 18,
-    color: "#555",
-  },
-  peopleGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))",
-    gap: 16,
-  },
-  personCard: {
-    background: "#fff",
-    borderRadius: 18,
-    padding: 16,
-    boxShadow: "0 4px 14px rgba(0,0,0,0.08)",
+  emptyText: { fontSize: 22, color: "#4b5563" },
+  formBox: {
+    background: "#ffffff",
+    borderRadius: 22,
+    padding: 20,
+    margin: "22px 0 10px",
     border: "1px solid #e2e2e2",
   },
-  personRole: {
-    fontSize: 16,
-    fontWeight: 700,
-    color: "#8b1e35",
-    marginBottom: 6,
+  formTitle: { marginTop: 0, fontSize: 28, color: "#17233d" },
+  formGrid2: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: 12,
+    marginBottom: 12,
   },
-  personName: {
-    fontSize: 24,
-    fontWeight: 800,
-    color: "#1f2430",
-    marginBottom: 8,
-    lineHeight: 1.25,
+  input: {
+    width: "100%",
+    borderRadius: 14,
+    border: "1px solid #cfd3d9",
+    padding: "14px 16px",
+    fontSize: 18,
+    boxSizing: "border-box",
+    marginBottom: 12,
   },
-  contactRow: {
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-    marginTop: 12,
+  textarea: {
+    width: "100%",
+    minHeight: 100,
+    borderRadius: 14,
+    border: "1px solid #cfd3d9",
+    padding: "14px 16px",
+    fontSize: 18,
+    boxSizing: "border-box",
+    marginBottom: 12,
+    resize: "vertical",
   },
-  contactLink: {
-    display: "inline-block",
-    padding: "8px 12px",
-    borderRadius: 999,
-    background: "#eef2f7",
-    color: "#1f2430",
-    textDecoration: "none",
-    fontWeight: 700,
-    fontSize: 14,
+  adminActionRow: { display: "flex", gap: 12, flexWrap: "wrap" },
+  helpText: { color: "#556", fontSize: 16, marginTop: 8 },
+  statusMessage: {
+    background: "#f4f4f4",
+    borderRadius: 18,
+    padding: "14px 18px",
+    fontSize: 18,
+    color: "#17233d",
+    marginBottom: 18,
   },
-  docLink: {
-    display: "inline-block",
-    marginTop: 8,
-    padding: "10px 14px",
-    borderRadius: 12,
-    background: "#8b1e35",
-    color: "#fff",
-    textDecoration: "none",
-    fontWeight: 700,
-  },
-  warningBox: {
-    background: "#fff3cd",
-    color: "#7a5a00",
-    border: "1px solid #f1d27a",
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 16,
-    fontSize: 16,
-    fontWeight: 700,
-  },
+  memberGroup: { marginTop: 16 },
 };
