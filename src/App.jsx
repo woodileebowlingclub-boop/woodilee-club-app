@@ -28,36 +28,64 @@ function getField(item, keys, fallback = "") {
   return fallback;
 }
 
-function parseEventDate(event) {
-  const raw = event?.event_date || event?.date_text;
-  if (!raw) return null;
+function parseDateTextToDate(text) {
+  if (!text) return null;
+  const clean = String(text).trim();
+  if (!clean) return null;
 
-  const text = String(raw).trim();
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-    const d = new Date(`${text}T12:00:00`);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+    const d = new Date(`${clean}T12:00:00`);
     return Number.isNaN(d.getTime()) ? null : d;
   }
 
-  const d = new Date(text);
-  if (!Number.isNaN(d.getTime())) return d;
+  const d1 = new Date(clean);
+  if (!Number.isNaN(d1.getTime())) return d1;
+
+  const match = clean.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})$/);
+  if (match) {
+    const [, day, monthName, year] = match;
+    const trial = new Date(`${day} ${monthName} ${year} 12:00:00`);
+    if (!Number.isNaN(trial.getTime())) return trial;
+  }
 
   return null;
 }
 
-function displayEventDate(event) {
-  if (event?.date_text && String(event.date_text).trim()) {
-    return String(event.date_text).trim();
+function parseEventDate(event) {
+  const eventDate = safeString(event?.event_date).trim();
+  if (eventDate) {
+    const parsed = parseDateTextToDate(eventDate);
+    if (parsed) return parsed;
   }
 
-  const d = parseEventDate(event);
-  if (!d) return "";
+  const dateText = safeString(event?.date_text).trim();
+  if (dateText) {
+    const parsed = parseDateTextToDate(dateText);
+    if (parsed) return parsed;
+  }
 
-  return d.toLocaleDateString("en-GB", {
+  return null;
+}
+
+function formatDateForDisplay(dateObj) {
+  if (!dateObj) return "";
+  return dateObj.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
+}
+
+function displayEventDate(event) {
+  const dateText = safeString(event?.date_text).trim();
+  if (dateText) {
+    const parsed = parseDateTextToDate(dateText);
+    return parsed ? formatDateForDisplay(parsed) : dateText;
+  }
+
+  const parsed = parseEventDate(event);
+  if (!parsed) return "";
+  return formatDateForDisplay(parsed);
 }
 
 export default function App() {
@@ -237,7 +265,10 @@ export default function App() {
     setSaving(true);
     clearMessages();
 
-    const { error } = await supabase.from("information_posts").delete().eq("id", id);
+    const { error } = await supabase
+      .from("information_posts")
+      .delete()
+      .eq("id", id);
 
     if (error) {
       setErrorMessage(error.message || "Failed to delete notice");
@@ -383,7 +414,9 @@ export default function App() {
     const { error } = await supabase.from("office_bearers").insert({
       role,
       name,
-      display_order: officeForm.display_order ? Number(officeForm.display_order) : null,
+      display_order: officeForm.display_order
+        ? Number(officeForm.display_order)
+        : null,
     });
 
     if (error) {
@@ -409,7 +442,10 @@ export default function App() {
     setSaving(true);
     clearMessages();
 
-    const { error } = await supabase.from("office_bearers").delete().eq("id", id);
+    const { error } = await supabase
+      .from("office_bearers")
+      .delete()
+      .eq("id", id);
 
     if (error) {
       setErrorMessage(error.message || "Failed to delete office bearer");
@@ -455,7 +491,10 @@ export default function App() {
     setSaving(true);
     clearMessages();
 
-    const { error } = await supabase.from("club_coaches").delete().eq("id", id);
+    const { error } = await supabase
+      .from("club_coaches")
+      .delete()
+      .eq("id", id);
 
     if (error) {
       setErrorMessage(error.message || "Failed to delete coach");
@@ -526,10 +565,13 @@ export default function App() {
       const da = parseEventDate(a);
       const db = parseEventDate(b);
 
-      if (!da && !db) return 0;
+      if (!da && !db) {
+        return safeString(getField(a, ["title"], "")).localeCompare(
+          safeString(getField(b, ["title"], ""))
+        );
+      }
       if (!da) return 1;
       if (!db) return -1;
-
       return da - db;
     });
   }, [events]);
@@ -554,7 +596,11 @@ export default function App() {
       const name = safeString(getField(m, ["name"], "")).toLowerCase();
       const section = safeString(getField(m, ["section"], "")).toLowerCase();
       const phone = safeString(getField(m, ["phone"], "")).toLowerCase();
-      return name.includes(search) || section.includes(search) || phone.includes(search);
+      return (
+        name.includes(search) ||
+        section.includes(search) ||
+        phone.includes(search)
+      );
     });
   }, [members, memberSearch]);
 
@@ -729,6 +775,9 @@ export default function App() {
                 <div key={event.id} style={styles.listItem}>
                   <div style={styles.listTitle}>{getField(event, ["title"], "Untitled event")}</div>
                   <div style={styles.listMeta}>{displayEventDate(event)}</div>
+                  {getField(event, ["event_time"], "") && (
+                    <div style={styles.listMeta}>{getField(event, ["event_time"], "")}</div>
+                  )}
                   {getField(event, ["note", "notes", "content"], "") && (
                     <div style={styles.paragraph}>{getField(event, ["note", "notes", "content"], "")}</div>
                   )}
@@ -1249,3 +1298,4 @@ const styles = {
     fontWeight: 700,
   },
 };
+ we have that already
