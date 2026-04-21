@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "./lib/supabase";
+import logo from "./assets/WBC Logo.png";
 
-const MEMBER_PIN = "1911";
 const ADMIN_PIN = "1954";
 const CLUB_NAME = "Woodilee Bowling Club";
 const CLUB_SUBTITLE = "Members diary, notices and club information";
@@ -73,9 +73,27 @@ function WhatsAppButton({ phone }) {
   );
 }
 
+function getEventDisplayDate(event) {
+  return getField(event, ["date_text"]) || formatDateTime(
+    getField(event, ["event_date", "date", "eventDate"]),
+    getField(event, ["event_time", "time", "eventTime"])
+  );
+}
+
+function getEventSortValue(event) {
+  const dateText = getField(event, ["date_text"], "");
+  const parsed = Date.parse(dateText);
+  if (!Number.isNaN(parsed)) return parsed;
+
+  const alt = getField(event, ["event_date", "date", "eventDate"], "");
+  const altParsed = Date.parse(alt);
+  if (!Number.isNaN(altParsed)) return altParsed;
+
+  return Number.MAX_SAFE_INTEGER;
+}
+
 export default function App() {
-  const [accessMode, setAccessMode] = useState(null);
-  const [pinInput, setPinInput] = useState("");
+  const [accessMode, setAccessMode] = useState("member");
   const [activeTab, setActiveTab] = useState("home");
 
   const [loading, setLoading] = useState(true);
@@ -150,10 +168,10 @@ export default function App() {
       supabase.from("events").select("*"),
       supabase.from("information_points").select("*"),
       supabase.from("information_posts").select("*"),
-      supabase.from("members").select("*"),
+      supabase.from("members").select("*").order("full_name", { ascending: true }),
       supabase.from("office_bearers").select("*"),
-      supabase.from("club_coaches").select("*"),
-      supabase.from("documents").select("*"),
+      supabase.from("club_coaches").select("*").order("name", { ascending: true }),
+      supabase.from("documents").select("*").order("id", { ascending: false }),
     ]);
 
     const errors = [
@@ -196,33 +214,21 @@ export default function App() {
     setTimeout(() => setSuccessMessage(""), 2500);
   }
 
-  function handleLogin(type) {
-    if (type === "member") {
-      if (pinInput === MEMBER_PIN) {
-        setAccessMode("member");
-        setPinInput("");
-        clearMessages();
-        return;
-      }
-      alert("Incorrect member PIN");
+  function handleAdminLogin() {
+    const enteredPin = window.prompt("Enter admin PIN");
+    if (enteredPin === ADMIN_PIN) {
+      setAccessMode("admin");
+      clearMessages();
       return;
     }
-
-    if (type === "admin") {
-      if (pinInput === ADMIN_PIN) {
-        setAccessMode("admin");
-        setPinInput("");
-        clearMessages();
-        return;
-      }
+    if (enteredPin !== null) {
       alert("Incorrect admin PIN");
     }
   }
 
   function handleLogout() {
-    setAccessMode(null);
+    setAccessMode("member");
     setActiveTab("home");
-    setPinInput("");
   }
 
   async function addNotice() {
@@ -299,6 +305,7 @@ export default function App() {
       event_time: eventForm.event_time || null,
       location: eventForm.location.trim() || null,
       notes: eventForm.notes.trim() || null,
+      date_text: formatDate(eventForm.event_date),
     };
 
     const { error } = await supabase.from("events").insert(payload);
@@ -563,11 +570,7 @@ export default function App() {
 
   const upcomingEvents = useMemo(() => {
     return [...events]
-      .sort((a, b) => {
-        const dateA = getField(a, ["event_date", "date", "eventDate"], "");
-        const dateB = getField(b, ["event_date", "date", "eventDate"], "");
-        return new Date(dateA || "9999-12-31") - new Date(dateB || "9999-12-31");
-      })
+      .sort((a, b) => getEventSortValue(a) - getEventSortValue(b))
       .slice(0, 5);
   }, [events]);
 
@@ -585,39 +588,31 @@ export default function App() {
     });
   }, [notices]);
 
-  const isLoggedIn = accessMode === "member" || accessMode === "admin";
   const isAdmin = accessMode === "admin";
 
   return (
     <div style={styles.page}>
       <div style={styles.wrap}>
         <div style={styles.headerCard}>
-          <h1 style={styles.title}>{CLUB_NAME}</h1>
-          <p style={styles.subtitle}>{CLUB_SUBTITLE}</p>
+          <div style={styles.headerRow}>
+            <img src={logo} alt="Woodilee Bowling Club Logo" style={styles.logo} />
+            <div>
+              <h1 style={styles.title}>{CLUB_NAME}</h1>
+              <p style={styles.subtitle}>{CLUB_SUBTITLE}</p>
+            </div>
+          </div>
 
-          {!isLoggedIn ? (
-            <div style={styles.loginBox}>
-              <input
-                type="password"
-                placeholder="Enter PIN"
-                value={pinInput}
-                onChange={(e) => setPinInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleLogin("member");
-                }}
-                style={styles.input}
-              />
-              <button style={styles.button} onClick={() => handleLogin("member")}>
-                Member Login
-              </button>
-              <button style={styles.secondaryButton} onClick={() => handleLogin("admin")}>
+          {!isAdmin ? (
+            <div style={styles.loggedInBar}>
+              <div style={styles.loggedInText}>Open member access</div>
+              <button style={styles.secondaryButton} onClick={handleAdminLogin}>
                 Admin Login
               </button>
             </div>
           ) : (
             <div style={styles.loggedInBar}>
               <div style={styles.loggedInText}>
-                Logged in as <strong>{isAdmin ? "Admin" : "Member"}</strong>
+                Logged in as <strong>Admin</strong>
               </div>
               <button style={styles.secondaryButton} onClick={handleLogout}>
                 Logout
@@ -626,33 +621,31 @@ export default function App() {
           )}
         </div>
 
-        {isLoggedIn && (
-          <div style={styles.tabBar}>
-            {TABS.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                style={activeTab === tab.key ? styles.activeTab : styles.tab}
-              >
-                {tab.label}
-              </button>
-            ))}
-            {isAdmin && (
-              <button
-                onClick={() => setActiveTab("admin")}
-                style={activeTab === "admin" ? styles.activeTab : styles.tab}
-              >
-                Admin
-              </button>
-            )}
-          </div>
-        )}
+        <div style={styles.tabBar}>
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={activeTab === tab.key ? styles.activeTab : styles.tab}
+            >
+              {tab.label}
+            </button>
+          ))}
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab("admin")}
+              style={activeTab === "admin" ? styles.activeTab : styles.tab}
+            >
+              Admin
+            </button>
+          )}
+        </div>
 
         {loading && <div style={styles.messageCard}>Loading…</div>}
         {!loading && errorMessage && <div style={styles.errorCard}>{errorMessage}</div>}
         {!loading && successMessage && <div style={styles.successCard}>{successMessage}</div>}
 
-        {!loading && isLoggedIn && activeTab === "home" && (
+        {!loading && activeTab === "home" && (
           <div style={styles.grid}>
             <div style={styles.card}>
               <h3 style={styles.sectionTitle}>Welcome</h3>
@@ -672,14 +665,14 @@ export default function App() {
                     <div style={styles.listTitle}>
                       {getField(event, ["title", "event_title"], "Untitled event")}
                     </div>
-                    <div style={styles.listMeta}>
-                      {formatDateTime(
-                        getField(event, ["event_date", "date", "eventDate"]),
-                        getField(event, ["event_time", "time", "eventTime"])
-                      )}
-                    </div>
+                    <div style={styles.listMeta}>{getEventDisplayDate(event)}</div>
                     {getField(event, ["location"]) && (
                       <div style={styles.listMeta}>{getField(event, ["location"])}</div>
+                    )}
+                    {getField(event, ["note", "notes", "description"]) && (
+                      <div style={styles.paragraph}>
+                        {getField(event, ["note", "notes", "description"])}
+                      </div>
                     )}
                   </div>
                 ))
@@ -707,34 +700,27 @@ export default function App() {
           </div>
         )}
 
-        {!loading && isLoggedIn && activeTab === "diary" && (
+        {!loading && activeTab === "diary" && (
           <div style={styles.card}>
             <h3 style={styles.sectionTitle}>Diary</h3>
             {events.length === 0 ? (
               <p style={styles.paragraph}>No diary entries yet.</p>
             ) : (
               [...events]
-                .sort((a, b) => {
-                  const dateA = getField(a, ["event_date", "date", "eventDate"], "");
-                  const dateB = getField(b, ["event_date", "date", "eventDate"], "");
-                  return new Date(dateA || "9999-12-31") - new Date(dateB || "9999-12-31");
-                })
+                .sort((a, b) => getEventSortValue(a) - getEventSortValue(b))
                 .map((event) => (
                   <div key={event.id} style={styles.listItem}>
                     <div style={styles.listTitle}>
                       {getField(event, ["title", "event_title"], "Untitled event")}
                     </div>
-                    <div style={styles.listMeta}>
-                      {formatDateTime(
-                        getField(event, ["event_date", "date", "eventDate"]),
-                        getField(event, ["event_time", "time", "eventTime"])
-                      )}
-                    </div>
+                    <div style={styles.listMeta}>{getEventDisplayDate(event)}</div>
                     {getField(event, ["location"]) && (
                       <div style={styles.listMeta}>Location: {getField(event, ["location"])}</div>
                     )}
-                    {getField(event, ["notes", "description"]) && (
-                      <div style={styles.paragraph}>{getField(event, ["notes", "description"])}</div>
+                    {getField(event, ["note", "notes", "description"]) && (
+                      <div style={styles.paragraph}>
+                        {getField(event, ["note", "notes", "description"])}
+                      </div>
                     )}
                     {isAdmin && (
                       <button style={styles.deleteButton} onClick={() => deleteEvent(event.id)}>
@@ -747,7 +733,7 @@ export default function App() {
           </div>
         )}
 
-        {!loading && isLoggedIn && activeTab === "notices" && (
+        {!loading && activeTab === "notices" && (
           <div style={styles.card}>
             <h3 style={styles.sectionTitle}>Notices</h3>
             {sortedNotices.length === 0 ? (
@@ -773,7 +759,7 @@ export default function App() {
           </div>
         )}
 
-        {!loading && isLoggedIn && activeTab === "members" && (
+        {!loading && activeTab === "members" && (
           <div style={styles.card}>
             <h3 style={styles.sectionTitle}>Members</h3>
             <input
@@ -818,14 +804,18 @@ export default function App() {
           </div>
         )}
 
-        {!loading && isLoggedIn && activeTab === "office" && (
+        {!loading && activeTab === "office" && (
           <div style={styles.card}>
             <h3 style={styles.sectionTitle}>Office Bearers</h3>
             {officeBearers.length === 0 ? (
               <p style={styles.paragraph}>No office bearers entered yet.</p>
             ) : (
               officeBearers
-                .sort((a, b) => Number(getField(a, ["display_order"], 9999)) - Number(getField(b, ["display_order"], 9999)))
+                .sort(
+                  (a, b) =>
+                    Number(getField(a, ["display_order"], 9999)) -
+                    Number(getField(b, ["display_order"], 9999))
+                )
                 .map((item) => (
                   <div key={item.id} style={styles.listItem}>
                     <div style={styles.listTitle}>{getField(item, ["role", "title"], "Role")}</div>
@@ -854,7 +844,7 @@ export default function App() {
           </div>
         )}
 
-        {!loading && isLoggedIn && activeTab === "coaches" && (
+        {!loading && activeTab === "coaches" && (
           <div style={styles.card}>
             <h3 style={styles.sectionTitle}>Club Coaches</h3>
             {coaches.length === 0 ? (
@@ -890,7 +880,7 @@ export default function App() {
           </div>
         )}
 
-        {!loading && isLoggedIn && activeTab === "documents" && (
+        {!loading && activeTab === "documents" && (
           <div style={styles.card}>
             <h3 style={styles.sectionTitle}>Documents</h3>
             {documents.length === 0 ? (
@@ -902,9 +892,7 @@ export default function App() {
                   <div key={doc.id} style={styles.listItem}>
                     <div style={styles.listTitle}>{getField(doc, ["title", "name"], "Document")}</div>
                     {getField(doc, ["description", "notes"]) && (
-                      <div style={styles.paragraph}>
-                        {getField(doc, ["description", "notes"])}
-                      </div>
+                      <div style={styles.paragraph}>{getField(doc, ["description", "notes"])}</div>
                     )}
                     {url ? (
                       <a href={url} target="_blank" rel="noreferrer" style={styles.link}>
@@ -1166,6 +1154,19 @@ const styles = {
     boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
     marginBottom: 16,
   },
+  headerRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
+    flexWrap: "wrap",
+  },
+  logo: {
+    width: 90,
+    height: 90,
+    objectFit: "contain",
+    borderRadius: 12,
+    background: "#fff",
+  },
   title: {
     margin: 0,
     color: "#7a2638",
@@ -1177,13 +1178,6 @@ const styles = {
     marginBottom: 0,
     color: "#444",
     fontSize: 18,
-  },
-  loginBox: {
-    display: "flex",
-    gap: 10,
-    flexWrap: "wrap",
-    marginTop: 18,
-    alignItems: "center",
   },
   loggedInBar: {
     display: "flex",
