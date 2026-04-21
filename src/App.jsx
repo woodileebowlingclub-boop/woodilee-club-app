@@ -5,7 +5,6 @@ const MEMBER_PIN = "1911";
 const ADMIN_PIN = "1954";
 const CLUB_NAME = "Woodilee Bowling Club";
 const CLUB_SUBTITLE = "Members diary, notices and club information";
-const DEFAULT_RECUR_UNTIL = "2026-10-03";
 
 const TABS = [
   { key: "home", label: "Home" },
@@ -33,7 +32,7 @@ function getField(item, keys, fallback = "") {
 
 function formatDate(dateStr) {
   if (!dateStr) return "";
-  const d = new Date(`${dateStr}T12:00:00`);
+  const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return safeString(dateStr);
   return d.toLocaleDateString("en-GB", {
     day: "2-digit",
@@ -47,39 +46,6 @@ function formatDateTime(dateStr, timeStr) {
   const timePart = safeString(timeStr);
   if (datePart && timePart) return `${datePart} • ${timePart}`;
   return datePart || timePart || "";
-}
-
-function parseDateOnly(dateStr) {
-  return new Date(`${dateStr}T12:00:00`);
-}
-
-function toIsoDate(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function buildWeeklyDates(startDateStr, endDateStr) {
-  const dates = [];
-  const start = parseDateOnly(startDateStr);
-  const end = parseDateOnly(endDateStr);
-
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
-    return dates;
-  }
-
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 7)) {
-    dates.push(toIsoDate(d));
-  }
-
-  return dates;
-}
-
-function getEventSortValue(event) {
-  const dateStr = getField(event, ["event_date", "date"], "9999-12-31");
-  const timeStr = getField(event, ["event_time", "time"], "23:59");
-  return new Date(`${dateStr}T${timeStr || "23:59"}:00`).getTime();
 }
 
 export default function App() {
@@ -106,24 +72,19 @@ export default function App() {
     text: "",
     important: false,
   });
-
   const [eventForm, setEventForm] = useState({
     title: "",
     event_date: "",
     event_time: "",
     location: "",
     notes: "",
-    isRecurring: false,
-    recurring_until: DEFAULT_RECUR_UNTIL,
   });
-
   const [memberForm, setMemberForm] = useState({
     full_name: "",
     section: "Gents",
     phone: "",
     email: "",
   });
-
   const [officeForm, setOfficeForm] = useState({
     role: "",
     name: "",
@@ -131,7 +92,6 @@ export default function App() {
     email: "",
     display_order: "",
   });
-
   const [coachForm, setCoachForm] = useState({
     name: "",
     role: "",
@@ -139,7 +99,6 @@ export default function App() {
     email: "",
     notes: "",
   });
-
   const [documentForm, setDocumentForm] = useState({
     title: "",
     file_url: "",
@@ -195,58 +154,6 @@ export default function App() {
   function showSaved(message = "Saved") {
     setSuccessMessage(message);
     setTimeout(() => setSuccessMessage(""), 2500);
-  }
-
-  function resetEventForm() {
-    setEventForm({
-      title: "",
-      event_date: "",
-      event_time: "",
-      location: "",
-      notes: "",
-      isRecurring: false,
-      recurring_until: DEFAULT_RECUR_UNTIL,
-    });
-  }
-
-  function fillRecurringPreset(type) {
-    if (type === "monday") {
-      setEventForm({
-        title: "Monday Points Night",
-        event_date: "2026-04-20",
-        event_time: "18:45",
-        location: "",
-        notes: "On the green for 6.45pm. Please be there for 6.30pm prompt.",
-        isRecurring: true,
-        recurring_until: DEFAULT_RECUR_UNTIL,
-      });
-      return;
-    }
-
-    if (type === "tuesday") {
-      setEventForm({
-        title: "Vernett Trophy",
-        event_date: "2026-04-21",
-        event_time: "",
-        location: "",
-        notes: "",
-        isRecurring: true,
-        recurring_until: DEFAULT_RECUR_UNTIL,
-      });
-      return;
-    }
-
-    if (type === "thursday") {
-      setEventForm({
-        title: "Thursday Bounce Night",
-        event_date: "2026-04-23",
-        event_time: "",
-        location: "",
-        notes: "",
-        isRecurring: true,
-        recurring_until: DEFAULT_RECUR_UNTIL,
-      });
-    }
   }
 
   function handleLogin(type) {
@@ -313,7 +220,6 @@ export default function App() {
 
   async function deleteNotice(id) {
     if (!window.confirm("Delete this notice?")) return;
-
     setSaving(true);
     clearMessages();
 
@@ -332,12 +238,7 @@ export default function App() {
 
   async function addEvent() {
     const title = eventForm.title.trim();
-    const eventDate = eventForm.event_date;
-    const eventTime = eventForm.event_time || null;
-    const location = eventForm.location.trim() || null;
-    const notes = eventForm.notes.trim() || null;
-
-    if (!title || !eventDate) {
+    if (!title || !eventForm.event_date) {
       alert("Enter an event title and date");
       return;
     }
@@ -345,52 +246,12 @@ export default function App() {
     setSaving(true);
     clearMessages();
 
-    if (eventForm.isRecurring) {
-      const recurringUntil = eventForm.recurring_until;
-
-      if (!recurringUntil) {
-        setErrorMessage("Please enter a recurring until date.");
-        setSaving(false);
-        return;
-      }
-
-      const weeklyDates = buildWeeklyDates(eventDate, recurringUntil);
-
-      if (weeklyDates.length === 0) {
-        setErrorMessage("Recurring dates could not be created. Check the start date and end date.");
-        setSaving(false);
-        return;
-      }
-
-      const payloads = weeklyDates.map((date) => ({
-        title,
-        event_date: date,
-        event_time: eventTime,
-        location,
-        notes,
-      }));
-
-      const { error } = await supabase.from("events").insert(payloads);
-
-      if (error) {
-        setErrorMessage(error.message || "Failed to add recurring events");
-        setSaving(false);
-        return;
-      }
-
-      resetEventForm();
-      await loadAll();
-      setSaving(false);
-      showSaved(`Recurring diary entries added (${weeklyDates.length})`);
-      return;
-    }
-
     const payload = {
       title,
-      event_date: eventDate,
-      event_time: eventTime,
-      location,
-      notes,
+      event_date: eventForm.event_date,
+      event_time: eventForm.event_time || null,
+      location: eventForm.location.trim() || null,
+      notes: eventForm.notes.trim() || null,
     };
 
     const { error } = await supabase.from("events").insert(payload);
@@ -401,15 +262,14 @@ export default function App() {
       return;
     }
 
-    resetEventForm();
+    setEventForm({ title: "", event_date: "", event_time: "", location: "", notes: "" });
     await loadAll();
     setSaving(false);
-    showSaved("Diary entry added");
+    showSaved("Event added");
   }
 
   async function deleteEvent(id) {
     if (!window.confirm("Delete this diary entry?")) return;
-
     setSaving(true);
     clearMessages();
 
@@ -459,7 +319,6 @@ export default function App() {
 
   async function deleteMember(id) {
     if (!window.confirm("Delete this member?")) return;
-
     setSaving(true);
     clearMessages();
 
@@ -511,7 +370,6 @@ export default function App() {
 
   async function deleteOfficeBearer(id) {
     if (!window.confirm("Delete this office bearer?")) return;
-
     setSaving(true);
     clearMessages();
 
@@ -562,7 +420,6 @@ export default function App() {
 
   async function deleteCoach(id) {
     if (!window.confirm("Delete this coach?")) return;
-
     setSaving(true);
     clearMessages();
 
@@ -611,7 +468,6 @@ export default function App() {
 
   async function deleteDocument(id) {
     if (!window.confirm("Delete this document?")) return;
-
     setSaving(true);
     clearMessages();
 
@@ -627,10 +483,6 @@ export default function App() {
     setSaving(false);
     showSaved("Document deleted");
   }
-
-  const combinedEvents = useMemo(() => {
-    return [...events].sort((a, b) => getEventSortValue(a) - getEventSortValue(b));
-  }, [events]);
 
   const filteredMembers = useMemo(() => {
     const search = memberSearch.trim().toLowerCase();
@@ -663,8 +515,10 @@ export default function App() {
   }, [filteredMembers]);
 
   const upcomingEvents = useMemo(() => {
-    return [...combinedEvents].slice(0, 5);
-  }, [combinedEvents]);
+    return [...events]
+      .sort((a, b) => new Date(getField(a, ["event_date", "date"])) - new Date(getField(b, ["event_date", "date"])))
+      .slice(0, 5);
+  }, [events]);
 
   const sortedNotices = useMemo(() => {
     return [...notices].sort((a, b) => {
@@ -740,9 +594,7 @@ export default function App() {
           <div style={styles.grid}>
             <div style={styles.card}>
               <h3 style={styles.sectionTitle}>Welcome</h3>
-              <p style={styles.paragraph}>
-                Welcome to the club app. Use the tabs above to view diary dates, notices, members, office bearers, coaches and documents.
-              </p>
+              <p style={styles.paragraph}>Welcome to the club app. Use the tabs above to view diary dates, notices, members, office bearers, coaches and documents.</p>
             </div>
 
             <div style={styles.card}>
@@ -782,20 +634,22 @@ export default function App() {
         {!loading && isLoggedIn && activeTab === "diary" && (
           <div style={styles.card}>
             <h3 style={styles.sectionTitle}>Diary</h3>
-            {combinedEvents.length === 0 ? (
+            {events.length === 0 ? (
               <p style={styles.paragraph}>No diary entries yet.</p>
             ) : (
-              combinedEvents.map((event) => (
-                <div key={event.id} style={styles.listItem}>
-                  <div style={styles.listTitle}>{getField(event, ["title", "event_title"], "Untitled event")}</div>
-                  <div style={styles.listMeta}>{formatDateTime(getField(event, ["event_date", "date"]), getField(event, ["event_time", "time"]))}</div>
-                  {getField(event, ["location"]) && <div style={styles.listMeta}>Location: {getField(event, ["location"])}</div>}
-                  {getField(event, ["notes", "description"]) && <div style={styles.paragraph}>{getField(event, ["notes", "description"])}</div>}
-                  {isAdmin && (
-                    <button style={styles.deleteButton} onClick={() => deleteEvent(event.id)}>Delete</button>
-                  )}
-                </div>
-              ))
+              [...events]
+                .sort((a, b) => new Date(getField(a, ["event_date", "date"])) - new Date(getField(b, ["event_date", "date"])))
+                .map((event) => (
+                  <div key={event.id} style={styles.listItem}>
+                    <div style={styles.listTitle}>{getField(event, ["title", "event_title"], "Untitled event")}</div>
+                    <div style={styles.listMeta}>{formatDateTime(getField(event, ["event_date", "date"]), getField(event, ["event_time", "time"]))}</div>
+                    {getField(event, ["location"]) && <div style={styles.listMeta}>Location: {getField(event, ["location"])}</div>}
+                    {getField(event, ["notes", "description"]) && <div style={styles.paragraph}>{getField(event, ["notes", "description"])}</div>}
+                    {isAdmin && (
+                      <button style={styles.deleteButton} onClick={() => deleteEvent(event.id)}>Delete</button>
+                    )}
+                  </div>
+                ))
             )}
           </div>
         )}
@@ -957,19 +811,6 @@ export default function App() {
 
             <div style={styles.card}>
               <h3 style={styles.sectionTitle}>Add Diary Entry</h3>
-
-              <div style={styles.presetRow}>
-                <button type="button" style={styles.smallButton} onClick={() => fillRecurringPreset("monday")}>
-                  Monday Points
-                </button>
-                <button type="button" style={styles.smallButton} onClick={() => fillRecurringPreset("tuesday")}>
-                  Vernett Trophy
-                </button>
-                <button type="button" style={styles.smallButton} onClick={() => fillRecurringPreset("thursday")}>
-                  Thursday Bounce
-                </button>
-              </div>
-
               <input
                 type="text"
                 placeholder="Event title"
@@ -977,23 +818,18 @@ export default function App() {
                 onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
                 style={styles.input}
               />
-
-              <label style={styles.fieldLabel}>Date</label>
               <input
                 type="date"
                 value={eventForm.event_date}
                 onChange={(e) => setEventForm({ ...eventForm, event_date: e.target.value })}
                 style={styles.input}
               />
-
-              <label style={styles.fieldLabel}>Time</label>
               <input
                 type="time"
                 value={eventForm.event_time}
                 onChange={(e) => setEventForm({ ...eventForm, event_time: e.target.value })}
                 style={styles.input}
               />
-
               <input
                 type="text"
                 placeholder="Location"
@@ -1001,51 +837,13 @@ export default function App() {
                 onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}
                 style={styles.input}
               />
-
               <textarea
                 placeholder="Notes"
                 value={eventForm.notes}
                 onChange={(e) => setEventForm({ ...eventForm, notes: e.target.value })}
                 style={styles.textarea}
               />
-
-              <label style={styles.checkboxRow}>
-                <input
-                  type="checkbox"
-                  checked={eventForm.isRecurring}
-                  onChange={(e) =>
-                    setEventForm({ ...eventForm, isRecurring: e.target.checked })
-                  }
-                />
-                Recurring weekly
-              </label>
-
-              {eventForm.isRecurring && (
-                <>
-                  <label style={styles.fieldLabel}>Recurring until</label>
-                  <input
-                    type="date"
-                    value={eventForm.recurring_until}
-                    onChange={(e) =>
-                      setEventForm({ ...eventForm, recurring_until: e.target.value })
-                    }
-                    style={styles.input}
-                  />
-                </>
-              )}
-
-              <div style={styles.helpText}>
-                Tick <strong>Recurring weekly</strong> and the app will add the same event every 7 days from the chosen start date until the end date.
-              </div>
-
-              <div style={styles.buttonRow}>
-                <button style={styles.button} onClick={addEvent} disabled={saving}>
-                  Save Diary Entry
-                </button>
-                <button type="button" style={styles.secondaryButton} onClick={resetEventForm} disabled={saving}>
-                  Clear
-                </button>
-              </div>
+              <button style={styles.button} onClick={addEvent} disabled={saving}>Save Diary Entry</button>
             </div>
 
             <div style={styles.card}>
@@ -1352,16 +1150,6 @@ const styles = {
     cursor: "pointer",
     fontWeight: 700,
   },
-  smallButton: {
-    padding: "8px 10px",
-    borderRadius: 8,
-    border: "none",
-    background: "#b65b14",
-    color: "#fff",
-    cursor: "pointer",
-    fontWeight: 700,
-    fontSize: 13,
-  },
   deleteButton: {
     marginTop: 8,
     padding: "8px 12px",
@@ -1410,31 +1198,5 @@ const styles = {
     marginBottom: 16,
     color: "#1f6b2d",
     fontWeight: 700,
-  },
-  fieldLabel: {
-    display: "block",
-    marginBottom: 4,
-    color: "#5b1d2a",
-    fontSize: 14,
-    fontWeight: 700,
-  },
-  helpText: {
-    marginTop: 8,
-    marginBottom: 12,
-    color: "#666",
-    fontSize: 13,
-    lineHeight: 1.4,
-  },
-  presetRow: {
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-    marginBottom: 12,
-  },
-  buttonRow: {
-    display: "flex",
-    gap: 10,
-    flexWrap: "wrap",
-    marginTop: 8,
   },
 };
