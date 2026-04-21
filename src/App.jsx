@@ -1,1880 +1,1440 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "./lib/supabase";
-import logo from "./assets/WBC Logo.png";
 
-const CLUB_PIN = "1911";
+const MEMBER_PIN = "1911";
 const ADMIN_PIN = "1954";
-const BUCKET = "club-files";
+const CLUB_NAME = "Woodilee Bowling Club";
+const CLUB_SUBTITLE = "Members diary, notices and club information";
+const DEFAULT_RECUR_UNTIL = "2026-10-03";
 
-const styles = {
-  page: {
-    padding: 16,
-    fontFamily: "Arial, sans-serif",
-    background: "linear-gradient(180deg, #5b1d2a 0%, #7a2638 45%, #a33a4d 100%)",
-    minHeight: "100vh",
-    color: "#222",
-  },
-  wrap: {
-    maxWidth: 1150,
-    margin: "0 auto",
-  },
-  header: {
-    background: "linear-gradient(135deg, #5a1323 0%, #7b1e32 55%, #a12f45 100%)",
-    color: "#fff",
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 18,
-    boxShadow: "0 8px 20px rgba(0,0,0,0.22)",
-  },
-  headerRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 16,
-    flexWrap: "wrap",
-  },
-  logo: {
-    width: 80,
-    height: 80,
-    borderRadius: "50%",
-    objectFit: "cover",
-    background: "#fff",
-    border: "3px solid #f3c76b",
-    boxShadow: "0 3px 10px rgba(0,0,0,0.25)",
-  },
-  title: {
-    margin: 0,
-    fontSize: 30,
-    lineHeight: 1.1,
-  },
-  subtitle: {
-    margin: "6px 0 0 0",
-    opacity: 0.95,
-    fontSize: 15,
-  },
-  panel: {
-    background: "#fffaf8",
-    border: "1px solid #e5c8cf",
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 18,
-    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-  },
-  loginPanel: {
-    background: "#fffaf8",
-    border: "1px solid #e5c8cf",
-    borderRadius: 18,
-    padding: 20,
-    maxWidth: 420,
-    margin: "80px auto",
-    boxShadow: "0 8px 20px rgba(0,0,0,0.18)",
-    textAlign: "center",
-  },
-  tabs: {
-    display: "flex",
-    gap: 10,
-    marginBottom: 16,
-    flexWrap: "wrap",
-  },
-  tab: (active) => ({
-    padding: "12px 16px",
-    background: active ? "#8b1e3f" : "#f3d9df",
-    color: active ? "#fff" : "#5b1d2a",
-    border: active ? "1px solid #8b1e3f" : "1px solid #e5c8cf",
-    borderRadius: 12,
-    fontWeight: 700,
-    cursor: "pointer",
-  }),
-  input: {
-    width: "100%",
-    padding: 12,
-    marginBottom: 10,
-    borderRadius: 12,
-    border: "1px solid #d7b7be",
-    boxSizing: "border-box",
-    background: "#fffefe",
-    fontSize: 15,
-  },
-  textarea: {
-    width: "100%",
-    padding: 12,
-    marginBottom: 10,
-    borderRadius: 12,
-    border: "1px solid #d7b7be",
-    boxSizing: "border-box",
-    minHeight: 100,
-    resize: "vertical",
-    background: "#fffefe",
-    fontSize: 15,
-  },
-  button: {
-    padding: "12px 16px",
-    background: "#8b1e3f",
-    color: "#fff",
-    border: "none",
-    borderRadius: 12,
-    fontWeight: 700,
-    cursor: "pointer",
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  secondaryButton: {
-    padding: "12px 16px",
-    background: "#f3d9df",
-    color: "#5b1d2a",
-    border: "1px solid #e5c8cf",
-    borderRadius: 12,
-    fontWeight: 700,
-    cursor: "pointer",
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  smallBtn: {
-    padding: "8px 10px",
-    background: "#f2e4e7",
-    border: "1px solid #e0c5cb",
-    borderRadius: 10,
-    cursor: "pointer",
-    marginLeft: 8,
-    color: "#5b1d2a",
-    fontWeight: 700,
-  },
-  reorderBtn: {
-    padding: "8px 10px",
-    background: "#dbeafe",
-    border: "1px solid #93c5fd",
-    borderRadius: 10,
-    cursor: "pointer",
-    marginLeft: 8,
-    color: "#1d4ed8",
-    fontWeight: 700,
-  },
-  disabledReorderBtn: {
-    padding: "8px 10px",
-    background: "#e5e7eb",
-    border: "1px solid #d1d5db",
-    borderRadius: 10,
-    cursor: "not-allowed",
-    marginLeft: 8,
-    color: "#9ca3af",
-    fontWeight: 700,
-  },
-  card: {
-    border: "1px solid #ead7dc",
-    borderRadius: 14,
-    padding: 14,
-    background: "#fffdfd",
-    marginBottom: 10,
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-    gap: 14,
-  },
-  sectionTitle: {
-    marginTop: 0,
-    color: "#7a2138",
-  },
-  memberSectionTitle: {
-    color: "#7a2138",
-    borderBottom: "2px solid #efd6dc",
-    paddingBottom: 6,
-    marginTop: 22,
-    marginBottom: 12,
-  },
-  message: {
-    marginBottom: 15,
-    padding: 12,
-    background: "#fff1c7",
-    border: "1px solid #e6c768",
-    borderRadius: 10,
-  },
-  linkBtn: {
-    display: "inline-block",
-    padding: "10px 14px",
-    background: "#2563eb",
-    color: "#fff",
-    borderRadius: 10,
-    textDecoration: "none",
-    fontWeight: 700,
-    marginTop: 10,
-  },
-  badge: {
-    display: "inline-block",
-    padding: "4px 8px",
-    borderRadius: 999,
-    background: "#fff1e8",
-    color: "#9a3412",
-    fontWeight: 700,
-    fontSize: 12,
-    marginBottom: 8,
-    border: "1px solid #fdba74",
-  },
-  pinnedCard: {
-    border: "2px solid #f59e0b",
-    background: "#fff7ed",
-  },
-  fileInfo: {
-    fontSize: 13,
-    color: "#666",
-    marginBottom: 10,
-  },
-  heroCard: {
-    background: "linear-gradient(135deg, #fff7ed 0%, #fde7d3 100%)",
-    border: "2px solid #f59e0b",
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 18,
-    boxShadow: "0 6px 16px rgba(0,0,0,0.10)",
-  },
-  heroTitle: {
-    margin: "0 0 8px 0",
-    color: "#9a3412",
-    fontSize: 24,
-    fontWeight: 700,
-  },
-  heroDate: {
-    fontSize: 18,
-    fontWeight: 700,
-    color: "#7c2d12",
-    marginBottom: 8,
-  },
-  homeGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-    gap: 16,
-  },
-  homeActionBtn: {
-    display: "inline-block",
-    padding: "12px 16px",
-    background: "#8b1e3f",
-    color: "#fff",
-    borderRadius: 12,
-    textDecoration: "none",
-    fontWeight: 700,
-    marginRight: 10,
-    marginBottom: 10,
-    cursor: "pointer",
-    border: "none",
-  },
-  homeMiniCard: {
-    border: "1px solid #ead7dc",
-    borderRadius: 14,
-    padding: 14,
-    background: "#fffdfd",
-    minHeight: 150,
-  },
-  homeLabel: {
-    fontSize: 12,
-    fontWeight: 700,
-    color: "#9a3412",
-    marginBottom: 8,
-    textTransform: "uppercase",
-    letterSpacing: "0.4px",
-  },
-  imagePreview: {
-    width: "100%",
-    maxWidth: 420,
-    borderRadius: 12,
-    marginTop: 12,
-    border: "1px solid #e5c8cf",
-    display: "block",
-  },
-};
+const TABS = [
+  { key: "home", label: "Home" },
+  { key: "diary", label: "Diary" },
+  { key: "notices", label: "Notices" },
+  { key: "members", label: "Members" },
+  { key: "office", label: "Office Bearers" },
+  { key: "coaches", label: "Club Coaches" },
+  { key: "documents", label: "Documents" },
+];
 
-function sortEventsChronologically(list) {
-  return [...list].sort(
-    (a, b) => new Date(a.date_text).getTime() - new Date(b.date_text).getTime()
-  );
+function safeString(value, fallback = "") {
+  if (value === null || value === undefined) return fallback;
+  return String(value);
 }
 
-function sortPosts(list) {
-  return [...list].sort((a, b) => {
-    const aPinned = a.pinned ? 1 : 0;
-    const bPinned = b.pinned ? 1 : 0;
-    if (aPinned !== bPinned) return bPinned - aPinned;
-    return new Date(b.date_posted).getTime() - new Date(a.date_posted).getTime();
-  });
+function getField(item, keys, fallback = "") {
+  for (const key of keys) {
+    if (item && item[key] !== undefined && item[key] !== null && item[key] !== "") {
+      return item[key];
+    }
+  }
+  return fallback;
 }
 
-function sortDocuments(list) {
-  return [...list].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  );
-}
-
-function sortByPositionThenName(list) {
-  return [...list].sort((a, b) => {
-    const aPos = Number.isFinite(Number(a.position)) ? Number(a.position) : 999;
-    const bPos = Number.isFinite(Number(b.position)) ? Number(b.position) : 999;
-    if (aPos !== bPos) return aPos - bPos;
-    return String(a.name || "").localeCompare(String(b.name || ""));
-  });
-}
-
-function normaliseUkPhoneForWhatsApp(phone) {
-  const digits = String(phone || "").replace(/\D/g, "");
-  if (!digits) return "";
-  if (digits.startsWith("44")) return digits;
-  if (digits.startsWith("0")) return `44${digits.slice(1)}`;
-  return digits;
-}
-
-function formatDiaryDate(dateValue) {
-  if (!dateValue) return "";
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return dateValue;
-
-  return date.toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return safeString(dateStr);
+  return d.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
     year: "numeric",
   });
 }
 
-function getFileTypeLabel(url) {
-  const lower = String(url || "").toLowerCase();
-  if (lower.endsWith(".pdf") || lower.includes(".pdf?")) return "PDF";
-  if (lower.endsWith(".png") || lower.includes(".png?")) return "PNG image";
-  if (
-    lower.endsWith(".jpg") ||
-    lower.endsWith(".jpeg") ||
-    lower.includes(".jpg?") ||
-    lower.includes(".jpeg?")
-  ) return "JPEG image";
-  if (
-    lower.endsWith(".xls") ||
-    lower.endsWith(".xlsx") ||
-    lower.includes(".xls?") ||
-    lower.includes(".xlsx?")
-  ) return "Excel file";
-  if (
-    lower.endsWith(".doc") ||
-    lower.endsWith(".docx") ||
-    lower.includes(".doc?") ||
-    lower.includes(".docx?")
-  ) return "Word document";
-  return "Attachment";
+function formatDateTime(dateStr, timeStr) {
+  const datePart = formatDate(dateStr);
+  const timePart = safeString(timeStr);
+  if (datePart && timePart) return `${datePart} • ${timePart}`;
+  return datePart || timePart || "";
 }
 
-function isImageFile(url) {
-  const lower = String(url || "").toLowerCase();
-  return (
-    lower.endsWith(".png") ||
-    lower.endsWith(".jpg") ||
-    lower.endsWith(".jpeg") ||
-    lower.includes(".png?") ||
-    lower.includes(".jpg?") ||
-    lower.includes(".jpeg?")
-  );
+function parseDateOnly(dateStr) {
+  return new Date(`${dateStr}T12:00:00`);
+}
+
+function toIsoDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function buildWeeklyDates(startDateStr, endDateStr) {
+  const dates = [];
+  const start = parseDateOnly(startDateStr);
+  const end = parseDateOnly(endDateStr);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+    return dates;
+  }
+
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 7)) {
+    dates.push(toIsoDate(d));
+  }
+
+  return dates;
+}
+
+function getEventSortValue(event) {
+  const dateStr = getField(event, ["event_date", "date"], "9999-12-31");
+  const timeStr = getField(event, ["event_time", "time"], "23:59");
+  return new Date(`${dateStr}T${timeStr || "23:59"}:00`).getTime();
 }
 
 export default function App() {
-  const [pin, setPin] = useState("");
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [tab, setTab] = useState("home");
+  const [accessMode, setAccessMode] = useState(null);
+  const [pinInput, setPinInput] = useState("");
+  const [activeTab, setActiveTab] = useState("home");
 
-  const [adminPin, setAdminPin] = useState("");
-  const [adminUnlocked, setAdminUnlocked] = useState(false);
-  const [message, setMessage] = useState("");
-  const [adminTab, setAdminTab] = useState("events");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
-  const [entries, setEntries] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [notices, setNotices] = useState([]);
   const [members, setMembers] = useState([]);
   const [officeBearers, setOfficeBearers] = useState([]);
-  const [clubCoaches, setClubCoaches] = useState([]);
-  const [posts, setPosts] = useState([]);
+  const [coaches, setCoaches] = useState([]);
   const [documents, setDocuments] = useState([]);
 
-  const [search, setSearch] = useState("");
-  const [eventSearch, setEventSearch] = useState("");
-  const [infoSearch, setInfoSearch] = useState("");
-  const [documentSearch, setDocumentSearch] = useState("");
+  const [memberSearch, setMemberSearch] = useState("");
 
-  const [title, setTitle] = useState("");
-  const [date, setDate] = useState("");
-  const [note, setNote] = useState("");
+  const [noticeForm, setNoticeForm] = useState({
+    title: "",
+    text: "",
+    important: false,
+  });
 
-  const [newMemberName, setNewMemberName] = useState("");
-  const [newMemberSection, setNewMemberSection] = useState("Gents");
-  const [newMemberPhone, setNewMemberPhone] = useState("");
+  const [eventForm, setEventForm] = useState({
+    title: "",
+    event_date: "",
+    event_time: "",
+    location: "",
+    notes: "",
+    isRecurring: false,
+    recurring_until: DEFAULT_RECUR_UNTIL,
+  });
 
-  const [newRole, setNewRole] = useState("");
-  const [newOfficerName, setNewOfficerName] = useState("");
-  const [newOfficerPhone, setNewOfficerPhone] = useState("");
-  const [newOfficerPosition, setNewOfficerPosition] = useState("");
+  const [memberForm, setMemberForm] = useState({
+    full_name: "",
+    section: "Gents",
+    phone: "",
+    email: "",
+  });
 
-  const [newCoachName, setNewCoachName] = useState("");
-  const [newCoachPhone, setNewCoachPhone] = useState("");
-  const [newCoachPosition, setNewCoachPosition] = useState("");
+  const [officeForm, setOfficeForm] = useState({
+    role: "",
+    name: "",
+    phone: "",
+    email: "",
+    display_order: "",
+  });
 
-  const [postTitle, setPostTitle] = useState("");
-  const [postMessage, setPostMessage] = useState("");
-  const [postDate, setPostDate] = useState("");
-  const [postLink, setPostLink] = useState("");
-  const [postButtonText, setPostButtonText] = useState("");
-  const [postPinned, setPostPinned] = useState(false);
-  const [postFile, setPostFile] = useState(null);
+  const [coachForm, setCoachForm] = useState({
+    name: "",
+    role: "",
+    phone: "",
+    email: "",
+    notes: "",
+  });
 
-  const [documentTitle, setDocumentTitle] = useState("");
-  const [documentDescription, setDocumentDescription] = useState("");
-  const [documentCategory, setDocumentCategory] = useState("General");
-  const [documentButtonText, setDocumentButtonText] = useState("");
-  const [documentLink, setDocumentLink] = useState("");
-  const [documentFile, setDocumentFile] = useState(null);
-
-  const [editingEntryId, setEditingEntryId] = useState(null);
-  const [editingMemberId, setEditingMemberId] = useState(null);
-  const [editingOfficerId, setEditingOfficerId] = useState(null);
-  const [editingCoachId, setEditingCoachId] = useState(null);
-  const [editingPostId, setEditingPostId] = useState(null);
-  const [editingDocumentId, setEditingDocumentId] = useState(null);
-
-  const sortedEntries = useMemo(() => sortEventsChronologically(entries), [entries]);
-  const sortedPosts = useMemo(() => sortPosts(posts), [posts]);
-  const sortedOfficeBearers = useMemo(() => sortByPositionThenName(officeBearers), [officeBearers]);
-  const sortedClubCoaches = useMemo(() => sortByPositionThenName(clubCoaches), [clubCoaches]);
-  const sortedDocuments = useMemo(() => sortDocuments(documents), [documents]);
-
-  const filteredEvents = useMemo(() => {
-    return sortedEntries.filter((e) => {
-      const q = eventSearch.toLowerCase();
-      return (
-        String(e.title || "").toLowerCase().includes(q) ||
-        String(e.note || "").toLowerCase().includes(q) ||
-        String(formatDiaryDate(e.date_text) || "").toLowerCase().includes(q)
-      );
-    });
-  }, [sortedEntries, eventSearch]);
-
-  const filteredPosts = useMemo(() => {
-    return sortedPosts.filter((post) => {
-      const q = infoSearch.toLowerCase();
-      return (
-        String(post.title || "").toLowerCase().includes(q) ||
-        String(post.message || "").toLowerCase().includes(q) ||
-        String(post.date_posted || "").toLowerCase().includes(q)
-      );
-    });
-  }, [sortedPosts, infoSearch]);
-
-  const filteredDocuments = useMemo(() => {
-    return sortedDocuments.filter((doc) => {
-      const q = documentSearch.toLowerCase();
-      return (
-        String(doc.title || "").toLowerCase().includes(q) ||
-        String(doc.description || "").toLowerCase().includes(q) ||
-        String(doc.category || "").toLowerCase().includes(q)
-      );
-    });
-  }, [sortedDocuments, documentSearch]);
-
-  const filteredMembers = useMemo(() => {
-    return members.filter((m) =>
-      String(m.name || "").toLowerCase().includes(search.toLowerCase())
-    );
-  }, [members, search]);
-
-  const gentsMembers = useMemo(
-    () =>
-      filteredMembers
-        .filter((m) => String(m.section || "").trim().toLowerCase() === "gents")
-        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
-    [filteredMembers]
-  );
-
-  const ladiesMembers = useMemo(
-    () =>
-      filteredMembers
-        .filter((m) => String(m.section || "").trim().toLowerCase() === "ladies")
-        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
-    [filteredMembers]
-  );
-
-  const associateMembers = useMemo(
-    () =>
-      filteredMembers
-        .filter((m) => String(m.section || "").trim().toLowerCase() === "associate")
-        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
-    [filteredMembers]
-  );
-
-  const upcomingEvents = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    return sortedEntries.filter((e) => {
-      const d = new Date(e.date_text);
-      return !Number.isNaN(d.getTime()) && d >= today;
-    });
-  }, [sortedEntries]);
-
-  const nextEvent = useMemo(() => upcomingEvents[0] || null, [upcomingEvents]);
-  const nextTwoEvents = useMemo(() => upcomingEvents.slice(1, 3), [upcomingEvents]);
-  const latestPinnedPost = useMemo(() => sortedPosts.find((p) => p.pinned) || null, [sortedPosts]);
+  const [documentForm, setDocumentForm] = useState({
+    title: "",
+    file_url: "",
+    description: "",
+  });
 
   useEffect(() => {
-    if (!loggedIn) return;
     loadAll();
-  }, [loggedIn]);
+  }, []);
 
-  const loadAll = async () => {
-    await Promise.all([
-      loadEntries(),
-      loadMembers(),
-      loadOfficeBearers(),
-      loadClubCoaches(),
-      loadPosts(),
-      loadDocuments(),
+  async function loadAll() {
+    setLoading(true);
+    setErrorMessage("");
+
+    const [
+      eventsRes,
+      noticesRes,
+      membersRes,
+      officeRes,
+      coachesRes,
+      docsRes,
+    ] = await Promise.all([
+      supabase.from("events").select("*").order("event_date", { ascending: true }),
+      supabase.from("information_points").select("*").order("id", { ascending: false }),
+      supabase.from("members").select("*").order("full_name", { ascending: true }),
+      supabase.from("office_bearers").select("*").order("display_order", { ascending: true }),
+      supabase.from("club_coaches").select("*").order("name", { ascending: true }),
+      supabase.from("documents").select("*").order("id", { ascending: false }),
     ]);
-  };
 
-  const loadEntries = async () => {
-    const { data, error } = await supabase.from("events").select("*");
-    if (error) return setMessage(`Could not load events: ${error.message}`);
-    setEntries(data || []);
-  };
+    const errors = [eventsRes.error, noticesRes.error, membersRes.error, officeRes.error, coachesRes.error, docsRes.error]
+      .filter(Boolean)
+      .map((err) => err.message);
 
-  const loadMembers = async () => {
-    const { data, error } = await supabase.from("members").select("*");
-    if (error) return setMessage(`Could not load members: ${error.message}`);
-    setMembers(data || []);
-  };
-
-  const loadOfficeBearers = async () => {
-    const { data, error } = await supabase
-      .from("office_bearers")
-      .select("*")
-      .order("position", { ascending: true });
-
-    if (error) return setMessage(`Could not load office bearers: ${error.message}`);
-    setOfficeBearers(data || []);
-  };
-
-  const loadClubCoaches = async () => {
-    const { data, error } = await supabase
-      .from("club_coaches")
-      .select("*")
-      .order("position", { ascending: true });
-
-    if (error) return setMessage(`Could not load club coaches: ${error.message}`);
-    setClubCoaches(data || []);
-  };
-
-  const loadPosts = async () => {
-    const { data, error } = await supabase.from("information_posts").select("*");
-    if (error) return setMessage(`Could not load information posts: ${error.message}`);
-    setPosts(data || []);
-  };
-
-  const loadDocuments = async () => {
-    const { data, error } = await supabase.from("documents").select("*");
-    if (error) return setMessage(`Could not load games info: ${error.message}`);
-    setDocuments(data || []);
-  };
-
-  const handleLogin = () => {
-    if (pin === CLUB_PIN) {
-      setLoggedIn(true);
-      setMessage("");
-    } else {
-      setMessage("Incorrect club PIN.");
-    }
-  };
-
-  const handleAdminLogin = () => {
-    if (adminPin === ADMIN_PIN) {
-      setAdminUnlocked(true);
-      setMessage("");
-      setAdminTab("events");
-    } else {
-      setMessage("Incorrect admin PIN.");
-    }
-  };
-
-  const clearEntryForm = () => {
-    setEditingEntryId(null);
-    setTitle("");
-    setDate("");
-    setNote("");
-  };
-
-  const clearMemberForm = () => {
-    setEditingMemberId(null);
-    setNewMemberName("");
-    setNewMemberSection("Gents");
-    setNewMemberPhone("");
-  };
-
-  const clearOfficerForm = () => {
-    setEditingOfficerId(null);
-    setNewRole("");
-    setNewOfficerName("");
-    setNewOfficerPhone("");
-    setNewOfficerPosition("");
-  };
-
-  const clearCoachForm = () => {
-    setEditingCoachId(null);
-    setNewCoachName("");
-    setNewCoachPhone("");
-    setNewCoachPosition("");
-  };
-
-  const clearPostForm = () => {
-    setEditingPostId(null);
-    setPostTitle("");
-    setPostMessage("");
-    setPostDate("");
-    setPostLink("");
-    setPostButtonText("");
-    setPostPinned(false);
-    setPostFile(null);
-  };
-
-  const clearDocumentForm = () => {
-    setEditingDocumentId(null);
-    setDocumentTitle("");
-    setDocumentDescription("");
-    setDocumentCategory("General");
-    setDocumentButtonText("");
-    setDocumentLink("");
-    setDocumentFile(null);
-  };
-
-  const saveEntry = async () => {
-    if (!title || !date) return setMessage("Enter event title and date.");
-
-    if (editingEntryId) {
-      const { data, error } = await supabase
-        .from("events")
-        .update({ title, date_text: date, note })
-        .eq("id", editingEntryId)
-        .select()
-        .single();
-
-      if (error) return setMessage(`Could not update event: ${error.message}`);
-      setEntries((prev) => prev.map((x) => (x.id === editingEntryId ? data : x)));
-      setMessage("Event updated.");
-    } else {
-      const { data, error } = await supabase
-        .from("events")
-        .insert([{ title, date_text: date, note }])
-        .select()
-        .single();
-
-      if (error) return setMessage(`Could not save event: ${error.message}`);
-      setEntries((prev) => [...prev, data]);
-      setMessage("Event added.");
+    if (errors.length > 0) {
+      setErrorMessage(errors[0]);
     }
 
-    clearEntryForm();
-  };
+    setEvents(eventsRes.data || []);
+    setNotices(noticesRes.data || []);
+    setMembers(membersRes.data || []);
+    setOfficeBearers(officeRes.data || []);
+    setCoaches(coachesRes.data || []);
+    setDocuments(docsRes.data || []);
+    setLoading(false);
+  }
 
-  const editEntry = (entry) => {
-    setEditingEntryId(entry.id);
-    setTitle(entry.title || "");
-    setDate(entry.date_text || "");
-    setNote(entry.note || "");
-    setTab("admin");
-    setAdminTab("events");
-  };
+  function clearMessages() {
+    setErrorMessage("");
+    setSuccessMessage("");
+  }
 
-  const deleteEntry = async (id) => {
-    if (!window.confirm("Delete this event?")) return;
+  function showSaved(message = "Saved") {
+    setSuccessMessage(message);
+    setTimeout(() => setSuccessMessage(""), 2500);
+  }
+
+  function resetEventForm() {
+    setEventForm({
+      title: "",
+      event_date: "",
+      event_time: "",
+      location: "",
+      notes: "",
+      isRecurring: false,
+      recurring_until: DEFAULT_RECUR_UNTIL,
+    });
+  }
+
+  function fillRecurringPreset(type) {
+    if (type === "monday") {
+      setEventForm({
+        title: "Monday Points Night",
+        event_date: "2026-04-20",
+        event_time: "18:45",
+        location: "",
+        notes: "On the green for 6.45pm. Please be there for 6.30pm prompt.",
+        isRecurring: true,
+        recurring_until: DEFAULT_RECUR_UNTIL,
+      });
+      return;
+    }
+
+    if (type === "tuesday") {
+      setEventForm({
+        title: "Vernett Trophy",
+        event_date: "2026-04-21",
+        event_time: "",
+        location: "",
+        notes: "",
+        isRecurring: true,
+        recurring_until: DEFAULT_RECUR_UNTIL,
+      });
+      return;
+    }
+
+    if (type === "thursday") {
+      setEventForm({
+        title: "Thursday Bounce Night",
+        event_date: "2026-04-23",
+        event_time: "",
+        location: "",
+        notes: "",
+        isRecurring: true,
+        recurring_until: DEFAULT_RECUR_UNTIL,
+      });
+    }
+  }
+
+  function handleLogin(type) {
+    if (type === "member") {
+      if (pinInput === MEMBER_PIN) {
+        setAccessMode("member");
+        setPinInput("");
+        clearMessages();
+        return;
+      }
+      alert("Incorrect member PIN");
+      return;
+    }
+
+    if (type === "admin") {
+      if (pinInput === ADMIN_PIN) {
+        setAccessMode("admin");
+        setPinInput("");
+        clearMessages();
+        return;
+      }
+      alert("Incorrect admin PIN");
+    }
+  }
+
+  function handleLogout() {
+    setAccessMode(null);
+    setActiveTab("home");
+    setPinInput("");
+  }
+
+  async function addNotice() {
+    const title = noticeForm.title.trim();
+    const text = noticeForm.text.trim();
+
+    if (!title || !text) {
+      alert("Enter a notice title and text");
+      return;
+    }
+
+    setSaving(true);
+    clearMessages();
+
+    const payload = {
+      title,
+      text,
+      important: noticeForm.important,
+      created_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase.from("information_points").insert(payload);
+
+    if (error) {
+      setErrorMessage(error.message || "Failed to add notice");
+      setSaving(false);
+      return;
+    }
+
+    setNoticeForm({ title: "", text: "", important: false });
+    await loadAll();
+    setSaving(false);
+    showSaved("Notice added");
+  }
+
+  async function deleteNotice(id) {
+    if (!window.confirm("Delete this notice?")) return;
+
+    setSaving(true);
+    clearMessages();
+
+    const { error } = await supabase.from("information_points").delete().eq("id", id);
+
+    if (error) {
+      setErrorMessage(error.message || "Failed to delete notice");
+      setSaving(false);
+      return;
+    }
+
+    await loadAll();
+    setSaving(false);
+    showSaved("Notice deleted");
+  }
+
+  async function addEvent() {
+    const title = eventForm.title.trim();
+    const eventDate = eventForm.event_date;
+    const eventTime = eventForm.event_time || null;
+    const location = eventForm.location.trim() || null;
+    const notes = eventForm.notes.trim() || null;
+
+    if (!title || !eventDate) {
+      alert("Enter an event title and date");
+      return;
+    }
+
+    setSaving(true);
+    clearMessages();
+
+    if (eventForm.isRecurring) {
+      const recurringUntil = eventForm.recurring_until;
+
+      if (!recurringUntil) {
+        setErrorMessage("Please enter a recurring until date.");
+        setSaving(false);
+        return;
+      }
+
+      const weeklyDates = buildWeeklyDates(eventDate, recurringUntil);
+
+      if (weeklyDates.length === 0) {
+        setErrorMessage("Recurring dates could not be created. Check the start date and end date.");
+        setSaving(false);
+        return;
+      }
+
+      const payloads = weeklyDates.map((date) => ({
+        title,
+        event_date: date,
+        event_time: eventTime,
+        location,
+        notes,
+      }));
+
+      const { error } = await supabase.from("events").insert(payloads);
+
+      if (error) {
+        setErrorMessage(error.message || "Failed to add recurring events");
+        setSaving(false);
+        return;
+      }
+
+      resetEventForm();
+      await loadAll();
+      setSaving(false);
+      showSaved(`Recurring diary entries added (${weeklyDates.length})`);
+      return;
+    }
+
+    const payload = {
+      title,
+      event_date: eventDate,
+      event_time: eventTime,
+      location,
+      notes,
+    };
+
+    const { error } = await supabase.from("events").insert(payload);
+
+    if (error) {
+      setErrorMessage(error.message || "Failed to add event");
+      setSaving(false);
+      return;
+    }
+
+    resetEventForm();
+    await loadAll();
+    setSaving(false);
+    showSaved("Diary entry added");
+  }
+
+  async function deleteEvent(id) {
+    if (!window.confirm("Delete this diary entry?")) return;
+
+    setSaving(true);
+    clearMessages();
 
     const { error } = await supabase.from("events").delete().eq("id", id);
-    if (error) return setMessage(`Could not delete event: ${error.message}`);
-    setEntries((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Event deleted.");
-  };
 
-  const saveMember = async () => {
-    if (!newMemberName) return setMessage("Enter member name.");
-
-    const payload = {
-      name: newMemberName,
-      section: newMemberSection,
-      phone: newMemberPhone,
-    };
-
-    if (editingMemberId) {
-      const { data, error } = await supabase
-        .from("members")
-        .update(payload)
-        .eq("id", editingMemberId)
-        .select()
-        .single();
-
-      if (error) return setMessage(`Could not update member: ${error.message}`);
-      setMembers((prev) => prev.map((x) => (x.id === editingMemberId ? data : x)));
-      setMessage("Member updated.");
-    } else {
-      const { data, error } = await supabase
-        .from("members")
-        .insert([payload])
-        .select()
-        .single();
-
-      if (error) return setMessage(`Could not save member: ${error.message}`);
-      setMembers((prev) => [...prev, data]);
-      setMessage("Member added.");
+    if (error) {
+      setErrorMessage(error.message || "Failed to delete event");
+      setSaving(false);
+      return;
     }
 
-    clearMemberForm();
-  };
+    await loadAll();
+    setSaving(false);
+    showSaved("Diary entry deleted");
+  }
 
-  const editMember = (member) => {
-    setEditingMemberId(member.id);
-    setNewMemberName(member.name || "");
-    setNewMemberSection(member.section || "Gents");
-    setNewMemberPhone(member.phone || "");
-    setTab("admin");
-    setAdminTab("members");
-  };
+  async function addMember() {
+    const full_name = memberForm.full_name.trim();
+    if (!full_name) {
+      alert("Enter member name");
+      return;
+    }
 
-  const deleteMember = async (id) => {
+    setSaving(true);
+    clearMessages();
+
+    const payload = {
+      full_name,
+      section: memberForm.section,
+      phone: memberForm.phone.trim() || null,
+      email: memberForm.email.trim() || null,
+    };
+
+    const { error } = await supabase.from("members").insert(payload);
+
+    if (error) {
+      setErrorMessage(error.message || "Failed to add member");
+      setSaving(false);
+      return;
+    }
+
+    setMemberForm({ full_name: "", section: "Gents", phone: "", email: "" });
+    await loadAll();
+    setSaving(false);
+    showSaved("Member added");
+  }
+
+  async function deleteMember(id) {
     if (!window.confirm("Delete this member?")) return;
 
+    setSaving(true);
+    clearMessages();
+
     const { error } = await supabase.from("members").delete().eq("id", id);
-    if (error) return setMessage(`Could not delete member: ${error.message}`);
-    setMembers((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Member deleted.");
-  };
 
-  const saveOfficeBearer = async () => {
-    if (!newRole || !newOfficerName) return setMessage("Enter role and name.");
-
-    const payload = {
-      role: newRole,
-      name: newOfficerName,
-      phone: newOfficerPhone,
-      position: newOfficerPosition === "" ? null : Number(newOfficerPosition),
-    };
-
-    if (editingOfficerId) {
-      const { data, error } = await supabase
-        .from("office_bearers")
-        .update(payload)
-        .eq("id", editingOfficerId)
-        .select()
-        .single();
-
-      if (error) return setMessage(`Could not update office bearer: ${error.message}`);
-      setOfficeBearers((prev) => prev.map((x) => (x.id === editingOfficerId ? data : x)));
-      setMessage("Office bearer updated.");
-    } else {
-      const { data, error } = await supabase
-        .from("office_bearers")
-        .insert([payload])
-        .select()
-        .single();
-
-      if (error) return setMessage(`Could not save office bearer: ${error.message}`);
-      setOfficeBearers((prev) => [...prev, data]);
-      setMessage("Office bearer added.");
+    if (error) {
+      setErrorMessage(error.message || "Failed to delete member");
+      setSaving(false);
+      return;
     }
 
-    clearOfficerForm();
-  };
+    await loadAll();
+    setSaving(false);
+    showSaved("Member deleted");
+  }
 
-  const editOfficeBearer = (person) => {
-    setEditingOfficerId(person.id);
-    setNewRole(person.role || "");
-    setNewOfficerName(person.name || "");
-    setNewOfficerPhone(person.phone || "");
-    setNewOfficerPosition(person.position == null ? "" : String(person.position));
-    setTab("admin");
-    setAdminTab("officers");
-  };
+  async function addOfficeBearer() {
+    const role = officeForm.role.trim();
+    const name = officeForm.name.trim();
+    if (!role || !name) {
+      alert("Enter role and name");
+      return;
+    }
 
-  const deleteOfficeBearer = async (id) => {
+    setSaving(true);
+    clearMessages();
+
+    const payload = {
+      role,
+      name,
+      phone: officeForm.phone.trim() || null,
+      email: officeForm.email.trim() || null,
+      display_order: officeForm.display_order ? Number(officeForm.display_order) : officeBearers.length + 1,
+    };
+
+    const { error } = await supabase.from("office_bearers").insert(payload);
+
+    if (error) {
+      setErrorMessage(error.message || "Failed to add office bearer");
+      setSaving(false);
+      return;
+    }
+
+    setOfficeForm({ role: "", name: "", phone: "", email: "", display_order: "" });
+    await loadAll();
+    setSaving(false);
+    showSaved("Office bearer added");
+  }
+
+  async function deleteOfficeBearer(id) {
     if (!window.confirm("Delete this office bearer?")) return;
 
-    const { error } = await supabase.from("office_bearers").delete().eq("id", id);
-    if (error) return setMessage(`Could not delete office bearer: ${error.message}`);
-    setOfficeBearers((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Office bearer deleted.");
-  };
+    setSaving(true);
+    clearMessages();
 
-  const saveCoach = async () => {
-    if (!newCoachName) return setMessage("Enter coach name.");
+    const { error } = await supabase.from("office_bearers").delete().eq("id", id);
+
+    if (error) {
+      setErrorMessage(error.message || "Failed to delete office bearer");
+      setSaving(false);
+      return;
+    }
+
+    await loadAll();
+    setSaving(false);
+    showSaved("Office bearer deleted");
+  }
+
+  async function addCoach() {
+    const name = coachForm.name.trim();
+    if (!name) {
+      alert("Enter coach name");
+      return;
+    }
+
+    setSaving(true);
+    clearMessages();
 
     const payload = {
-      name: newCoachName,
-      phone: newCoachPhone,
-      position: newCoachPosition === "" ? null : Number(newCoachPosition),
+      name,
+      role: coachForm.role.trim() || null,
+      phone: coachForm.phone.trim() || null,
+      email: coachForm.email.trim() || null,
+      notes: coachForm.notes.trim() || null,
     };
 
-    if (editingCoachId) {
-      const { data, error } = await supabase
-        .from("club_coaches")
-        .update(payload)
-        .eq("id", editingCoachId)
-        .select()
-        .single();
+    const { error } = await supabase.from("club_coaches").insert(payload);
 
-      if (error) return setMessage(`Could not update club coach: ${error.message}`);
-      setClubCoaches((prev) => prev.map((x) => (x.id === editingCoachId ? data : x)));
-      setMessage("Club coach updated.");
-    } else {
-      const { data, error } = await supabase
-        .from("club_coaches")
-        .insert([payload])
-        .select()
-        .single();
-
-      if (error) return setMessage(`Could not save club coach: ${error.message}`);
-      setClubCoaches((prev) => [...prev, data]);
-      setMessage("Club coach added.");
+    if (error) {
+      setErrorMessage(error.message || "Failed to add coach");
+      setSaving(false);
+      return;
     }
 
-    clearCoachForm();
-  };
+    setCoachForm({ name: "", role: "", phone: "", email: "", notes: "" });
+    await loadAll();
+    setSaving(false);
+    showSaved("Coach added");
+  }
 
-  const editCoach = (coach) => {
-    setEditingCoachId(coach.id);
-    setNewCoachName(coach.name || "");
-    setNewCoachPhone(coach.phone || "");
-    setNewCoachPosition(coach.position == null ? "" : String(coach.position));
-    setTab("admin");
-    setAdminTab("coaches");
-  };
+  async function deleteCoach(id) {
+    if (!window.confirm("Delete this coach?")) return;
 
-  const deleteCoach = async (id) => {
-    if (!window.confirm("Delete this club coach?")) return;
+    setSaving(true);
+    clearMessages();
 
     const { error } = await supabase.from("club_coaches").delete().eq("id", id);
-    if (error) return setMessage(`Could not delete club coach: ${error.message}`);
-    setClubCoaches((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Club coach deleted.");
-  };
 
-  const uploadFileToBucket = async (file, folder) => {
-    if (!file) return null;
-
-    const fileName = `${Date.now()}-${file.name.replace(/\s+/g, "-")}`;
-    const filePath = `${folder}/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET)
-      .upload(filePath, file, { upsert: false });
-
-    if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-    return data.publicUrl;
-  };
-
-  const savePost = async () => {
-    if (!postTitle || !postMessage || !postDate) {
-      return setMessage("Enter post title, message and date.");
+    if (error) {
+      setErrorMessage(error.message || "Failed to delete coach");
+      setSaving(false);
+      return;
     }
 
-    try {
-      const finalLink = postFile
-        ? await uploadFileToBucket(postFile, "information")
-        : postLink || null;
+    await loadAll();
+    setSaving(false);
+    showSaved("Coach deleted");
+  }
 
-      const payload = {
-        title: postTitle,
-        message: postMessage,
-        date_posted: postDate,
-        attachment_link: finalLink,
-        button_text: postButtonText || null,
-        pinned: postPinned,
-      };
-
-      if (editingPostId) {
-        const { data, error } = await supabase
-          .from("information_posts")
-          .update(payload)
-          .eq("id", editingPostId)
-          .select()
-          .single();
-
-        if (error) return setMessage(`Could not update information post: ${error.message}`);
-        setPosts((prev) => prev.map((x) => (x.id === editingPostId ? data : x)));
-      } else {
-        const { data, error } = await supabase
-          .from("information_posts")
-          .insert([payload])
-          .select()
-          .single();
-
-        if (error) return setMessage(`Could not save information post: ${error.message}`);
-        setPosts((prev) => [...prev, data]);
-      }
-
-      setMessage("Information post saved.");
-      clearPostForm();
-    } catch (err) {
-      setMessage(`Could not upload file: ${err.message}`);
+  async function addDocument() {
+    const title = documentForm.title.trim();
+    if (!title) {
+      alert("Enter document title");
+      return;
     }
-  };
 
-  const editPost = (post) => {
-    setEditingPostId(post.id);
-    setPostTitle(post.title || "");
-    setPostMessage(post.message || "");
-    setPostDate(post.date_posted || "");
-    setPostLink(post.attachment_link || "");
-    setPostButtonText(post.button_text || "");
-    setPostPinned(!!post.pinned);
-    setPostFile(null);
-    setTab("admin");
-    setAdminTab("info");
-  };
+    setSaving(true);
+    clearMessages();
 
-  const deletePost = async (id) => {
-    if (!window.confirm("Delete this information post?")) return;
+    const payload = {
+      title,
+      file_url: documentForm.file_url.trim() || null,
+      description: documentForm.description.trim() || null,
+    };
 
-    const { error } = await supabase.from("information_posts").delete().eq("id", id);
-    if (error) return setMessage(`Could not delete information post: ${error.message}`);
-    setPosts((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Information post deleted.");
-  };
+    const { error } = await supabase.from("documents").insert(payload);
 
-  const saveDocument = async () => {
-    if (!documentTitle) return setMessage("Enter a games info title.");
-
-    try {
-      const finalLink = documentFile
-        ? await uploadFileToBucket(documentFile, "documents")
-        : documentLink || null;
-
-      const payload = {
-        title: documentTitle,
-        description: documentDescription || null,
-        file_url: finalLink,
-        button_text: documentButtonText || null,
-        category: documentCategory || "General",
-      };
-
-      if (editingDocumentId) {
-        const { data, error } = await supabase
-          .from("documents")
-          .update(payload)
-          .eq("id", editingDocumentId)
-          .select()
-          .single();
-
-        if (error) return setMessage(`Could not update games info: ${error.message}`);
-        setDocuments((prev) => prev.map((x) => (x.id === editingDocumentId ? data : x)));
-      } else {
-        const { data, error } = await supabase
-          .from("documents")
-          .insert([payload])
-          .select()
-          .single();
-
-        if (error) return setMessage(`Could not save games info: ${error.message}`);
-        setDocuments((prev) => [...prev, data]);
-      }
-
-      setMessage("Games info saved.");
-      clearDocumentForm();
-    } catch (err) {
-      setMessage(`Could not upload games info: ${err.message}`);
+    if (error) {
+      setErrorMessage(error.message || "Failed to add document");
+      setSaving(false);
+      return;
     }
-  };
 
-  const editDocument = (doc) => {
-    setEditingDocumentId(doc.id);
-    setDocumentTitle(doc.title || "");
-    setDocumentDescription(doc.description || "");
-    setDocumentCategory(doc.category || "General");
-    setDocumentButtonText(doc.button_text || "");
-    setDocumentLink(doc.file_url || "");
-    setDocumentFile(null);
-    setTab("admin");
-    setAdminTab("gamesinfo");
-  };
+    setDocumentForm({ title: "", file_url: "", description: "" });
+    await loadAll();
+    setSaving(false);
+    showSaved("Document added");
+  }
 
-  const deleteDocument = async (id) => {
-    if (!window.confirm("Delete this games info item?")) return;
+  async function deleteDocument(id) {
+    if (!window.confirm("Delete this document?")) return;
+
+    setSaving(true);
+    clearMessages();
 
     const { error } = await supabase.from("documents").delete().eq("id", id);
-    if (error) return setMessage(`Could not delete games info: ${error.message}`);
-    setDocuments((prev) => prev.filter((x) => x.id !== id));
-    setMessage("Games info deleted.");
-  };
 
-  const moveItem = async (table, items, onItemsUpdated, id, direction, label) => {
-    const currentList = sortByPositionThenName(items);
-    const currentIndex = currentList.findIndex((item) => item.id === id);
-    if (currentIndex === -1) return;
-
-    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
-    if (targetIndex < 0 || targetIndex >= currentList.length) return;
-
-    const currentItem = currentList[currentIndex];
-    const targetItem = currentList[targetIndex];
-
-    const currentPos = Number.isFinite(Number(currentItem.position))
-      ? Number(currentItem.position)
-      : currentIndex + 1;
-
-    const targetPos = Number.isFinite(Number(targetItem.position))
-      ? Number(targetItem.position)
-      : targetIndex + 1;
-
-    const { error: error1 } = await supabase
-      .from(table)
-      .update({ position: targetPos })
-      .eq("id", currentItem.id);
-    if (error1) return setMessage(`Could not move ${label}: ${error1.message}`);
-
-    const { error: error2 } = await supabase
-      .from(table)
-      .update({ position: currentPos })
-      .eq("id", targetItem.id);
-    if (error2) return setMessage(`Could not move ${label}: ${error2.message}`);
-
-    const updatedList = items.map((item) => {
-      if (item.id === currentItem.id) return { ...item, position: targetPos };
-      if (item.id === targetItem.id) return { ...item, position: currentPos };
-      return item;
-    });
-
-    onItemsUpdated(updatedList);
-    setMessage(`${label} order updated.`);
-  };
-
-  const renderMemberCards = (list) => {
-    if (list.length === 0) {
-      return <div style={{ color: "#777", marginBottom: 12 }}>No members in this section.</div>;
+    if (error) {
+      setErrorMessage(error.message || "Failed to delete document");
+      setSaving(false);
+      return;
     }
 
-    return list.map((m) => (
-      <div key={m.id} style={styles.card}>
-        <div style={{ fontWeight: 700, fontSize: 18 }}>{m.name}</div>
-        <div style={{ color: "#92400e", marginTop: 4 }}>{m.section}</div>
-        <div style={{ marginTop: 10 }}>
-          {m.phone ? (
-            <>
-              <a href={`tel:${m.phone}`} style={styles.linkBtn}>Call</a>
-              <a
-                href={`https://wa.me/${normaliseUkPhoneForWhatsApp(m.phone)}`}
-                target="_blank"
-                rel="noreferrer"
-                style={{ ...styles.linkBtn, background: "#25D366", marginLeft: 8 }}
-              >
-                WhatsApp
-              </a>
-            </>
-          ) : (
-            <span style={{ color: "#888" }}>No phone</span>
-          )}
-        </div>
-      </div>
-    ));
-  };
-
-  const renderPersonCards = (list, badgeText) => {
-    if (list.length === 0) return <div style={{ color: "#777" }}>No entries yet.</div>;
-
-    return (
-      <div style={styles.grid}>
-        {list.map((person) => (
-          <div key={person.id} style={styles.card}>
-            <span style={styles.badge}>{badgeText}</span>
-            <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{person.name}</div>
-            <div style={{ marginBottom: 10, color: "#444" }}>{person.phone || "No phone listed"}</div>
-            {person.phone ? (
-              <div>
-                <a href={`tel:${person.phone}`} style={styles.linkBtn}>Call</a>
-                <a
-                  href={`https://wa.me/${normaliseUkPhoneForWhatsApp(person.phone)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ ...styles.linkBtn, background: "#25D366", marginLeft: 8 }}
-                >
-                  WhatsApp
-                </a>
-              </div>
-            ) : null}
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  if (!loggedIn) {
-    return (
-      <div style={styles.page}>
-        <div style={styles.loginPanel}>
-          <img src={logo} alt="Club Logo" style={{ ...styles.logo, margin: "0 auto 12px auto" }} />
-          <h1 style={{ ...styles.title, marginBottom: 14 }}>Woodilee Bowling Club</h1>
-          <input
-            type="password"
-            placeholder="Enter PIN"
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            style={styles.input}
-          />
-          <button onClick={handleLogin} style={styles.button}>Enter</button>
-          {message ? (
-            <div style={{ marginTop: 8, color: "#8b1e3f", fontWeight: 700 }}>
-              {message}
-            </div>
-          ) : null}
-        </div>
-      </div>
-    );
+    await loadAll();
+    setSaving(false);
+    showSaved("Document deleted");
   }
+
+  const combinedEvents = useMemo(() => {
+    return [...events].sort((a, b) => getEventSortValue(a) - getEventSortValue(b));
+  }, [events]);
+
+  const filteredMembers = useMemo(() => {
+    const search = memberSearch.trim().toLowerCase();
+    if (!search) return members;
+    return members.filter((member) => {
+      const name = safeString(getField(member, ["full_name", "name"])).toLowerCase();
+      const section = safeString(getField(member, ["section", "member_type"])).toLowerCase();
+      return name.includes(search) || section.includes(search);
+    });
+  }, [members, memberSearch]);
+
+  const groupedMembers = useMemo(() => {
+    const groups = {
+      Gents: [],
+      Ladies: [],
+      Associate: [],
+      Other: [],
+    };
+
+    filteredMembers.forEach((member) => {
+      const section = safeString(getField(member, ["section", "member_type"], "Other"));
+      if (groups[section]) {
+        groups[section].push(member);
+      } else {
+        groups.Other.push(member);
+      }
+    });
+
+    return groups;
+  }, [filteredMembers]);
+
+  const upcomingEvents = useMemo(() => {
+    return [...combinedEvents].slice(0, 5);
+  }, [combinedEvents]);
+
+  const sortedNotices = useMemo(() => {
+    return [...notices].sort((a, b) => {
+      const aImportant = !!getField(a, ["important", "is_important"], false);
+      const bImportant = !!getField(b, ["important", "is_important"], false);
+      if (aImportant !== bImportant) return aImportant ? -1 : 1;
+      return Number(getField(b, ["id"], 0)) - Number(getField(a, ["id"], 0));
+    });
+  }, [notices]);
+
+  const isLoggedIn = accessMode === "member" || accessMode === "admin";
+  const isAdmin = accessMode === "admin";
 
   return (
     <div style={styles.page}>
       <div style={styles.wrap}>
-        <div style={styles.header}>
-          <div style={styles.headerRow}>
-            <img src={logo} alt="Club Logo" style={styles.logo} />
-            <div>
-              <h1 style={styles.title}>Woodilee Bowling Club</h1>
-              <p style={styles.subtitle}>Members diary, notices and contact details</p>
+        <div style={styles.headerCard}>
+          <h1 style={styles.title}>{CLUB_NAME}</h1>
+          <p style={styles.subtitle}>{CLUB_SUBTITLE}</p>
+
+          {!isLoggedIn ? (
+            <div style={styles.loginBox}>
+              <input
+                type="password"
+                placeholder="Enter PIN"
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleLogin("member");
+                }}
+                style={styles.input}
+              />
+              <button style={styles.button} onClick={() => handleLogin("member")}>Member Login</button>
+              <button style={styles.secondaryButton} onClick={() => handleLogin("admin")}>Admin Login</button>
             </div>
+          ) : (
+            <div style={styles.loggedInBar}>
+              <div style={styles.loggedInText}>
+                Logged in as <strong>{isAdmin ? "Admin" : "Member"}</strong>
+              </div>
+              <button style={styles.secondaryButton} onClick={handleLogout}>Logout</button>
+            </div>
+          )}
+        </div>
+
+        {isLoggedIn && (
+          <div style={styles.tabBar}>
+            {TABS.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                style={activeTab === tab.key ? styles.activeTab : styles.tab}
+              >
+                {tab.label}
+              </button>
+            ))}
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab("admin")}
+                style={activeTab === "admin" ? styles.activeTab : styles.tab}
+              >
+                Admin
+              </button>
+            )}
           </div>
-        </div>
+        )}
 
-        {message && <div style={styles.message}>{message}</div>}
+        {loading && <div style={styles.messageCard}>Loading…</div>}
+        {!loading && errorMessage && <div style={styles.errorCard}>{errorMessage}</div>}
+        {!loading && successMessage && <div style={styles.successCard}>{successMessage}</div>}
 
-        <div style={styles.tabs}>
-          <button style={styles.tab(tab === "home")} onClick={() => setTab("home")}>Home</button>
-          <button style={styles.tab(tab === "events")} onClick={() => setTab("events")}>Events</button>
-          <button style={styles.tab(tab === "members")} onClick={() => setTab("members")}>Members</button>
-          <button style={styles.tab(tab === "gamesinfo")} onClick={() => setTab("gamesinfo")}>Games Info</button>
-          <button style={styles.tab(tab === "information")} onClick={() => setTab("information")}>Information</button>
-          <button style={styles.tab(tab === "office")} onClick={() => setTab("office")}>Office Bearers / Coaches</button>
-          <button style={styles.tab(tab === "admin")} onClick={() => setTab("admin")}>Admin</button>
-        </div>
+        {!loading && isLoggedIn && activeTab === "home" && (
+          <div style={styles.grid}>
+            <div style={styles.card}>
+              <h3 style={styles.sectionTitle}>Welcome</h3>
+              <p style={styles.paragraph}>
+                Welcome to the club app. Use the tabs above to view diary dates, notices, members, office bearers, coaches and documents.
+              </p>
+            </div>
 
-        {tab === "home" && (
-          <>
-            <div style={styles.heroCard}>
-              <div style={styles.homeLabel}>Next Club Event</div>
-
-              {nextEvent ? (
-                <>
-                  <div style={styles.heroTitle}>{nextEvent.title}</div>
-                  <div style={styles.heroDate}>{formatDiaryDate(nextEvent.date_text)}</div>
-                  {nextEvent.note ? (
-                    <div style={{ color: "#444", whiteSpace: "pre-wrap", marginBottom: 12 }}>
-                      {nextEvent.note}
-                    </div>
-                  ) : null}
-
-                  <div>
-                    <button style={styles.homeActionBtn} onClick={() => setTab("events")}>
-                      View All Events
-                    </button>
-                    <button style={styles.homeActionBtn} onClick={() => setTab("information")}>
-                      Club Notices
-                    </button>
-                    <button style={styles.homeActionBtn} onClick={() => setTab("gamesinfo")}>
-                      Games Info
-                    </button>
-                  </div>
-                </>
+            <div style={styles.card}>
+              <h3 style={styles.sectionTitle}>Upcoming Diary</h3>
+              {upcomingEvents.length === 0 ? (
+                <p style={styles.paragraph}>No diary entries yet.</p>
               ) : (
-                <>
-                  <div style={styles.heroTitle}>No upcoming events</div>
-                  <div style={{ color: "#555" }}>Add events in Admin to show them here.</div>
-                </>
+                upcomingEvents.map((event) => (
+                  <div key={event.id} style={styles.listItem}>
+                    <div style={styles.listTitle}>{getField(event, ["title", "event_title"], "Untitled event")}</div>
+                    <div style={styles.listMeta}>{formatDateTime(getField(event, ["event_date", "date"]), getField(event, ["event_time", "time"]))}</div>
+                    {getField(event, ["location"]) && <div style={styles.listMeta}>{getField(event, ["location"])}</div>}
+                  </div>
+                ))
               )}
             </div>
 
-            <div style={styles.homeGrid}>
-              <div style={styles.homeMiniCard}>
-                <div style={styles.homeLabel}>Pinned Notice</div>
-
-                {latestPinnedPost ? (
-                  <>
-                    <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
-                      {latestPinnedPost.title}
+            <div style={styles.card}>
+              <h3 style={styles.sectionTitle}>Latest Notices</h3>
+              {sortedNotices.length === 0 ? (
+                <p style={styles.paragraph}>No notices yet.</p>
+              ) : (
+                sortedNotices.slice(0, 5).map((notice) => (
+                  <div key={notice.id} style={styles.listItem}>
+                    <div style={styles.listTitle}>
+                      {getField(notice, ["title", "heading"], "Notice")}
+                      {getField(notice, ["important", "is_important"], false) ? " • Important" : ""}
                     </div>
-                    <div style={{ color: "#555", whiteSpace: "pre-wrap", marginBottom: 10 }}>
-                      {latestPinnedPost.message}
-                    </div>
-                    {latestPinnedPost.attachment_link ? (
-                      <>
-                        {isImageFile(latestPinnedPost.attachment_link) ? (
-                          <img
-                            src={latestPinnedPost.attachment_link}
-                            alt={latestPinnedPost.title}
-                            style={styles.imagePreview}
-                          />
-                        ) : null}
-                        <a
-                          href={latestPinnedPost.attachment_link}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={styles.linkBtn}
-                        >
-                          {latestPinnedPost.button_text || "Open Notice"}
-                        </a>
-                      </>
-                    ) : null}
-                  </>
-                ) : (
-                  <div style={{ color: "#777" }}>No pinned notice.</div>
-                )}
-              </div>
-
-              <div style={styles.homeMiniCard}>
-                <div style={styles.homeLabel}>Coming Up</div>
-
-                {nextTwoEvents.length > 0 ? (
-                  nextTwoEvents.map((e) => (
-                    <div key={e.id} style={{ marginBottom: 12 }}>
-                      <div style={{ fontWeight: 700 }}>{e.title}</div>
-                      <div style={{ color: "#92400e" }}>{formatDiaryDate(e.date_text)}</div>
-                    </div>
-                  ))
-                ) : (
-                  <div style={{ color: "#777" }}>No further upcoming events.</div>
-                )}
-              </div>
-            </div>
-
-            <div style={styles.panel}>
-              <h3 style={styles.sectionTitle}>Quick Links</h3>
-              <button style={styles.homeActionBtn} onClick={() => setTab("events")}>Events</button>
-              <button style={styles.homeActionBtn} onClick={() => setTab("members")}>Members</button>
-              <button style={styles.homeActionBtn} onClick={() => setTab("gamesinfo")}>Games Info</button>
-              <button style={styles.homeActionBtn} onClick={() => setTab("information")}>Information</button>
-              <button style={styles.homeActionBtn} onClick={() => setTab("office")}>Office Bearers / Coaches</button>
-            </div>
-          </>
-        )}
-
-        {tab === "office" && (
-          <>
-            <div style={styles.panel}>
-              <h3 style={styles.sectionTitle}>Office Bearers</h3>
-              <div style={styles.grid}>
-                {sortedOfficeBearers.map((person) => (
-                  <div key={person.id} style={styles.card}>
-                    <span style={styles.badge}>{person.role}</span>
-                    <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{person.name}</div>
-                    <div style={{ marginBottom: 10, color: "#444" }}>{person.phone || "No phone listed"}</div>
-                    {person.phone ? (
-                      <div>
-                        <a href={`tel:${person.phone}`} style={styles.linkBtn}>Call</a>
-                        <a
-                          href={`https://wa.me/${normaliseUkPhoneForWhatsApp(person.phone)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ ...styles.linkBtn, background: "#25D366", marginLeft: 8 }}
-                        >
-                          WhatsApp
-                        </a>
-                      </div>
-                    ) : null}
+                    <div style={styles.paragraph}>{getField(notice, ["text", "content", "description"], "")}</div>
                   </div>
-                ))}
-              </div>
+                ))
+              )}
             </div>
-
-            <div style={styles.panel}>
-              <h3 style={styles.sectionTitle}>Club Coaches</h3>
-              {renderPersonCards(sortedClubCoaches, "Club Coach")}
-            </div>
-          </>
+          </div>
         )}
 
-        {tab === "events" && (
-          <div style={styles.panel}>
-            <h3 style={styles.sectionTitle}>Events</h3>
-
-            <input
-              type="text"
-              placeholder="Search events..."
-              value={eventSearch}
-              onChange={(e) => setEventSearch(e.target.value)}
-              style={styles.input}
-            />
-
-            {filteredEvents.length === 0 ? (
-              <div style={{ color: "#777" }}>No matching events found.</div>
+        {!loading && isLoggedIn && activeTab === "diary" && (
+          <div style={styles.card}>
+            <h3 style={styles.sectionTitle}>Diary</h3>
+            {combinedEvents.length === 0 ? (
+              <p style={styles.paragraph}>No diary entries yet.</p>
             ) : (
-              filteredEvents.map((e) => (
-                <div key={e.id} style={styles.card}>
-                  <strong style={{ color: "#92400e" }}>{formatDiaryDate(e.date_text)}</strong> — {e.title}
-                  {e.note ? (
-                    <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>
-                      {e.note}
-                    </div>
-                  ) : null}
+              combinedEvents.map((event) => (
+                <div key={event.id} style={styles.listItem}>
+                  <div style={styles.listTitle}>{getField(event, ["title", "event_title"], "Untitled event")}</div>
+                  <div style={styles.listMeta}>{formatDateTime(getField(event, ["event_date", "date"]), getField(event, ["event_time", "time"]))}</div>
+                  {getField(event, ["location"]) && <div style={styles.listMeta}>Location: {getField(event, ["location"])}</div>}
+                  {getField(event, ["notes", "description"]) && <div style={styles.paragraph}>{getField(event, ["notes", "description"])}</div>}
+                  {isAdmin && (
+                    <button style={styles.deleteButton} onClick={() => deleteEvent(event.id)}>Delete</button>
+                  )}
                 </div>
               ))
             )}
           </div>
         )}
 
-        {tab === "members" && (
-          <div style={styles.panel}>
+        {!loading && isLoggedIn && activeTab === "notices" && (
+          <div style={styles.card}>
+            <h3 style={styles.sectionTitle}>Notices</h3>
+            {sortedNotices.length === 0 ? (
+              <p style={styles.paragraph}>No notices yet.</p>
+            ) : (
+              sortedNotices.map((notice) => (
+                <div key={notice.id} style={styles.listItem}>
+                  <div style={styles.listTitle}>
+                    {getField(notice, ["title", "heading"], "Notice")}
+                    {getField(notice, ["important", "is_important"], false) ? " • Important" : ""}
+                  </div>
+                  <div style={styles.paragraph}>{getField(notice, ["text", "content", "description"], "")}</div>
+                  {isAdmin && (
+                    <button style={styles.deleteButton} onClick={() => deleteNotice(notice.id)}>Delete</button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {!loading && isLoggedIn && activeTab === "members" && (
+          <div style={styles.card}>
             <h3 style={styles.sectionTitle}>Members</h3>
             <input
-              placeholder="Search members..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={styles.input}
-            />
-
-            <h4 style={styles.memberSectionTitle}>Gents</h4>
-            {renderMemberCards(gentsMembers)}
-
-            <h4 style={styles.memberSectionTitle}>Ladies</h4>
-            {renderMemberCards(ladiesMembers)}
-
-            <h4 style={styles.memberSectionTitle}>Associate</h4>
-            {renderMemberCards(associateMembers)}
-          </div>
-        )}
-
-        {tab === "gamesinfo" && (
-          <div style={styles.panel}>
-            <h3 style={styles.sectionTitle}>Games Info</h3>
-
-            <input
               type="text"
-              placeholder="Search games info..."
-              value={documentSearch}
-              onChange={(e) => setDocumentSearch(e.target.value)}
-              style={styles.input}
+              placeholder="Search members"
+              value={memberSearch}
+              onChange={(e) => setMemberSearch(e.target.value)}
+              style={{ ...styles.input, marginBottom: 16, maxWidth: 320 }}
             />
 
-            {filteredDocuments.length === 0 ? (
-              <div style={{ color: "#777" }}>No matching games info found.</div>
-            ) : (
-              filteredDocuments.map((doc) => (
-                <div key={doc.id} style={styles.card}>
-                  <div style={styles.badge}>{doc.category || "General"}</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>{doc.title}</div>
-                  {doc.description ? (
-                    <div style={{ marginTop: 8, whiteSpace: "pre-wrap", color: "#555" }}>
-                      {doc.description}
-                    </div>
-                  ) : null}
-                  {doc.file_url ? (
-                    <div style={{ marginTop: 10 }}>
-                      <div style={styles.fileInfo}>{getFileTypeLabel(doc.file_url)}</div>
-
-                      {isImageFile(doc.file_url) ? (
-                        <>
-                          <img src={doc.file_url} alt={doc.title} style={styles.imagePreview} />
-                          <a href={doc.file_url} target="_blank" rel="noreferrer" style={styles.linkBtn}>
-                            {doc.button_text || "Open Image"}
-                          </a>
-                        </>
-                      ) : (
-                        <a href={doc.file_url} target="_blank" rel="noreferrer" style={styles.linkBtn}>
-                          {doc.button_text || "Open File"}
-                        </a>
+            {Object.entries(groupedMembers).map(([groupName, groupItems]) => (
+              <div key={groupName} style={{ marginBottom: 22 }}>
+                <h4 style={styles.subHeading}>{groupName}</h4>
+                {groupItems.length === 0 ? (
+                  <div style={styles.paragraph}>No members in this section.</div>
+                ) : (
+                  groupItems.map((member) => (
+                    <div key={member.id} style={styles.listItem}>
+                      <div style={styles.listTitle}>{getField(member, ["full_name", "name"], "Unnamed member")}</div>
+                      {getField(member, ["phone"]) && <div style={styles.listMeta}>Phone: {getField(member, ["phone"])}</div>}
+                      {getField(member, ["email"]) && <div style={styles.listMeta}>Email: {getField(member, ["email"])}</div>}
+                      {isAdmin && (
+                        <button style={styles.deleteButton} onClick={() => deleteMember(member.id)}>Delete</button>
                       )}
                     </div>
-                  ) : null}
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {tab === "information" && (
-          <div style={styles.panel}>
-            <h3 style={styles.sectionTitle}>General Information</h3>
-
-            <input
-              type="text"
-              placeholder="Search information..."
-              value={infoSearch}
-              onChange={(e) => setInfoSearch(e.target.value)}
-              style={styles.input}
-            />
-
-            {filteredPosts.length === 0 ? (
-              <div style={{ color: "#777" }}>No matching information found.</div>
-            ) : (
-              filteredPosts.map((post) => (
-                <div key={post.id} style={{ ...styles.card, ...(post.pinned ? styles.pinnedCard : {}) }}>
-                  {post.pinned ? <div style={styles.badge}>📌 Pinned Notice</div> : null}
-                  <div style={{ color: "#92400e", fontWeight: 700 }}>{post.date_posted}</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, marginTop: 6 }}>{post.title}</div>
-                  <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{post.message}</div>
-
-                  {post.attachment_link ? (
-                    <div style={{ marginTop: 10 }}>
-                      <div style={styles.fileInfo}>{getFileTypeLabel(post.attachment_link)}</div>
-
-                      {isImageFile(post.attachment_link) ? (
-                        <>
-                          <img src={post.attachment_link} alt={post.title} style={styles.imagePreview} />
-                          <a href={post.attachment_link} target="_blank" rel="noreferrer" style={styles.linkBtn}>
-                            {post.button_text || "Open Image"}
-                          </a>
-                        </>
-                      ) : (
-                        <a href={post.attachment_link} target="_blank" rel="noreferrer" style={styles.linkBtn}>
-                          {post.button_text || "Open Attachment"}
-                        </a>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {tab === "admin" && (
-          <div>
-            {!adminUnlocked ? (
-              <div style={{ ...styles.panel, maxWidth: 420 }}>
-                <h3 style={styles.sectionTitle}>Admin Login</h3>
-                <input
-                  type="password"
-                  value={adminPin}
-                  onChange={(e) => setAdminPin(e.target.value)}
-                  style={styles.input}
-                />
-                <button onClick={handleAdminLogin} style={styles.button}>Enter</button>
+                  ))
+                )}
               </div>
+            ))}
+          </div>
+        )}
+
+        {!loading && isLoggedIn && activeTab === "office" && (
+          <div style={styles.card}>
+            <h3 style={styles.sectionTitle}>Office Bearers</h3>
+            {officeBearers.length === 0 ? (
+              <p style={styles.paragraph}>No office bearers entered yet.</p>
             ) : (
-              <>
-                <div style={styles.tabs}>
-                  <button onClick={() => setAdminTab("events")} style={styles.tab(adminTab === "events")}>
-                    Events
-                  </button>
-                  <button onClick={() => setAdminTab("officers")} style={styles.tab(adminTab === "officers")}>
-                    Office Bearers
-                  </button>
-                  <button onClick={() => setAdminTab("coaches")} style={styles.tab(adminTab === "coaches")}>
-                    Coaches
-                  </button>
-                  <button onClick={() => setAdminTab("members")} style={styles.tab(adminTab === "members")}>
-                    Members
-                  </button>
-                  <button onClick={() => setAdminTab("gamesinfo")} style={styles.tab(adminTab === "gamesinfo")}>
-                    Games Info
-                  </button>
-                  <button onClick={() => setAdminTab("info")} style={styles.tab(adminTab === "info")}>
-                    Information
-                  </button>
+              officeBearers.map((item) => (
+                <div key={item.id} style={styles.listItem}>
+                  <div style={styles.listTitle}>{getField(item, ["role", "title"], "Role")}</div>
+                  <div style={styles.listMeta}>{getField(item, ["name", "person_name"], "")}</div>
+                  {getField(item, ["phone"]) && <div style={styles.listMeta}>Phone: {getField(item, ["phone"])}</div>}
+                  {getField(item, ["email"]) && <div style={styles.listMeta}>Email: {getField(item, ["email"])}</div>}
+                  {isAdmin && (
+                    <button style={styles.deleteButton} onClick={() => deleteOfficeBearer(item.id)}>Delete</button>
+                  )}
                 </div>
-
-                {adminTab === "events" && (
-                  <>
-                    <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>{editingEntryId ? "Edit Event" : "Add Event"}</h3>
-
-                      <input
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        placeholder="Event title"
-                        style={styles.input}
-                      />
-
-                      <input
-                        type="date"
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        style={styles.input}
-                      />
-
-                      <textarea
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        placeholder="Optional note"
-                        style={styles.textarea}
-                      />
-
-                      <button onClick={saveEntry} style={styles.button}>
-                        {editingEntryId ? "Update Event" : "Save Event"}
-                      </button>
-
-                      {(editingEntryId || title || date || note) && (
-                        <button onClick={clearEntryForm} style={styles.secondaryButton}>
-                          Clear
-                        </button>
-                      )}
-                    </div>
-
-                    <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>Manage Events</h3>
-                      {sortedEntries.map((e) => (
-                        <div key={e.id} style={styles.card}>
-                          <strong>{formatDiaryDate(e.date_text)}</strong> — {e.title}
-                          {e.note ? (
-                            <div style={{ marginTop: 8, color: "#555", whiteSpace: "pre-wrap" }}>
-                              {e.note}
-                            </div>
-                          ) : null}
-                          <div style={{ marginTop: 8 }}>
-                            <button onClick={() => editEntry(e)} style={styles.smallBtn}>Edit</button>
-                            <button onClick={() => deleteEntry(e.id)} style={styles.smallBtn}>Delete</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                {adminTab === "officers" && (
-                  <>
-                    <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>
-                        {editingOfficerId ? "Edit Office Bearer" : "Add Office Bearer"}
-                      </h3>
-                      <input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Role" style={styles.input} />
-                      <input value={newOfficerName} onChange={(e) => setNewOfficerName(e.target.value)} placeholder="Name" style={styles.input} />
-                      <input value={newOfficerPhone} onChange={(e) => setNewOfficerPhone(e.target.value)} placeholder="Phone" style={styles.input} />
-                      <input
-                        type="number"
-                        value={newOfficerPosition}
-                        onChange={(e) => setNewOfficerPosition(e.target.value)}
-                        placeholder="Position order"
-                        style={styles.input}
-                      />
-                      <button onClick={saveOfficeBearer} style={styles.button}>
-                        {editingOfficerId ? "Update Office Bearer" : "Save Office Bearer"}
-                      </button>
-                      {(editingOfficerId || newRole || newOfficerName || newOfficerPhone || newOfficerPosition) && (
-                        <button onClick={clearOfficerForm} style={styles.secondaryButton}>Clear</button>
-                      )}
-                    </div>
-
-                    <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>Manage Office Bearers</h3>
-                      {sortedOfficeBearers.map((person, index) => {
-                        const canMoveUp = index > 0;
-                        const canMoveDown = index < sortedOfficeBearers.length - 1;
-
-                        return (
-                          <div key={person.id} style={styles.card}>
-                            <strong>{person.role}</strong> — {person.name}
-                            <div style={{ marginTop: 8 }}>
-                              <button onClick={() => editOfficeBearer(person)} style={styles.smallBtn}>Edit</button>
-                              <button onClick={() => deleteOfficeBearer(person.id)} style={styles.smallBtn}>Delete</button>
-                              <button
-                                onClick={() =>
-                                  canMoveUp &&
-                                  moveItem(
-                                    "office_bearers",
-                                    officeBearers,
-                                    (updated) => setOfficeBearers(updated),
-                                    person.id,
-                                    "up",
-                                    "Office bearer"
-                                  )
-                                }
-                                style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
-                                type="button"
-                              >
-                                ↑ Up
-                              </button>
-                              <button
-                                onClick={() =>
-                                  canMoveDown &&
-                                  moveItem(
-                                    "office_bearers",
-                                    officeBearers,
-                                    (updated) => setOfficeBearers(updated),
-                                    person.id,
-                                    "down",
-                                    "Office bearer"
-                                  )
-                                }
-                                style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
-                                type="button"
-                              >
-                                ↓ Down
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-
-                {adminTab === "coaches" && (
-                  <>
-                    <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>{editingCoachId ? "Edit Club Coach" : "Add Club Coach"}</h3>
-                      <input value={newCoachName} onChange={(e) => setNewCoachName(e.target.value)} placeholder="Name" style={styles.input} />
-                      <input value={newCoachPhone} onChange={(e) => setNewCoachPhone(e.target.value)} placeholder="Phone" style={styles.input} />
-                      <input
-                        type="number"
-                        value={newCoachPosition}
-                        onChange={(e) => setNewCoachPosition(e.target.value)}
-                        placeholder="Position order"
-                        style={styles.input}
-                      />
-                      <button onClick={saveCoach} style={styles.button}>
-                        {editingCoachId ? "Update Club Coach" : "Save Club Coach"}
-                      </button>
-                      {(editingCoachId || newCoachName || newCoachPhone || newCoachPosition) && (
-                        <button onClick={clearCoachForm} style={styles.secondaryButton}>Clear</button>
-                      )}
-                    </div>
-
-                    <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>Manage Club Coaches</h3>
-                      {sortedClubCoaches.map((coach, index) => {
-                        const canMoveUp = index > 0;
-                        const canMoveDown = index < sortedClubCoaches.length - 1;
-
-                        return (
-                          <div key={coach.id} style={styles.card}>
-                            <strong>{coach.name}</strong> — {coach.phone || "no phone"}
-                            <div style={{ marginTop: 8 }}>
-                              <button onClick={() => editCoach(coach)} style={styles.smallBtn}>Edit</button>
-                              <button onClick={() => deleteCoach(coach.id)} style={styles.smallBtn}>Delete</button>
-                              <button
-                                onClick={() =>
-                                  canMoveUp &&
-                                  moveItem(
-                                    "club_coaches",
-                                    clubCoaches,
-                                    (updated) => setClubCoaches(updated),
-                                    coach.id,
-                                    "up",
-                                    "Club coach"
-                                  )
-                                }
-                                style={canMoveUp ? styles.reorderBtn : styles.disabledReorderBtn}
-                                type="button"
-                              >
-                                ↑ Up
-                              </button>
-                              <button
-                                onClick={() =>
-                                  canMoveDown &&
-                                  moveItem(
-                                    "club_coaches",
-                                    clubCoaches,
-                                    (updated) => setClubCoaches(updated),
-                                    coach.id,
-                                    "down",
-                                    "Club coach"
-                                  )
-                                }
-                                style={canMoveDown ? styles.reorderBtn : styles.disabledReorderBtn}
-                                type="button"
-                              >
-                                ↓ Down
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-
-                {adminTab === "members" && (
-                  <>
-                    <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>{editingMemberId ? "Edit Member" : "Add Member"}</h3>
-                      <input value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="Name" style={styles.input} />
-                      <select value={newMemberSection} onChange={(e) => setNewMemberSection(e.target.value)} style={styles.input}>
-                        <option>Gents</option>
-                        <option>Ladies</option>
-                        <option>Associate</option>
-                      </select>
-                      <input value={newMemberPhone} onChange={(e) => setNewMemberPhone(e.target.value)} placeholder="Phone" style={styles.input} />
-                      <button onClick={saveMember} style={styles.button}>
-                        {editingMemberId ? "Update Member" : "Save Member"}
-                      </button>
-                      {(editingMemberId || newMemberName || newMemberPhone) && (
-                        <button onClick={clearMemberForm} style={styles.secondaryButton}>Clear</button>
-                      )}
-                    </div>
-
-                    <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>Manage Members</h3>
-                      {members
-                        .slice()
-                        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
-                        .map((m) => (
-                          <div key={m.id} style={styles.card}>
-                            <strong>{m.name}</strong> — {m.section} — {m.phone || "no phone"}
-                            <div style={{ marginTop: 8 }}>
-                              <button onClick={() => editMember(m)} style={styles.smallBtn}>Edit</button>
-                              <button onClick={() => deleteMember(m.id)} style={styles.smallBtn}>Delete</button>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  </>
-                )}
-
-                {adminTab === "gamesinfo" && (
-                  <>
-                    <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>{editingDocumentId ? "Edit Games Info" : "Add Games Info"}</h3>
-
-                      <input
-                        value={documentTitle}
-                        onChange={(e) => setDocumentTitle(e.target.value)}
-                        placeholder="Games info title"
-                        style={styles.input}
-                      />
-
-                      <textarea
-                        value={documentDescription}
-                        onChange={(e) => setDocumentDescription(e.target.value)}
-                        placeholder="Description"
-                        style={styles.textarea}
-                      />
-
-                      <select
-                        value={documentCategory}
-                        onChange={(e) => setDocumentCategory(e.target.value)}
-                        style={styles.input}
-                      >
-                        <option>General</option>
-                        <option>Fixtures</option>
-                        <option>Competitions</option>
-                        <option>Results</option>
-                        <option>Rules</option>
-                        <option>Forms</option>
-                      </select>
-
-                      <input
-                        value={documentLink}
-                        onChange={(e) => setDocumentLink(e.target.value)}
-                        placeholder="Attachment link (optional if uploading file)"
-                        style={styles.input}
-                      />
-
-                      <input
-                        value={documentButtonText}
-                        onChange={(e) => setDocumentButtonText(e.target.value)}
-                        placeholder="Button text"
-                        style={styles.input}
-                      />
-
-                      <div style={{ marginBottom: 10 }}>
-                        <input
-                          type="file"
-                          accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx"
-                          onChange={(e) => setDocumentFile(e.target.files?.[0] || null)}
-                        />
-                        {documentFile ? <div style={styles.fileInfo}>Selected file: {documentFile.name}</div> : null}
-                      </div>
-
-                      <button onClick={saveDocument} style={styles.button}>
-                        {editingDocumentId ? "Update Games Info" : "Save Games Info"}
-                      </button>
-
-                      {(editingDocumentId ||
-                        documentTitle ||
-                        documentDescription ||
-                        documentCategory ||
-                        documentLink ||
-                        documentButtonText ||
-                        documentFile) && (
-                        <button onClick={clearDocumentForm} style={styles.secondaryButton}>Clear</button>
-                      )}
-                    </div>
-
-                    <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>Manage Games Info</h3>
-                      {sortedDocuments.length === 0 ? (
-                        <div style={{ color: "#777" }}>No games info yet.</div>
-                      ) : (
-                        sortedDocuments.map((doc) => (
-                          <div key={doc.id} style={styles.card}>
-                            <strong>{doc.title}</strong> — {doc.category || "General"}
-                            {doc.file_url ? (
-                              <div style={{ marginTop: 6, color: "#666" }}>
-                                {getFileTypeLabel(doc.file_url)}
-                              </div>
-                            ) : null}
-                            <div style={{ marginTop: 8 }}>
-                              <button onClick={() => editDocument(doc)} style={styles.smallBtn}>Edit</button>
-                              <button onClick={() => deleteDocument(doc.id)} style={styles.smallBtn}>Delete</button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </>
-                )}
-
-                {adminTab === "info" && (
-                  <>
-                    <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>
-                        {editingPostId ? "Edit Information Post" : "Add Information Post"}
-                      </h3>
-                      <input value={postTitle} onChange={(e) => setPostTitle(e.target.value)} placeholder="Title" style={styles.input} />
-                      <textarea value={postMessage} onChange={(e) => setPostMessage(e.target.value)} placeholder="Message" style={styles.textarea} />
-                      <input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} style={styles.input} />
-                      <input value={postLink} onChange={(e) => setPostLink(e.target.value)} placeholder="Attachment link (optional if uploading file)" style={styles.input} />
-                      <input value={postButtonText} onChange={(e) => setPostButtonText(e.target.value)} placeholder="Button text" style={styles.input} />
-
-                      <div style={{ marginBottom: 10 }}>
-                        <input
-                          type="file"
-                          accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx"
-                          onChange={(e) => setPostFile(e.target.files?.[0] || null)}
-                        />
-                        {postFile ? <div style={styles.fileInfo}>Selected file: {postFile.name}</div> : null}
-                      </div>
-
-                      <label style={{ display: "block", marginBottom: 10 }}>
-                        <input
-                          type="checkbox"
-                          checked={postPinned}
-                          onChange={(e) => setPostPinned(e.target.checked)}
-                          style={{ marginRight: 8 }}
-                        />
-                        Pin this post to the top
-                      </label>
-
-                      <button onClick={savePost} style={styles.button}>
-                        {editingPostId ? "Update Information Post" : "Save Information Post"}
-                      </button>
-
-                      {(editingPostId ||
-                        postTitle ||
-                        postMessage ||
-                        postDate ||
-                        postLink ||
-                        postButtonText ||
-                        postPinned ||
-                        postFile) && (
-                        <button onClick={clearPostForm} style={styles.secondaryButton}>Clear</button>
-                      )}
-                    </div>
-
-                    <div style={styles.panel}>
-                      <h3 style={styles.sectionTitle}>Manage Information Posts</h3>
-                      {sortedPosts.map((post) => (
-                        <div key={post.id} style={styles.card}>
-                          <strong>{post.date_posted}</strong> — {post.title} {post.pinned ? "• PINNED" : ""}
-                          {post.attachment_link ? (
-                            <div style={{ marginTop: 6, color: "#666" }}>
-                              {getFileTypeLabel(post.attachment_link)}
-                            </div>
-                          ) : null}
-                          <div style={{ marginTop: 8 }}>
-                            <button onClick={() => editPost(post)} style={styles.smallBtn}>Edit</button>
-                            <button onClick={() => deletePost(post.id)} style={styles.smallBtn}>Delete</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </>
+              ))
             )}
+          </div>
+        )}
+
+        {!loading && isLoggedIn && activeTab === "coaches" && (
+          <div style={styles.card}>
+            <h3 style={styles.sectionTitle}>Club Coaches</h3>
+            {coaches.length === 0 ? (
+              <p style={styles.paragraph}>No coaches entered yet.</p>
+            ) : (
+              coaches.map((coach) => (
+                <div key={coach.id} style={styles.listItem}>
+                  <div style={styles.listTitle}>{getField(coach, ["name"], "")}</div>
+                  {getField(coach, ["role"]) && <div style={styles.listMeta}>{getField(coach, ["role"])}</div>}
+                  {getField(coach, ["phone"]) && <div style={styles.listMeta}>Phone: {getField(coach, ["phone"])}</div>}
+                  {getField(coach, ["email"]) && <div style={styles.listMeta}>Email: {getField(coach, ["email"])}</div>}
+                  {getField(coach, ["notes"]) && <div style={styles.paragraph}>{getField(coach, ["notes"])}</div>}
+                  {isAdmin && (
+                    <button style={styles.deleteButton} onClick={() => deleteCoach(coach.id)}>Delete</button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {!loading && isLoggedIn && activeTab === "documents" && (
+          <div style={styles.card}>
+            <h3 style={styles.sectionTitle}>Documents</h3>
+            {documents.length === 0 ? (
+              <p style={styles.paragraph}>No documents yet.</p>
+            ) : (
+              documents.map((doc) => {
+                const url = getField(doc, ["file_url", "url", "link"], "");
+                return (
+                  <div key={doc.id} style={styles.listItem}>
+                    <div style={styles.listTitle}>{getField(doc, ["title", "name"], "Document")}</div>
+                    {getField(doc, ["description", "notes"]) && <div style={styles.paragraph}>{getField(doc, ["description", "notes"])}</div>}
+                    {url ? (
+                      <a href={url} target="_blank" rel="noreferrer" style={styles.link}>
+                        Open document
+                      </a>
+                    ) : (
+                      <div style={styles.listMeta}>No link added</div>
+                    )}
+                    {isAdmin && (
+                      <button style={styles.deleteButton} onClick={() => deleteDocument(doc.id)}>Delete</button>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {!loading && isAdmin && activeTab === "admin" && (
+          <div style={styles.grid}>
+            <div style={styles.card}>
+              <h3 style={styles.sectionTitle}>Add Notice</h3>
+              <input
+                type="text"
+                placeholder="Notice title"
+                value={noticeForm.title}
+                onChange={(e) => setNoticeForm({ ...noticeForm, title: e.target.value })}
+                style={styles.input}
+              />
+              <textarea
+                placeholder="Notice text"
+                value={noticeForm.text}
+                onChange={(e) => setNoticeForm({ ...noticeForm, text: e.target.value })}
+                style={styles.textarea}
+              />
+              <label style={styles.checkboxRow}>
+                <input
+                  type="checkbox"
+                  checked={noticeForm.important}
+                  onChange={(e) => setNoticeForm({ ...noticeForm, important: e.target.checked })}
+                />
+                Important notice
+              </label>
+              <button style={styles.button} onClick={addNotice} disabled={saving}>Save Notice</button>
+            </div>
+
+            <div style={styles.card}>
+              <h3 style={styles.sectionTitle}>Add Diary Entry</h3>
+
+              <div style={styles.presetRow}>
+                <button type="button" style={styles.smallButton} onClick={() => fillRecurringPreset("monday")}>
+                  Monday Points
+                </button>
+                <button type="button" style={styles.smallButton} onClick={() => fillRecurringPreset("tuesday")}>
+                  Vernett Trophy
+                </button>
+                <button type="button" style={styles.smallButton} onClick={() => fillRecurringPreset("thursday")}>
+                  Thursday Bounce
+                </button>
+              </div>
+
+              <input
+                type="text"
+                placeholder="Event title"
+                value={eventForm.title}
+                onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
+                style={styles.input}
+              />
+
+              <label style={styles.fieldLabel}>Date</label>
+              <input
+                type="date"
+                value={eventForm.event_date}
+                onChange={(e) => setEventForm({ ...eventForm, event_date: e.target.value })}
+                style={styles.input}
+              />
+
+              <label style={styles.fieldLabel}>Time</label>
+              <input
+                type="time"
+                value={eventForm.event_time}
+                onChange={(e) => setEventForm({ ...eventForm, event_time: e.target.value })}
+                style={styles.input}
+              />
+
+              <input
+                type="text"
+                placeholder="Location"
+                value={eventForm.location}
+                onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}
+                style={styles.input}
+              />
+
+              <textarea
+                placeholder="Notes"
+                value={eventForm.notes}
+                onChange={(e) => setEventForm({ ...eventForm, notes: e.target.value })}
+                style={styles.textarea}
+              />
+
+              <label style={styles.checkboxRow}>
+                <input
+                  type="checkbox"
+                  checked={eventForm.isRecurring}
+                  onChange={(e) =>
+                    setEventForm({ ...eventForm, isRecurring: e.target.checked })
+                  }
+                />
+                Recurring weekly
+              </label>
+
+              {eventForm.isRecurring && (
+                <>
+                  <label style={styles.fieldLabel}>Recurring until</label>
+                  <input
+                    type="date"
+                    value={eventForm.recurring_until}
+                    onChange={(e) =>
+                      setEventForm({ ...eventForm, recurring_until: e.target.value })
+                    }
+                    style={styles.input}
+                  />
+                </>
+              )}
+
+              <div style={styles.helpText}>
+                Tick <strong>Recurring weekly</strong> and the app will add the same event every 7 days from the chosen start date until the end date.
+              </div>
+
+              <div style={styles.buttonRow}>
+                <button style={styles.button} onClick={addEvent} disabled={saving}>
+                  Save Diary Entry
+                </button>
+                <button type="button" style={styles.secondaryButton} onClick={resetEventForm} disabled={saving}>
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <div style={styles.card}>
+              <h3 style={styles.sectionTitle}>Add Member</h3>
+              <input
+                type="text"
+                placeholder="Full name"
+                value={memberForm.full_name}
+                onChange={(e) => setMemberForm({ ...memberForm, full_name: e.target.value })}
+                style={styles.input}
+              />
+              <select
+                value={memberForm.section}
+                onChange={(e) => setMemberForm({ ...memberForm, section: e.target.value })}
+                style={styles.input}
+              >
+                <option>Gents</option>
+                <option>Ladies</option>
+                <option>Associate</option>
+              </select>
+              <input
+                type="text"
+                placeholder="Phone"
+                value={memberForm.phone}
+                onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })}
+                style={styles.input}
+              />
+              <input
+                type="text"
+                placeholder="Email"
+                value={memberForm.email}
+                onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })}
+                style={styles.input}
+              />
+              <button style={styles.button} onClick={addMember} disabled={saving}>Save Member</button>
+            </div>
+
+            <div style={styles.card}>
+              <h3 style={styles.sectionTitle}>Add Office Bearer</h3>
+              <input
+                type="text"
+                placeholder="Role"
+                value={officeForm.role}
+                onChange={(e) => setOfficeForm({ ...officeForm, role: e.target.value })}
+                style={styles.input}
+              />
+              <input
+                type="text"
+                placeholder="Name"
+                value={officeForm.name}
+                onChange={(e) => setOfficeForm({ ...officeForm, name: e.target.value })}
+                style={styles.input}
+              />
+              <input
+                type="number"
+                placeholder="Display order"
+                value={officeForm.display_order}
+                onChange={(e) => setOfficeForm({ ...officeForm, display_order: e.target.value })}
+                style={styles.input}
+              />
+              <input
+                type="text"
+                placeholder="Phone"
+                value={officeForm.phone}
+                onChange={(e) => setOfficeForm({ ...officeForm, phone: e.target.value })}
+                style={styles.input}
+              />
+              <input
+                type="text"
+                placeholder="Email"
+                value={officeForm.email}
+                onChange={(e) => setOfficeForm({ ...officeForm, email: e.target.value })}
+                style={styles.input}
+              />
+              <button style={styles.button} onClick={addOfficeBearer} disabled={saving}>Save Office Bearer</button>
+            </div>
+
+            <div style={styles.card}>
+              <h3 style={styles.sectionTitle}>Add Coach</h3>
+              <input
+                type="text"
+                placeholder="Name"
+                value={coachForm.name}
+                onChange={(e) => setCoachForm({ ...coachForm, name: e.target.value })}
+                style={styles.input}
+              />
+              <input
+                type="text"
+                placeholder="Role"
+                value={coachForm.role}
+                onChange={(e) => setCoachForm({ ...coachForm, role: e.target.value })}
+                style={styles.input}
+              />
+              <input
+                type="text"
+                placeholder="Phone"
+                value={coachForm.phone}
+                onChange={(e) => setCoachForm({ ...coachForm, phone: e.target.value })}
+                style={styles.input}
+              />
+              <input
+                type="text"
+                placeholder="Email"
+                value={coachForm.email}
+                onChange={(e) => setCoachForm({ ...coachForm, email: e.target.value })}
+                style={styles.input}
+              />
+              <textarea
+                placeholder="Notes"
+                value={coachForm.notes}
+                onChange={(e) => setCoachForm({ ...coachForm, notes: e.target.value })}
+                style={styles.textarea}
+              />
+              <button style={styles.button} onClick={addCoach} disabled={saving}>Save Coach</button>
+            </div>
+
+            <div style={styles.card}>
+              <h3 style={styles.sectionTitle}>Add Document</h3>
+              <input
+                type="text"
+                placeholder="Document title"
+                value={documentForm.title}
+                onChange={(e) => setDocumentForm({ ...documentForm, title: e.target.value })}
+                style={styles.input}
+              />
+              <input
+                type="text"
+                placeholder="Document link"
+                value={documentForm.file_url}
+                onChange={(e) => setDocumentForm({ ...documentForm, file_url: e.target.value })}
+                style={styles.input}
+              />
+              <textarea
+                placeholder="Description"
+                value={documentForm.description}
+                onChange={(e) => setDocumentForm({ ...documentForm, description: e.target.value })}
+                style={styles.textarea}
+              />
+              <button style={styles.button} onClick={addDocument} disabled={saving}>Save Document</button>
+            </div>
           </div>
         )}
       </div>
     </div>
   );
 }
+
+const styles = {
+  page: {
+    minHeight: "100vh",
+    background: "linear-gradient(180deg, #5b1d2a 0%, #7a2638 55%, #a33a4d 100%)",
+    padding: 16,
+    fontFamily: "Arial, sans-serif",
+    color: "#222",
+  },
+  wrap: {
+    maxWidth: 1200,
+    margin: "0 auto",
+  },
+  headerCard: {
+    background: "#fff",
+    borderRadius: 20,
+    padding: 20,
+    boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+    marginBottom: 16,
+  },
+  title: {
+    margin: 0,
+    color: "#7a2638",
+    fontSize: 32,
+    lineHeight: 1.15,
+  },
+  subtitle: {
+    marginTop: 8,
+    marginBottom: 0,
+    color: "#444",
+    fontSize: 18,
+  },
+  loginBox: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    marginTop: 18,
+    alignItems: "center",
+  },
+  loggedInBar: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 10,
+    flexWrap: "wrap",
+    alignItems: "center",
+    marginTop: 18,
+  },
+  loggedInText: {
+    color: "#333",
+    fontSize: 15,
+  },
+  tabBar: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    marginBottom: 16,
+  },
+  tab: {
+    padding: "10px 14px",
+    borderRadius: 10,
+    border: "none",
+    background: "#f1d8de",
+    color: "#5b1d2a",
+    cursor: "pointer",
+    fontWeight: 700,
+  },
+  activeTab: {
+    padding: "10px 14px",
+    borderRadius: 10,
+    border: "none",
+    background: "#7a2638",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 700,
+  },
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+    gap: 16,
+  },
+  card: {
+    background: "#fff",
+    borderRadius: 18,
+    padding: 18,
+    boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+  },
+  sectionTitle: {
+    marginTop: 0,
+    marginBottom: 16,
+    fontSize: 24,
+    color: "#7a2638",
+  },
+  subHeading: {
+    marginTop: 0,
+    marginBottom: 10,
+    color: "#5b1d2a",
+    fontSize: 18,
+  },
+  paragraph: {
+    color: "#444",
+    lineHeight: 1.45,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  listItem: {
+    border: "1px solid #e5d7db",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    background: "#fffafc",
+  },
+  listTitle: {
+    fontWeight: 700,
+    color: "#5b1d2a",
+    marginBottom: 4,
+  },
+  listMeta: {
+    color: "#555",
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  input: {
+    width: "100%",
+    padding: "10px 12px",
+    borderRadius: 8,
+    border: "1px solid #ccc",
+    fontSize: 14,
+    marginBottom: 10,
+    boxSizing: "border-box",
+  },
+  textarea: {
+    width: "100%",
+    minHeight: 90,
+    padding: "10px 12px",
+    borderRadius: 8,
+    border: "1px solid #ccc",
+    fontSize: 14,
+    marginBottom: 10,
+    boxSizing: "border-box",
+    resize: "vertical",
+    fontFamily: "Arial, sans-serif",
+  },
+  button: {
+    padding: "10px 14px",
+    borderRadius: 8,
+    border: "none",
+    background: "#7a2638",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 700,
+  },
+  secondaryButton: {
+    padding: "10px 14px",
+    borderRadius: 8,
+    border: "none",
+    background: "#555",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 700,
+  },
+  smallButton: {
+    padding: "8px 10px",
+    borderRadius: 8,
+    border: "none",
+    background: "#b65b14",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 700,
+    fontSize: 13,
+  },
+  deleteButton: {
+    marginTop: 8,
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: "none",
+    background: "#b00020",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 700,
+  },
+  checkboxRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+    color: "#333",
+  },
+  link: {
+    color: "#7a2638",
+    fontWeight: 700,
+    textDecoration: "none",
+  },
+  messageCard: {
+    background: "#fff",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+    boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+    color: "#333",
+    fontWeight: 700,
+  },
+  errorCard: {
+    background: "#fff1f2",
+    border: "1px solid #f0c5cb",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+    color: "#b00020",
+    fontWeight: 700,
+  },
+  successCard: {
+    background: "#f2fbf4",
+    border: "1px solid #cbe8d0",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+    color: "#1f6b2d",
+    fontWeight: 700,
+  },
+  fieldLabel: {
+    display: "block",
+    marginBottom: 4,
+    color: "#5b1d2a",
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  helpText: {
+    marginTop: 8,
+    marginBottom: 12,
+    color: "#666",
+    fontSize: 13,
+    lineHeight: 1.4,
+  },
+  presetRow: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    marginBottom: 12,
+  },
+  buttonRow: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    marginTop: 8,
+  },
+};
