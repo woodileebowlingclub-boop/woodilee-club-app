@@ -74,9 +74,12 @@ function WhatsAppButton({ phone }) {
 }
 
 function getEventDisplayDate(event) {
-  return getField(event, ["date_text"]) || formatDateTime(
-    getField(event, ["event_date", "date", "eventDate"]),
-    getField(event, ["event_time", "time", "eventTime"])
+  return (
+    getField(event, ["date_text"]) ||
+    formatDateTime(
+      getField(event, ["event_date", "date", "eventDate"]),
+      getField(event, ["event_time", "time", "eventTime"])
+    )
   );
 }
 
@@ -123,7 +126,7 @@ export default function App() {
     notes: "",
   });
   const [memberForm, setMemberForm] = useState({
-    full_name: "",
+    name: "",
     section: "Gents",
     phone: "",
     email: "",
@@ -168,7 +171,7 @@ export default function App() {
       supabase.from("events").select("*"),
       supabase.from("information_points").select("*"),
       supabase.from("information_posts").select("*"),
-      supabase.from("members").select("*").order("full_name", { ascending: true }),
+      supabase.from("members").select("*").order("name", { ascending: true }),
       supabase.from("office_bearers").select("*"),
       supabase.from("club_coaches").select("*").order("name", { ascending: true }),
       supabase.from("documents").select("*").order("id", { ascending: false }),
@@ -341,8 +344,8 @@ export default function App() {
   }
 
   async function addMember() {
-    const full_name = memberForm.full_name.trim();
-    if (!full_name) {
+    const name = memberForm.name.trim();
+    if (!name) {
       alert("Enter member name");
       return;
     }
@@ -351,7 +354,7 @@ export default function App() {
     clearMessages();
 
     const payload = {
-      full_name,
+      name,
       section: memberForm.section,
       phone: memberForm.phone.trim() || null,
       email: memberForm.email.trim() || null,
@@ -365,7 +368,7 @@ export default function App() {
       return;
     }
 
-    setMemberForm({ full_name: "", section: "Gents", phone: "", email: "" });
+    setMemberForm({ name: "", section: "Gents", phone: "", email: "" });
     await loadAll();
     setSaving(false);
     showSaved("Member added");
@@ -542,7 +545,7 @@ export default function App() {
     const search = memberSearch.trim().toLowerCase();
     if (!search) return members;
     return members.filter((member) => {
-      const name = safeString(getField(member, ["full_name", "name"])).toLowerCase();
+      const name = safeString(getField(member, ["name", "full_name"])).toLowerCase();
       const section = safeString(getField(member, ["section", "member_type"])).toLowerCase();
       return name.includes(search) || section.includes(search);
     });
@@ -779,7 +782,7 @@ export default function App() {
                   groupItems.map((member) => (
                     <div key={member.id} style={styles.listItem}>
                       <div style={styles.listTitle}>
-                        {getField(member, ["full_name", "name"], "Unnamed member")}
+                        {getField(member, ["name", "full_name"], "Unnamed member")}
                       </div>
                       {getField(member, ["phone"]) && (
                         <div style={styles.listMeta}>Phone: {getField(member, ["phone"])}</div>
@@ -987,8 +990,8 @@ export default function App() {
               <input
                 type="text"
                 placeholder="Full name"
-                value={memberForm.full_name}
-                onChange={(e) => setMemberForm({ ...memberForm, full_name: e.target.value })}
+                value={memberForm.name}
+                onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })}
                 style={styles.input}
               />
               <select
@@ -1161,8 +1164,8 @@ const styles = {
     flexWrap: "wrap",
   },
   logo: {
-    width: 90,
-    height: 90,
+    width: 120,
+    height: 120,
     objectFit: "contain",
     borderRadius: 12,
     background: "#fff",
