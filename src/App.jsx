@@ -48,6 +48,31 @@ function formatDateTime(dateStr, timeStr) {
   return datePart || timePart || "";
 }
 
+function normalisePhoneForWhatsApp(phone) {
+  const raw = safeString(phone).replace(/\s+/g, "").replace(/[^\d+]/g, "");
+  if (!raw) return "";
+  if (raw.startsWith("+")) return raw.slice(1);
+  if (raw.startsWith("00")) return raw.slice(2);
+  if (raw.startsWith("0")) return `44${raw.slice(1)}`;
+  return raw;
+}
+
+function WhatsAppButton({ phone }) {
+  const waNumber = normalisePhoneForWhatsApp(phone);
+  if (!waNumber) return null;
+
+  return (
+    <a
+      href={`https://wa.me/${waNumber}`}
+      target="_blank"
+      rel="noreferrer"
+      style={styles.whatsAppButton}
+    >
+      WhatsApp
+    </a>
+  );
+}
+
 export default function App() {
   const [accessMode, setAccessMode] = useState(null);
   const [pinInput, setPinInput] = useState("");
@@ -115,21 +140,31 @@ export default function App() {
 
     const [
       eventsRes,
-      noticesRes,
+      noticesPointsRes,
+      noticesPostsRes,
       membersRes,
       officeRes,
       coachesRes,
       docsRes,
     ] = await Promise.all([
-      supabase.from("events").select("*").order("event_date", { ascending: true }),
-      supabase.from("information_points").select("*").order("id", { ascending: false }),
-      supabase.from("members").select("*").order("full_name", { ascending: true }),
-      supabase.from("office_bearers").select("*").order("display_order", { ascending: true }),
-      supabase.from("club_coaches").select("*").order("name", { ascending: true }),
-      supabase.from("documents").select("*").order("id", { ascending: false }),
+      supabase.from("events").select("*"),
+      supabase.from("information_points").select("*"),
+      supabase.from("information_posts").select("*"),
+      supabase.from("members").select("*"),
+      supabase.from("office_bearers").select("*"),
+      supabase.from("club_coaches").select("*"),
+      supabase.from("documents").select("*"),
     ]);
 
-    const errors = [eventsRes.error, noticesRes.error, membersRes.error, officeRes.error, coachesRes.error, docsRes.error]
+    const errors = [
+      eventsRes.error,
+      noticesPointsRes.error,
+      noticesPostsRes.error,
+      membersRes.error,
+      officeRes.error,
+      coachesRes.error,
+      docsRes.error,
+    ]
       .filter(Boolean)
       .map((err) => err.message);
 
@@ -137,8 +172,13 @@ export default function App() {
       setErrorMessage(errors[0]);
     }
 
+    const combinedNotices = [
+      ...(noticesPointsRes.data || []),
+      ...(noticesPostsRes.data || []),
+    ];
+
     setEvents(eventsRes.data || []);
-    setNotices(noticesRes.data || []);
+    setNotices(combinedNotices);
     setMembers(membersRes.data || []);
     setOfficeBearers(officeRes.data || []);
     setCoaches(coachesRes.data || []);
@@ -223,10 +263,17 @@ export default function App() {
     setSaving(true);
     clearMessages();
 
-    const { error } = await supabase.from("information_points").delete().eq("id", id);
+    const deletePoints = await supabase.from("information_points").delete().eq("id", id);
+    if (!deletePoints.error) {
+      await loadAll();
+      setSaving(false);
+      showSaved("Notice deleted");
+      return;
+    }
 
-    if (error) {
-      setErrorMessage(error.message || "Failed to delete notice");
+    const deletePosts = await supabase.from("information_posts").delete().eq("id", id);
+    if (deletePosts.error) {
+      setErrorMessage(deletePosts.error.message || deletePoints.error.message || "Failed to delete notice");
       setSaving(false);
       return;
     }
@@ -516,7 +563,11 @@ export default function App() {
 
   const upcomingEvents = useMemo(() => {
     return [...events]
-      .sort((a, b) => new Date(getField(a, ["event_date", "date"])) - new Date(getField(b, ["event_date", "date"])))
+      .sort((a, b) => {
+        const dateA = getField(a, ["event_date", "date", "eventDate"], "");
+        const dateB = getField(b, ["event_date", "date", "eventDate"], "");
+        return new Date(dateA || "9999-12-31") - new Date(dateB || "9999-12-31");
+      })
       .slice(0, 5);
   }, [events]);
 
@@ -525,6 +576,11 @@ export default function App() {
       const aImportant = !!getField(a, ["important", "is_important"], false);
       const bImportant = !!getField(b, ["important", "is_important"], false);
       if (aImportant !== bImportant) return aImportant ? -1 : 1;
+
+      const aDate = getField(a, ["created_at", "date", "posted_at"], "");
+      const bDate = getField(b, ["created_at", "date", "posted_at"], "");
+      if (aDate && bDate) return new Date(bDate) - new Date(aDate);
+
       return Number(getField(b, ["id"], 0)) - Number(getField(a, ["id"], 0));
     });
   }, [notices]);
@@ -551,15 +607,21 @@ export default function App() {
                 }}
                 style={styles.input}
               />
-              <button style={styles.button} onClick={() => handleLogin("member")}>Member Login</button>
-              <button style={styles.secondaryButton} onClick={() => handleLogin("admin")}>Admin Login</button>
+              <button style={styles.button} onClick={() => handleLogin("member")}>
+                Member Login
+              </button>
+              <button style={styles.secondaryButton} onClick={() => handleLogin("admin")}>
+                Admin Login
+              </button>
             </div>
           ) : (
             <div style={styles.loggedInBar}>
               <div style={styles.loggedInText}>
                 Logged in as <strong>{isAdmin ? "Admin" : "Member"}</strong>
               </div>
-              <button style={styles.secondaryButton} onClick={handleLogout}>Logout</button>
+              <button style={styles.secondaryButton} onClick={handleLogout}>
+                Logout
+              </button>
             </div>
           )}
         </div>
@@ -594,7 +656,10 @@ export default function App() {
           <div style={styles.grid}>
             <div style={styles.card}>
               <h3 style={styles.sectionTitle}>Welcome</h3>
-              <p style={styles.paragraph}>Welcome to the club app. Use the tabs above to view diary dates, notices, members, office bearers, coaches and documents.</p>
+              <p style={styles.paragraph}>
+                Welcome to the club app. Use the tabs above to view diary dates, notices, members,
+                office bearers, coaches and documents.
+              </p>
             </div>
 
             <div style={styles.card}>
@@ -604,9 +669,18 @@ export default function App() {
               ) : (
                 upcomingEvents.map((event) => (
                   <div key={event.id} style={styles.listItem}>
-                    <div style={styles.listTitle}>{getField(event, ["title", "event_title"], "Untitled event")}</div>
-                    <div style={styles.listMeta}>{formatDateTime(getField(event, ["event_date", "date"]), getField(event, ["event_time", "time"]))}</div>
-                    {getField(event, ["location"]) && <div style={styles.listMeta}>{getField(event, ["location"])}</div>}
+                    <div style={styles.listTitle}>
+                      {getField(event, ["title", "event_title"], "Untitled event")}
+                    </div>
+                    <div style={styles.listMeta}>
+                      {formatDateTime(
+                        getField(event, ["event_date", "date", "eventDate"]),
+                        getField(event, ["event_time", "time", "eventTime"])
+                      )}
+                    </div>
+                    {getField(event, ["location"]) && (
+                      <div style={styles.listMeta}>{getField(event, ["location"])}</div>
+                    )}
                   </div>
                 ))
               )}
@@ -617,13 +691,15 @@ export default function App() {
               {sortedNotices.length === 0 ? (
                 <p style={styles.paragraph}>No notices yet.</p>
               ) : (
-                sortedNotices.slice(0, 5).map((notice) => (
-                  <div key={notice.id} style={styles.listItem}>
+                sortedNotices.slice(0, 5).map((notice, index) => (
+                  <div key={`${notice.id || "notice"}-${index}`} style={styles.listItem}>
                     <div style={styles.listTitle}>
                       {getField(notice, ["title", "heading"], "Notice")}
                       {getField(notice, ["important", "is_important"], false) ? " • Important" : ""}
                     </div>
-                    <div style={styles.paragraph}>{getField(notice, ["text", "content", "description"], "")}</div>
+                    <div style={styles.paragraph}>
+                      {getField(notice, ["text", "content", "description", "body"], "")}
+                    </div>
                   </div>
                 ))
               )}
@@ -638,15 +714,32 @@ export default function App() {
               <p style={styles.paragraph}>No diary entries yet.</p>
             ) : (
               [...events]
-                .sort((a, b) => new Date(getField(a, ["event_date", "date"])) - new Date(getField(b, ["event_date", "date"])))
+                .sort((a, b) => {
+                  const dateA = getField(a, ["event_date", "date", "eventDate"], "");
+                  const dateB = getField(b, ["event_date", "date", "eventDate"], "");
+                  return new Date(dateA || "9999-12-31") - new Date(dateB || "9999-12-31");
+                })
                 .map((event) => (
                   <div key={event.id} style={styles.listItem}>
-                    <div style={styles.listTitle}>{getField(event, ["title", "event_title"], "Untitled event")}</div>
-                    <div style={styles.listMeta}>{formatDateTime(getField(event, ["event_date", "date"]), getField(event, ["event_time", "time"]))}</div>
-                    {getField(event, ["location"]) && <div style={styles.listMeta}>Location: {getField(event, ["location"])}</div>}
-                    {getField(event, ["notes", "description"]) && <div style={styles.paragraph}>{getField(event, ["notes", "description"])}</div>}
+                    <div style={styles.listTitle}>
+                      {getField(event, ["title", "event_title"], "Untitled event")}
+                    </div>
+                    <div style={styles.listMeta}>
+                      {formatDateTime(
+                        getField(event, ["event_date", "date", "eventDate"]),
+                        getField(event, ["event_time", "time", "eventTime"])
+                      )}
+                    </div>
+                    {getField(event, ["location"]) && (
+                      <div style={styles.listMeta}>Location: {getField(event, ["location"])}</div>
+                    )}
+                    {getField(event, ["notes", "description"]) && (
+                      <div style={styles.paragraph}>{getField(event, ["notes", "description"])}</div>
+                    )}
                     {isAdmin && (
-                      <button style={styles.deleteButton} onClick={() => deleteEvent(event.id)}>Delete</button>
+                      <button style={styles.deleteButton} onClick={() => deleteEvent(event.id)}>
+                        Delete
+                      </button>
                     )}
                   </div>
                 ))
@@ -660,15 +753,19 @@ export default function App() {
             {sortedNotices.length === 0 ? (
               <p style={styles.paragraph}>No notices yet.</p>
             ) : (
-              sortedNotices.map((notice) => (
-                <div key={notice.id} style={styles.listItem}>
+              sortedNotices.map((notice, index) => (
+                <div key={`${notice.id || "notice"}-${index}`} style={styles.listItem}>
                   <div style={styles.listTitle}>
                     {getField(notice, ["title", "heading"], "Notice")}
                     {getField(notice, ["important", "is_important"], false) ? " • Important" : ""}
                   </div>
-                  <div style={styles.paragraph}>{getField(notice, ["text", "content", "description"], "")}</div>
+                  <div style={styles.paragraph}>
+                    {getField(notice, ["text", "content", "description", "body"], "")}
+                  </div>
                   {isAdmin && (
-                    <button style={styles.deleteButton} onClick={() => deleteNotice(notice.id)}>Delete</button>
+                    <button style={styles.deleteButton} onClick={() => deleteNotice(notice.id)}>
+                      Delete
+                    </button>
                   )}
                 </div>
               ))
@@ -695,12 +792,24 @@ export default function App() {
                 ) : (
                   groupItems.map((member) => (
                     <div key={member.id} style={styles.listItem}>
-                      <div style={styles.listTitle}>{getField(member, ["full_name", "name"], "Unnamed member")}</div>
-                      {getField(member, ["phone"]) && <div style={styles.listMeta}>Phone: {getField(member, ["phone"])}</div>}
-                      {getField(member, ["email"]) && <div style={styles.listMeta}>Email: {getField(member, ["email"])}</div>}
-                      {isAdmin && (
-                        <button style={styles.deleteButton} onClick={() => deleteMember(member.id)}>Delete</button>
+                      <div style={styles.listTitle}>
+                        {getField(member, ["full_name", "name"], "Unnamed member")}
+                      </div>
+                      {getField(member, ["phone"]) && (
+                        <div style={styles.listMeta}>Phone: {getField(member, ["phone"])}</div>
                       )}
+                      {getField(member, ["email"]) && (
+                        <div style={styles.listMeta}>Email: {getField(member, ["email"])}</div>
+                      )}
+
+                      <div style={styles.actionRow}>
+                        <WhatsAppButton phone={getField(member, ["phone"], "")} />
+                        {isAdmin && (
+                          <button style={styles.deleteButton} onClick={() => deleteMember(member.id)}>
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))
                 )}
@@ -715,17 +824,32 @@ export default function App() {
             {officeBearers.length === 0 ? (
               <p style={styles.paragraph}>No office bearers entered yet.</p>
             ) : (
-              officeBearers.map((item) => (
-                <div key={item.id} style={styles.listItem}>
-                  <div style={styles.listTitle}>{getField(item, ["role", "title"], "Role")}</div>
-                  <div style={styles.listMeta}>{getField(item, ["name", "person_name"], "")}</div>
-                  {getField(item, ["phone"]) && <div style={styles.listMeta}>Phone: {getField(item, ["phone"])}</div>}
-                  {getField(item, ["email"]) && <div style={styles.listMeta}>Email: {getField(item, ["email"])}</div>}
-                  {isAdmin && (
-                    <button style={styles.deleteButton} onClick={() => deleteOfficeBearer(item.id)}>Delete</button>
-                  )}
-                </div>
-              ))
+              officeBearers
+                .sort((a, b) => Number(getField(a, ["display_order"], 9999)) - Number(getField(b, ["display_order"], 9999)))
+                .map((item) => (
+                  <div key={item.id} style={styles.listItem}>
+                    <div style={styles.listTitle}>{getField(item, ["role", "title"], "Role")}</div>
+                    <div style={styles.listMeta}>{getField(item, ["name", "person_name"], "")}</div>
+                    {getField(item, ["phone"]) && (
+                      <div style={styles.listMeta}>Phone: {getField(item, ["phone"])}</div>
+                    )}
+                    {getField(item, ["email"]) && (
+                      <div style={styles.listMeta}>Email: {getField(item, ["email"])}</div>
+                    )}
+
+                    <div style={styles.actionRow}>
+                      <WhatsAppButton phone={getField(item, ["phone"], "")} />
+                      {isAdmin && (
+                        <button
+                          style={styles.deleteButton}
+                          onClick={() => deleteOfficeBearer(item.id)}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
             )}
           </div>
         )}
@@ -739,13 +863,27 @@ export default function App() {
               coaches.map((coach) => (
                 <div key={coach.id} style={styles.listItem}>
                   <div style={styles.listTitle}>{getField(coach, ["name"], "")}</div>
-                  {getField(coach, ["role"]) && <div style={styles.listMeta}>{getField(coach, ["role"])}</div>}
-                  {getField(coach, ["phone"]) && <div style={styles.listMeta}>Phone: {getField(coach, ["phone"])}</div>}
-                  {getField(coach, ["email"]) && <div style={styles.listMeta}>Email: {getField(coach, ["email"])}</div>}
-                  {getField(coach, ["notes"]) && <div style={styles.paragraph}>{getField(coach, ["notes"])}</div>}
-                  {isAdmin && (
-                    <button style={styles.deleteButton} onClick={() => deleteCoach(coach.id)}>Delete</button>
+                  {getField(coach, ["role"]) && (
+                    <div style={styles.listMeta}>{getField(coach, ["role"])}</div>
                   )}
+                  {getField(coach, ["phone"]) && (
+                    <div style={styles.listMeta}>Phone: {getField(coach, ["phone"])}</div>
+                  )}
+                  {getField(coach, ["email"]) && (
+                    <div style={styles.listMeta}>Email: {getField(coach, ["email"])}</div>
+                  )}
+                  {getField(coach, ["notes"]) && (
+                    <div style={styles.paragraph}>{getField(coach, ["notes"])}</div>
+                  )}
+
+                  <div style={styles.actionRow}>
+                    <WhatsAppButton phone={getField(coach, ["phone"], "")} />
+                    {isAdmin && (
+                      <button style={styles.deleteButton} onClick={() => deleteCoach(coach.id)}>
+                        Delete
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))
             )}
@@ -763,7 +901,11 @@ export default function App() {
                 return (
                   <div key={doc.id} style={styles.listItem}>
                     <div style={styles.listTitle}>{getField(doc, ["title", "name"], "Document")}</div>
-                    {getField(doc, ["description", "notes"]) && <div style={styles.paragraph}>{getField(doc, ["description", "notes"])}</div>}
+                    {getField(doc, ["description", "notes"]) && (
+                      <div style={styles.paragraph}>
+                        {getField(doc, ["description", "notes"])}
+                      </div>
+                    )}
                     {url ? (
                       <a href={url} target="_blank" rel="noreferrer" style={styles.link}>
                         Open document
@@ -772,7 +914,9 @@ export default function App() {
                       <div style={styles.listMeta}>No link added</div>
                     )}
                     {isAdmin && (
-                      <button style={styles.deleteButton} onClick={() => deleteDocument(doc.id)}>Delete</button>
+                      <button style={styles.deleteButton} onClick={() => deleteDocument(doc.id)}>
+                        Delete
+                      </button>
                     )}
                   </div>
                 );
@@ -806,7 +950,9 @@ export default function App() {
                 />
                 Important notice
               </label>
-              <button style={styles.button} onClick={addNotice} disabled={saving}>Save Notice</button>
+              <button style={styles.button} onClick={addNotice} disabled={saving}>
+                Save Notice
+              </button>
             </div>
 
             <div style={styles.card}>
@@ -843,7 +989,9 @@ export default function App() {
                 onChange={(e) => setEventForm({ ...eventForm, notes: e.target.value })}
                 style={styles.textarea}
               />
-              <button style={styles.button} onClick={addEvent} disabled={saving}>Save Diary Entry</button>
+              <button style={styles.button} onClick={addEvent} disabled={saving}>
+                Save Diary Entry
+              </button>
             </div>
 
             <div style={styles.card}>
@@ -878,7 +1026,9 @@ export default function App() {
                 onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })}
                 style={styles.input}
               />
-              <button style={styles.button} onClick={addMember} disabled={saving}>Save Member</button>
+              <button style={styles.button} onClick={addMember} disabled={saving}>
+                Save Member
+              </button>
             </div>
 
             <div style={styles.card}>
@@ -918,7 +1068,9 @@ export default function App() {
                 onChange={(e) => setOfficeForm({ ...officeForm, email: e.target.value })}
                 style={styles.input}
               />
-              <button style={styles.button} onClick={addOfficeBearer} disabled={saving}>Save Office Bearer</button>
+              <button style={styles.button} onClick={addOfficeBearer} disabled={saving}>
+                Save Office Bearer
+              </button>
             </div>
 
             <div style={styles.card}>
@@ -957,7 +1109,9 @@ export default function App() {
                 onChange={(e) => setCoachForm({ ...coachForm, notes: e.target.value })}
                 style={styles.textarea}
               />
-              <button style={styles.button} onClick={addCoach} disabled={saving}>Save Coach</button>
+              <button style={styles.button} onClick={addCoach} disabled={saving}>
+                Save Coach
+              </button>
             </div>
 
             <div style={styles.card}>
@@ -982,7 +1136,9 @@ export default function App() {
                 onChange={(e) => setDocumentForm({ ...documentForm, description: e.target.value })}
                 style={styles.textarea}
               />
-              <button style={styles.button} onClick={addDocument} disabled={saving}>Save Document</button>
+              <button style={styles.button} onClick={addDocument} disabled={saving}>
+                Save Document
+              </button>
             </div>
           </div>
         )}
@@ -1160,6 +1316,18 @@ const styles = {
     cursor: "pointer",
     fontWeight: 700,
   },
+  whatsAppButton: {
+    display: "inline-block",
+    marginTop: 8,
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: "none",
+    background: "#1f9d55",
+    color: "#fff",
+    textDecoration: "none",
+    cursor: "pointer",
+    fontWeight: 700,
+  },
   checkboxRow: {
     display: "flex",
     alignItems: "center",
@@ -1198,5 +1366,11 @@ const styles = {
     marginBottom: 16,
     color: "#1f6b2d",
     fontWeight: 700,
+  },
+  actionRow: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    alignItems: "center",
   },
 };
