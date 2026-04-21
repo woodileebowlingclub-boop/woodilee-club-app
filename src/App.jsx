@@ -118,7 +118,7 @@ export default function App() {
   });
 
   const [memberForm, setMemberForm] = useState({
-    full_name: "",
+    name: "",
     section: "Gents",
     phone: "",
     email: "",
@@ -164,7 +164,7 @@ export default function App() {
     ] = await Promise.all([
       supabase.from("events").select("*").order("event_date", { ascending: true }),
       supabase.from("information_points").select("*").order("id", { ascending: false }),
-      supabase.from("members").select("*").order("full_name", { ascending: true }),
+      supabase.from("members").select("*").order("name", { ascending: true }),
       supabase.from("office_bearers").select("*").order("display_order", { ascending: true }),
       supabase.from("club_coaches").select("*").order("name", { ascending: true }),
       supabase.from("documents").select("*").order("id", { ascending: false }),
@@ -346,6 +346,7 @@ export default function App() {
 
     if (!title || !eventDate) {
       alert("Enter an event title and date");
+      setSaving(false);
       return;
     }
 
@@ -434,9 +435,9 @@ export default function App() {
   }
 
   async function addMember() {
-    const full_name = memberForm.full_name.trim();
+    const name = memberForm.name.trim();
 
-    if (!full_name) {
+    if (!name) {
       alert("Enter member name");
       return;
     }
@@ -445,7 +446,7 @@ export default function App() {
     clearMessages();
 
     const payload = {
-      full_name,
+      name,
       section: memberForm.section,
       phone: memberForm.phone.trim() || null,
       email: memberForm.email.trim() || null,
@@ -459,7 +460,7 @@ export default function App() {
       return;
     }
 
-    setMemberForm({ full_name: "", section: "Gents", phone: "", email: "" });
+    setMemberForm({ name: "", section: "Gents", phone: "", email: "" });
     await loadAll();
     setSaving(false);
     showSaved("Member added");
@@ -650,7 +651,7 @@ export default function App() {
     if (!search) return members;
 
     return members.filter((member) => {
-      const name = safeString(getField(member, ["full_name", "name"])).toLowerCase();
+      const name = safeString(getField(member, ["name"])).toLowerCase();
       const section = safeString(getField(member, ["section", "member_type"])).toLowerCase();
       return name.includes(search) || section.includes(search);
     });
@@ -798,12 +799,10 @@ export default function App() {
                 sortedNotices.slice(0, 5).map((notice) => (
                   <div key={notice.id} style={styles.listItem}>
                     <div style={styles.listTitle}>
-                      {getField(notice, ["title", "heading"], "Notice")}
-                      {getField(notice, ["important", "is_important"], false) ? " • Important" : ""}
+                      {getField(notice, ["title"], "Notice")}
+                      {getField(notice, ["important"], false) ? " • Important" : ""}
                     </div>
-                    <div style={styles.paragraph}>
-                      {getField(notice, ["text", "content", "description"], "")}
-                    </div>
+                    <div style={styles.paragraph}>{getField(notice, ["text"], "")}</div>
                   </div>
                 ))
               )}
@@ -819,22 +818,18 @@ export default function App() {
             ) : (
               combinedEvents.map((event) => (
                 <div key={event.id} style={styles.listItem}>
-                  <div style={styles.listTitle}>
-                    {getField(event, ["title", "event_title"], "Untitled event")}
-                  </div>
+                  <div style={styles.listTitle}>{getField(event, ["title"], "Untitled event")}</div>
                   <div style={styles.listMeta}>
                     {formatDateTime(
-                      getField(event, ["event_date", "date"]),
-                      getField(event, ["event_time", "time"])
+                      getField(event, ["event_date"]),
+                      getField(event, ["event_time"])
                     )}
                   </div>
                   {getField(event, ["location"]) && (
                     <div style={styles.listMeta}>Location: {getField(event, ["location"])}</div>
                   )}
-                  {getField(event, ["notes", "description"]) && (
-                    <div style={styles.paragraph}>
-                      {getField(event, ["notes", "description"])}
-                    </div>
+                  {getField(event, ["notes"]) && (
+                    <div style={styles.paragraph}>{getField(event, ["notes"])}</div>
                   )}
                   {isAdmin && (
                     <button style={styles.deleteButton} onClick={() => deleteEvent(event.id)}>
@@ -856,12 +851,10 @@ export default function App() {
               sortedNotices.map((notice) => (
                 <div key={notice.id} style={styles.listItem}>
                   <div style={styles.listTitle}>
-                    {getField(notice, ["title", "heading"], "Notice")}
-                    {getField(notice, ["important", "is_important"], false) ? " • Important" : ""}
+                    {getField(notice, ["title"], "Notice")}
+                    {getField(notice, ["important"], false) ? " • Important" : ""}
                   </div>
-                  <div style={styles.paragraph}>
-                    {getField(notice, ["text", "content", "description"], "")}
-                  </div>
+                  <div style={styles.paragraph}>{getField(notice, ["text"], "")}</div>
                   {isAdmin && (
                     <button style={styles.deleteButton} onClick={() => deleteNotice(notice.id)}>
                       Delete
@@ -892,9 +885,7 @@ export default function App() {
                 ) : (
                   groupItems.map((member) => (
                     <div key={member.id} style={styles.listItem}>
-                      <div style={styles.listTitle}>
-                        {getField(member, ["full_name", "name"], "Unnamed member")}
-                      </div>
+                      <div style={styles.listTitle}>{getField(member, ["name"], "Unnamed member")}</div>
                       {getField(member, ["phone"]) && (
                         <div style={styles.listMeta}>Phone: {getField(member, ["phone"])}</div>
                       )}
@@ -922,8 +913,8 @@ export default function App() {
             ) : (
               officeBearers.map((item) => (
                 <div key={item.id} style={styles.listItem}>
-                  <div style={styles.listTitle}>{getField(item, ["role", "title"], "Role")}</div>
-                  <div style={styles.listMeta}>{getField(item, ["name", "person_name"], "")}</div>
+                  <div style={styles.listTitle}>{getField(item, ["role"], "Role")}</div>
+                  <div style={styles.listMeta}>{getField(item, ["name"], "")}</div>
                   {getField(item, ["phone"]) && (
                     <div style={styles.listMeta}>Phone: {getField(item, ["phone"])}</div>
                   )}
@@ -931,10 +922,7 @@ export default function App() {
                     <div style={styles.listMeta}>Email: {getField(item, ["email"])}</div>
                   )}
                   {isAdmin && (
-                    <button
-                      style={styles.deleteButton}
-                      onClick={() => deleteOfficeBearer(item.id)}
-                    >
+                    <button style={styles.deleteButton} onClick={() => deleteOfficeBearer(item.id)}>
                       Delete
                     </button>
                   )}
@@ -986,13 +974,9 @@ export default function App() {
                 const url = getField(doc, ["file_url", "url", "link"], "");
                 return (
                   <div key={doc.id} style={styles.listItem}>
-                    <div style={styles.listTitle}>
-                      {getField(doc, ["title", "name"], "Document")}
-                    </div>
-                    {getField(doc, ["description", "notes"]) && (
-                      <div style={styles.paragraph}>
-                        {getField(doc, ["description", "notes"])}
-                      </div>
+                    <div style={styles.listTitle}>{getField(doc, ["title"], "Document")}</div>
+                    {getField(doc, ["description"]) && (
+                      <div style={styles.paragraph}>{getField(doc, ["description"])}</div>
                     )}
                     {url ? (
                       <a href={url} target="_blank" rel="noreferrer" style={styles.link}>
@@ -1147,8 +1131,8 @@ export default function App() {
                 <input
                   type="text"
                   placeholder="Full name"
-                  value={memberForm.full_name}
-                  onChange={(e) => setMemberForm({ ...memberForm, full_name: e.target.value })}
+                  value={memberForm.name}
+                  onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })}
                   style={styles.input}
                 />
                 <select
@@ -1287,131 +1271,6 @@ export default function App() {
                 <button style={styles.button} onClick={addDocument} disabled={saving}>
                   Save Document
                 </button>
-              </div>
-            </div>
-
-            <div style={styles.grid}>
-              <div style={styles.card}>
-                <h3 style={styles.sectionTitle}>Existing Diary Entries</h3>
-                {combinedEvents.length === 0 ? (
-                  <p style={styles.paragraph}>No diary entries yet.</p>
-                ) : (
-                  combinedEvents.map((event) => (
-                    <div key={event.id} style={styles.listItem}>
-                      <div style={styles.listTitle}>
-                        {getField(event, ["title", "event_title"], "Untitled event")}
-                      </div>
-                      <div style={styles.listMeta}>
-                        {formatDateTime(
-                          getField(event, ["event_date", "date"]),
-                          getField(event, ["event_time", "time"])
-                        )}
-                      </div>
-                      {getField(event, ["location"]) && (
-                        <div style={styles.listMeta}>{getField(event, ["location"])}</div>
-                      )}
-                      <button style={styles.deleteButton} onClick={() => deleteEvent(event.id)}>
-                        Delete
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div style={styles.card}>
-                <h3 style={styles.sectionTitle}>Existing Notices</h3>
-                {sortedNotices.length === 0 ? (
-                  <p style={styles.paragraph}>No notices yet.</p>
-                ) : (
-                  sortedNotices.map((notice) => (
-                    <div key={notice.id} style={styles.listItem}>
-                      <div style={styles.listTitle}>
-                        {getField(notice, ["title", "heading"], "Notice")}
-                      </div>
-                      <div style={styles.paragraph}>
-                        {getField(notice, ["text", "content", "description"], "")}
-                      </div>
-                      <button style={styles.deleteButton} onClick={() => deleteNotice(notice.id)}>
-                        Delete
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div style={styles.card}>
-                <h3 style={styles.sectionTitle}>Existing Members</h3>
-                {members.length === 0 ? (
-                  <p style={styles.paragraph}>No members yet.</p>
-                ) : (
-                  members.map((member) => (
-                    <div key={member.id} style={styles.listItem}>
-                      <div style={styles.listTitle}>
-                        {getField(member, ["full_name", "name"], "Unnamed member")}
-                      </div>
-                      <div style={styles.listMeta}>
-                        {getField(member, ["section", "member_type"], "")}
-                      </div>
-                      <button style={styles.deleteButton} onClick={() => deleteMember(member.id)}>
-                        Delete
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div style={styles.card}>
-                <h3 style={styles.sectionTitle}>Existing Office Bearers</h3>
-                {officeBearers.length === 0 ? (
-                  <p style={styles.paragraph}>No office bearers yet.</p>
-                ) : (
-                  officeBearers.map((item) => (
-                    <div key={item.id} style={styles.listItem}>
-                      <div style={styles.listTitle}>{getField(item, ["role", "title"], "Role")}</div>
-                      <div style={styles.listMeta}>{getField(item, ["name", "person_name"], "")}</div>
-                      <button style={styles.deleteButton} onClick={() => deleteOfficeBearer(item.id)}>
-                        Delete
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div style={styles.card}>
-                <h3 style={styles.sectionTitle}>Existing Coaches</h3>
-                {coaches.length === 0 ? (
-                  <p style={styles.paragraph}>No coaches yet.</p>
-                ) : (
-                  coaches.map((coach) => (
-                    <div key={coach.id} style={styles.listItem}>
-                      <div style={styles.listTitle}>{getField(coach, ["name"], "")}</div>
-                      {getField(coach, ["role"]) && (
-                        <div style={styles.listMeta}>{getField(coach, ["role"])}</div>
-                      )}
-                      <button style={styles.deleteButton} onClick={() => deleteCoach(coach.id)}>
-                        Delete
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div style={styles.card}>
-                <h3 style={styles.sectionTitle}>Existing Documents</h3>
-                {documents.length === 0 ? (
-                  <p style={styles.paragraph}>No documents yet.</p>
-                ) : (
-                  documents.map((doc) => (
-                    <div key={doc.id} style={styles.listItem}>
-                      <div style={styles.listTitle}>
-                        {getField(doc, ["title", "name"], "Document")}
-                      </div>
-                      <button style={styles.deleteButton} onClick={() => deleteDocument(doc.id)}>
-                        Delete
-                      </button>
-                    </div>
-                  ))
-                )}
               </div>
             </div>
           </div>
