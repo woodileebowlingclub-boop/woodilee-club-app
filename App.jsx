@@ -32,7 +32,7 @@ function getField(item, keys, fallback = "") {
 
 function formatDate(dateStr) {
   if (!dateStr) return "";
-  const d = new Date(`${dateStr}T12:00:00`);
+  const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return safeString(dateStr);
   return d.toLocaleDateString("en-GB", {
     day: "2-digit",
@@ -46,68 +46,6 @@ function formatDateTime(dateStr, timeStr) {
   const timePart = safeString(timeStr);
   if (datePart && timePart) return `${datePart} • ${timePart}`;
   return datePart || timePart || "";
-}
-
-function toISODate(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function buildRecurringEvents() {
-  const recurring = [];
-  const start = new Date("2026-04-20T12:00:00");
-  const end = new Date("2026-10-03T12:00:00");
-
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const day = d.getDay();
-    const date = toISODate(d);
-
-    if (day === 1) {
-      recurring.push({
-        id: `rec-mon-${date}`,
-        title: "Monday Points Night",
-        event_date: date,
-        event_time: "18:45",
-        location: null,
-        notes: "On the green for 6.45pm. Please be there for 6.30pm prompt.",
-        isRecurring: true,
-      });
-    }
-
-    if (day === 2) {
-      recurring.push({
-        id: `rec-tue-${date}`,
-        title: "Vernett Trophy",
-        event_date: date,
-        event_time: null,
-        location: null,
-        notes: null,
-        isRecurring: true,
-      });
-    }
-
-    if (day === 4) {
-      recurring.push({
-        id: `rec-thu-${date}`,
-        title: "Thursday Bounce Night",
-        event_date: date,
-        event_time: null,
-        location: null,
-        notes: null,
-        isRecurring: true,
-      });
-    }
-  }
-
-  return recurring;
-}
-
-function getEventSortValue(event) {
-  const dateStr = getField(event, ["event_date", "date"], "9999-12-31");
-  const timeStr = getField(event, ["event_time", "time"], "23:59");
-  return new Date(`${dateStr}T${timeStr || "23:59"}:00`).getTime();
 }
 
 export default function App() {
@@ -134,7 +72,6 @@ export default function App() {
     text: "",
     important: false,
   });
-
   const [eventForm, setEventForm] = useState({
     title: "",
     event_date: "",
@@ -142,14 +79,12 @@ export default function App() {
     location: "",
     notes: "",
   });
-
   const [memberForm, setMemberForm] = useState({
     full_name: "",
     section: "Gents",
     phone: "",
     email: "",
   });
-
   const [officeForm, setOfficeForm] = useState({
     role: "",
     name: "",
@@ -157,7 +92,6 @@ export default function App() {
     email: "",
     display_order: "",
   });
-
   const [coachForm, setCoachForm] = useState({
     name: "",
     role: "",
@@ -165,7 +99,6 @@ export default function App() {
     email: "",
     notes: "",
   });
-
   const [documentForm, setDocumentForm] = useState({
     title: "",
     file_url: "",
@@ -196,14 +129,7 @@ export default function App() {
       supabase.from("documents").select("*").order("id", { ascending: false }),
     ]);
 
-    const errors = [
-      eventsRes.error,
-      noticesRes.error,
-      membersRes.error,
-      officeRes.error,
-      coachesRes.error,
-      docsRes.error,
-    ]
+    const errors = [eventsRes.error, noticesRes.error, membersRes.error, officeRes.error, coachesRes.error, docsRes.error]
       .filter(Boolean)
       .map((err) => err.message);
 
@@ -294,7 +220,6 @@ export default function App() {
 
   async function deleteNotice(id) {
     if (!window.confirm("Delete this notice?")) return;
-
     setSaving(true);
     clearMessages();
 
@@ -313,7 +238,6 @@ export default function App() {
 
   async function addEvent() {
     const title = eventForm.title.trim();
-
     if (!title || !eventForm.event_date) {
       alert("Enter an event title and date");
       return;
@@ -338,27 +262,14 @@ export default function App() {
       return;
     }
 
-    setEventForm({
-      title: "",
-      event_date: "",
-      event_time: "",
-      location: "",
-      notes: "",
-    });
-
+    setEventForm({ title: "", event_date: "", event_time: "", location: "", notes: "" });
     await loadAll();
     setSaving(false);
     showSaved("Event added");
   }
 
-  async function deleteEvent(id, isRecurring = false) {
-    if (isRecurring) {
-      alert("This is an automatic recurring diary entry and cannot be deleted one by one.");
-      return;
-    }
-
+  async function deleteEvent(id) {
     if (!window.confirm("Delete this diary entry?")) return;
-
     setSaving(true);
     clearMessages();
 
@@ -377,7 +288,6 @@ export default function App() {
 
   async function addMember() {
     const full_name = memberForm.full_name.trim();
-
     if (!full_name) {
       alert("Enter member name");
       return;
@@ -409,7 +319,6 @@ export default function App() {
 
   async function deleteMember(id) {
     if (!window.confirm("Delete this member?")) return;
-
     setSaving(true);
     clearMessages();
 
@@ -429,7 +338,6 @@ export default function App() {
   async function addOfficeBearer() {
     const role = officeForm.role.trim();
     const name = officeForm.name.trim();
-
     if (!role || !name) {
       alert("Enter role and name");
       return;
@@ -443,9 +351,7 @@ export default function App() {
       name,
       phone: officeForm.phone.trim() || null,
       email: officeForm.email.trim() || null,
-      display_order: officeForm.display_order
-        ? Number(officeForm.display_order)
-        : officeBearers.length + 1,
+      display_order: officeForm.display_order ? Number(officeForm.display_order) : officeBearers.length + 1,
     };
 
     const { error } = await supabase.from("office_bearers").insert(payload);
@@ -464,7 +370,6 @@ export default function App() {
 
   async function deleteOfficeBearer(id) {
     if (!window.confirm("Delete this office bearer?")) return;
-
     setSaving(true);
     clearMessages();
 
@@ -483,7 +388,6 @@ export default function App() {
 
   async function addCoach() {
     const name = coachForm.name.trim();
-
     if (!name) {
       alert("Enter coach name");
       return;
@@ -516,7 +420,6 @@ export default function App() {
 
   async function deleteCoach(id) {
     if (!window.confirm("Delete this coach?")) return;
-
     setSaving(true);
     clearMessages();
 
@@ -535,7 +438,6 @@ export default function App() {
 
   async function addDocument() {
     const title = documentForm.title.trim();
-
     if (!title) {
       alert("Enter document title");
       return;
@@ -566,7 +468,6 @@ export default function App() {
 
   async function deleteDocument(id) {
     if (!window.confirm("Delete this document?")) return;
-
     setSaving(true);
     clearMessages();
 
@@ -583,18 +484,9 @@ export default function App() {
     showSaved("Document deleted");
   }
 
-  const recurringEvents = useMemo(() => buildRecurringEvents(), []);
-
-  const combinedEvents = useMemo(() => {
-    return [...events, ...recurringEvents].sort(
-      (a, b) => getEventSortValue(a) - getEventSortValue(b)
-    );
-  }, [events, recurringEvents]);
-
   const filteredMembers = useMemo(() => {
     const search = memberSearch.trim().toLowerCase();
     if (!search) return members;
-
     return members.filter((member) => {
       const name = safeString(getField(member, ["full_name", "name"])).toLowerCase();
       const section = safeString(getField(member, ["section", "member_type"])).toLowerCase();
@@ -623,8 +515,10 @@ export default function App() {
   }, [filteredMembers]);
 
   const upcomingEvents = useMemo(() => {
-    return [...combinedEvents].slice(0, 5);
-  }, [combinedEvents]);
+    return [...events]
+      .sort((a, b) => new Date(getField(a, ["event_date", "date"])) - new Date(getField(b, ["event_date", "date"])))
+      .slice(0, 5);
+  }, [events]);
 
   const sortedNotices = useMemo(() => {
     return [...notices].sort((a, b) => {
@@ -657,21 +551,15 @@ export default function App() {
                 }}
                 style={styles.input}
               />
-              <button style={styles.button} onClick={() => handleLogin("member")}>
-                Member Login
-              </button>
-              <button style={styles.secondaryButton} onClick={() => handleLogin("admin")}>
-                Admin Login
-              </button>
+              <button style={styles.button} onClick={() => handleLogin("member")}>Member Login</button>
+              <button style={styles.secondaryButton} onClick={() => handleLogin("admin")}>Admin Login</button>
             </div>
           ) : (
             <div style={styles.loggedInBar}>
               <div style={styles.loggedInText}>
                 Logged in as <strong>{isAdmin ? "Admin" : "Member"}</strong>
               </div>
-              <button style={styles.secondaryButton} onClick={handleLogout}>
-                Logout
-              </button>
+              <button style={styles.secondaryButton} onClick={handleLogout}>Logout</button>
             </div>
           )}
         </div>
@@ -706,10 +594,7 @@ export default function App() {
           <div style={styles.grid}>
             <div style={styles.card}>
               <h3 style={styles.sectionTitle}>Welcome</h3>
-              <p style={styles.paragraph}>
-                Welcome to the club app. Use the tabs above to view diary dates, notices, members,
-                office bearers, coaches and documents.
-              </p>
+              <p style={styles.paragraph}>Welcome to the club app. Use the tabs above to view diary dates, notices, members, office bearers, coaches and documents.</p>
             </div>
 
             <div style={styles.card}>
@@ -719,21 +604,9 @@ export default function App() {
               ) : (
                 upcomingEvents.map((event) => (
                   <div key={event.id} style={styles.listItem}>
-                    <div style={styles.listTitle}>
-                      {getField(event, ["title", "event_title"], "Untitled event")}
-                    </div>
-                    <div style={styles.listMeta}>
-                      Date: {formatDate(getField(event, ["event_date", "date"]))}
-                    </div>
-                    <div style={styles.listMeta}>
-                      Time: {getField(event, ["event_time", "time"]) || "—"}
-                    </div>
-                    {getField(event, ["location"]) && (
-                      <div style={styles.listMeta}>{getField(event, ["location"])}</div>
-                    )}
-                    {event.isRecurring && (
-                      <div style={styles.recurringBadge}>Recurring</div>
-                    )}
+                    <div style={styles.listTitle}>{getField(event, ["title", "event_title"], "Untitled event")}</div>
+                    <div style={styles.listMeta}>{formatDateTime(getField(event, ["event_date", "date"]), getField(event, ["event_time", "time"]))}</div>
+                    {getField(event, ["location"]) && <div style={styles.listMeta}>{getField(event, ["location"])}</div>}
                   </div>
                 ))
               )}
@@ -750,9 +623,7 @@ export default function App() {
                       {getField(notice, ["title", "heading"], "Notice")}
                       {getField(notice, ["important", "is_important"], false) ? " • Important" : ""}
                     </div>
-                    <div style={styles.paragraph}>
-                      {getField(notice, ["text", "content", "description"], "")}
-                    </div>
+                    <div style={styles.paragraph}>{getField(notice, ["text", "content", "description"], "")}</div>
                   </div>
                 ))
               )}
@@ -763,49 +634,22 @@ export default function App() {
         {!loading && isLoggedIn && activeTab === "diary" && (
           <div style={styles.card}>
             <h3 style={styles.sectionTitle}>Diary</h3>
-            {combinedEvents.length === 0 ? (
+            {events.length === 0 ? (
               <p style={styles.paragraph}>No diary entries yet.</p>
             ) : (
-              combinedEvents.map((event) => (
-                <div key={event.id} style={styles.listItem}>
-                  <div style={styles.listTitle}>
-                    {getField(event, ["title", "event_title"], "Untitled event")}
+              [...events]
+                .sort((a, b) => new Date(getField(a, ["event_date", "date"])) - new Date(getField(b, ["event_date", "date"])))
+                .map((event) => (
+                  <div key={event.id} style={styles.listItem}>
+                    <div style={styles.listTitle}>{getField(event, ["title", "event_title"], "Untitled event")}</div>
+                    <div style={styles.listMeta}>{formatDateTime(getField(event, ["event_date", "date"]), getField(event, ["event_time", "time"]))}</div>
+                    {getField(event, ["location"]) && <div style={styles.listMeta}>Location: {getField(event, ["location"])}</div>}
+                    {getField(event, ["notes", "description"]) && <div style={styles.paragraph}>{getField(event, ["notes", "description"])}</div>}
+                    {isAdmin && (
+                      <button style={styles.deleteButton} onClick={() => deleteEvent(event.id)}>Delete</button>
+                    )}
                   </div>
-
-                  <div style={styles.listMeta}>
-                    Date: {formatDate(getField(event, ["event_date", "date"]))}
-                  </div>
-
-                  <div style={styles.listMeta}>
-                    Time: {getField(event, ["event_time", "time"]) || "—"}
-                  </div>
-
-                  {getField(event, ["location"]) && (
-                    <div style={styles.listMeta}>
-                      Location: {getField(event, ["location"])}
-                    </div>
-                  )}
-
-                  {getField(event, ["notes", "description"]) && (
-                    <div style={styles.paragraph}>
-                      {getField(event, ["notes", "description"])}
-                    </div>
-                  )}
-
-                  {event.isRecurring && (
-                    <div style={styles.recurringBadge}>Recurring</div>
-                  )}
-
-                  {isAdmin && (
-                    <button
-                      style={styles.deleteButton}
-                      onClick={() => deleteEvent(event.id, !!event.isRecurring)}
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-              ))
+                ))
             )}
           </div>
         )}
@@ -822,13 +666,9 @@ export default function App() {
                     {getField(notice, ["title", "heading"], "Notice")}
                     {getField(notice, ["important", "is_important"], false) ? " • Important" : ""}
                   </div>
-                  <div style={styles.paragraph}>
-                    {getField(notice, ["text", "content", "description"], "")}
-                  </div>
+                  <div style={styles.paragraph}>{getField(notice, ["text", "content", "description"], "")}</div>
                   {isAdmin && (
-                    <button style={styles.deleteButton} onClick={() => deleteNotice(notice.id)}>
-                      Delete
-                    </button>
+                    <button style={styles.deleteButton} onClick={() => deleteNotice(notice.id)}>Delete</button>
                   )}
                 </div>
               ))
@@ -855,22 +695,11 @@ export default function App() {
                 ) : (
                   groupItems.map((member) => (
                     <div key={member.id} style={styles.listItem}>
-                      <div style={styles.listTitle}>
-                        {getField(member, ["full_name", "name"], "Unnamed member")}
-                      </div>
-                      {getField(member, ["phone"]) && (
-                        <div style={styles.listMeta}>Phone: {getField(member, ["phone"])}</div>
-                      )}
-                      {getField(member, ["email"]) && (
-                        <div style={styles.listMeta}>Email: {getField(member, ["email"])}</div>
-                      )}
+                      <div style={styles.listTitle}>{getField(member, ["full_name", "name"], "Unnamed member")}</div>
+                      {getField(member, ["phone"]) && <div style={styles.listMeta}>Phone: {getField(member, ["phone"])}</div>}
+                      {getField(member, ["email"]) && <div style={styles.listMeta}>Email: {getField(member, ["email"])}</div>}
                       {isAdmin && (
-                        <button
-                          style={styles.deleteButton}
-                          onClick={() => deleteMember(member.id)}
-                        >
-                          Delete
-                        </button>
+                        <button style={styles.deleteButton} onClick={() => deleteMember(member.id)}>Delete</button>
                       )}
                     </div>
                   ))
@@ -888,25 +717,12 @@ export default function App() {
             ) : (
               officeBearers.map((item) => (
                 <div key={item.id} style={styles.listItem}>
-                  <div style={styles.listTitle}>
-                    {getField(item, ["role", "title"], "Role")}
-                  </div>
-                  <div style={styles.listMeta}>
-                    {getField(item, ["name", "person_name"], "")}
-                  </div>
-                  {getField(item, ["phone"]) && (
-                    <div style={styles.listMeta}>Phone: {getField(item, ["phone"])}</div>
-                  )}
-                  {getField(item, ["email"]) && (
-                    <div style={styles.listMeta}>Email: {getField(item, ["email"])}</div>
-                  )}
+                  <div style={styles.listTitle}>{getField(item, ["role", "title"], "Role")}</div>
+                  <div style={styles.listMeta}>{getField(item, ["name", "person_name"], "")}</div>
+                  {getField(item, ["phone"]) && <div style={styles.listMeta}>Phone: {getField(item, ["phone"])}</div>}
+                  {getField(item, ["email"]) && <div style={styles.listMeta}>Email: {getField(item, ["email"])}</div>}
                   {isAdmin && (
-                    <button
-                      style={styles.deleteButton}
-                      onClick={() => deleteOfficeBearer(item.id)}
-                    >
-                      Delete
-                    </button>
+                    <button style={styles.deleteButton} onClick={() => deleteOfficeBearer(item.id)}>Delete</button>
                   )}
                 </div>
               ))
@@ -923,25 +739,12 @@ export default function App() {
               coaches.map((coach) => (
                 <div key={coach.id} style={styles.listItem}>
                   <div style={styles.listTitle}>{getField(coach, ["name"], "")}</div>
-                  {getField(coach, ["role"]) && (
-                    <div style={styles.listMeta}>{getField(coach, ["role"])}</div>
-                  )}
-                  {getField(coach, ["phone"]) && (
-                    <div style={styles.listMeta}>Phone: {getField(coach, ["phone"])}</div>
-                  )}
-                  {getField(coach, ["email"]) && (
-                    <div style={styles.listMeta}>Email: {getField(coach, ["email"])}</div>
-                  )}
-                  {getField(coach, ["notes"]) && (
-                    <div style={styles.paragraph}>{getField(coach, ["notes"])}</div>
-                  )}
+                  {getField(coach, ["role"]) && <div style={styles.listMeta}>{getField(coach, ["role"])}</div>}
+                  {getField(coach, ["phone"]) && <div style={styles.listMeta}>Phone: {getField(coach, ["phone"])}</div>}
+                  {getField(coach, ["email"]) && <div style={styles.listMeta}>Email: {getField(coach, ["email"])}</div>}
+                  {getField(coach, ["notes"]) && <div style={styles.paragraph}>{getField(coach, ["notes"])}</div>}
                   {isAdmin && (
-                    <button
-                      style={styles.deleteButton}
-                      onClick={() => deleteCoach(coach.id)}
-                    >
-                      Delete
-                    </button>
+                    <button style={styles.deleteButton} onClick={() => deleteCoach(coach.id)}>Delete</button>
                   )}
                 </div>
               ))
@@ -959,14 +762,8 @@ export default function App() {
                 const url = getField(doc, ["file_url", "url", "link"], "");
                 return (
                   <div key={doc.id} style={styles.listItem}>
-                    <div style={styles.listTitle}>
-                      {getField(doc, ["title", "name"], "Document")}
-                    </div>
-                    {getField(doc, ["description", "notes"]) && (
-                      <div style={styles.paragraph}>
-                        {getField(doc, ["description", "notes"])}
-                      </div>
-                    )}
+                    <div style={styles.listTitle}>{getField(doc, ["title", "name"], "Document")}</div>
+                    {getField(doc, ["description", "notes"]) && <div style={styles.paragraph}>{getField(doc, ["description", "notes"])}</div>}
                     {url ? (
                       <a href={url} target="_blank" rel="noreferrer" style={styles.link}>
                         Open document
@@ -975,12 +772,7 @@ export default function App() {
                       <div style={styles.listMeta}>No link added</div>
                     )}
                     {isAdmin && (
-                      <button
-                        style={styles.deleteButton}
-                        onClick={() => deleteDocument(doc.id)}
-                      >
-                        Delete
-                      </button>
+                      <button style={styles.deleteButton} onClick={() => deleteDocument(doc.id)}>Delete</button>
                     )}
                   </div>
                 );
@@ -1010,15 +802,11 @@ export default function App() {
                 <input
                   type="checkbox"
                   checked={noticeForm.important}
-                  onChange={(e) =>
-                    setNoticeForm({ ...noticeForm, important: e.target.checked })
-                  }
+                  onChange={(e) => setNoticeForm({ ...noticeForm, important: e.target.checked })}
                 />
                 Important notice
               </label>
-              <button style={styles.button} onClick={addNotice} disabled={saving}>
-                Save Notice
-              </button>
+              <button style={styles.button} onClick={addNotice} disabled={saving}>Save Notice</button>
             </div>
 
             <div style={styles.card}>
@@ -1030,23 +818,18 @@ export default function App() {
                 onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
                 style={styles.input}
               />
-
-              <label style={styles.fieldLabel}>Date</label>
               <input
                 type="date"
                 value={eventForm.event_date}
                 onChange={(e) => setEventForm({ ...eventForm, event_date: e.target.value })}
                 style={styles.input}
               />
-
-              <label style={styles.fieldLabel}>Time</label>
               <input
                 type="time"
                 value={eventForm.event_time}
                 onChange={(e) => setEventForm({ ...eventForm, event_time: e.target.value })}
                 style={styles.input}
               />
-
               <input
                 type="text"
                 placeholder="Location"
@@ -1060,13 +843,7 @@ export default function App() {
                 onChange={(e) => setEventForm({ ...eventForm, notes: e.target.value })}
                 style={styles.textarea}
               />
-              <button style={styles.button} onClick={addEvent} disabled={saving}>
-                Save Diary Entry
-              </button>
-              <div style={styles.helpText}>
-                Monday Points Night, Tuesday Vernett Trophy and Thursday Bounce Night are added
-                automatically each week until 03/10/2026.
-              </div>
+              <button style={styles.button} onClick={addEvent} disabled={saving}>Save Diary Entry</button>
             </div>
 
             <div style={styles.card}>
@@ -1101,9 +878,7 @@ export default function App() {
                 onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })}
                 style={styles.input}
               />
-              <button style={styles.button} onClick={addMember} disabled={saving}>
-                Save Member
-              </button>
+              <button style={styles.button} onClick={addMember} disabled={saving}>Save Member</button>
             </div>
 
             <div style={styles.card}>
@@ -1143,9 +918,7 @@ export default function App() {
                 onChange={(e) => setOfficeForm({ ...officeForm, email: e.target.value })}
                 style={styles.input}
               />
-              <button style={styles.button} onClick={addOfficeBearer} disabled={saving}>
-                Save Office Bearer
-              </button>
+              <button style={styles.button} onClick={addOfficeBearer} disabled={saving}>Save Office Bearer</button>
             </div>
 
             <div style={styles.card}>
@@ -1184,9 +957,7 @@ export default function App() {
                 onChange={(e) => setCoachForm({ ...coachForm, notes: e.target.value })}
                 style={styles.textarea}
               />
-              <button style={styles.button} onClick={addCoach} disabled={saving}>
-                Save Coach
-              </button>
+              <button style={styles.button} onClick={addCoach} disabled={saving}>Save Coach</button>
             </div>
 
             <div style={styles.card}>
@@ -1208,14 +979,10 @@ export default function App() {
               <textarea
                 placeholder="Description"
                 value={documentForm.description}
-                onChange={(e) =>
-                  setDocumentForm({ ...documentForm, description: e.target.value })
-                }
+                onChange={(e) => setDocumentForm({ ...documentForm, description: e.target.value })}
                 style={styles.textarea}
               />
-              <button style={styles.button} onClick={addDocument} disabled={saving}>
-                Save Document
-              </button>
+              <button style={styles.button} onClick={addDocument} disabled={saving}>Save Document</button>
             </div>
           </div>
         )}
@@ -1430,29 +1197,6 @@ const styles = {
     padding: 14,
     marginBottom: 16,
     color: "#1f6b2d",
-    fontWeight: 700,
-  },
-  recurringBadge: {
-    display: "inline-block",
-    marginTop: 6,
-    padding: "4px 8px",
-    borderRadius: 999,
-    background: "#f1d8de",
-    color: "#7a2638",
-    fontSize: 12,
-    fontWeight: 700,
-  },
-  helpText: {
-    marginTop: 10,
-    color: "#666",
-    fontSize: 13,
-    lineHeight: 1.4,
-  },
-  fieldLabel: {
-    display: "block",
-    marginBottom: 4,
-    color: "#5b1d2a",
-    fontSize: 14,
     fontWeight: 700,
   },
 };
