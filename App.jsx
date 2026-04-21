@@ -70,7 +70,7 @@ function buildRecurringEvents() {
         title: "Monday Points Night",
         event_date: date,
         event_time: "18:45",
-        location: "",
+        location: null,
         notes: "On the green for 6.45pm. Please be there for 6.30pm prompt.",
         isRecurring: true,
       });
@@ -81,9 +81,9 @@ function buildRecurringEvents() {
         id: `rec-tue-${date}`,
         title: "Vernett Trophy",
         event_date: date,
-        event_time: "",
-        location: "",
-        notes: "",
+        event_time: null,
+        location: null,
+        notes: null,
         isRecurring: true,
       });
     }
@@ -93,9 +93,9 @@ function buildRecurringEvents() {
         id: `rec-thu-${date}`,
         title: "Thursday Bounce Night",
         event_date: date,
-        event_time: "",
-        location: "",
-        notes: "",
+        event_time: null,
+        location: null,
+        notes: null,
         isRecurring: true,
       });
     }
@@ -586,7 +586,9 @@ export default function App() {
   const recurringEvents = useMemo(() => buildRecurringEvents(), []);
 
   const combinedEvents = useMemo(() => {
-    return [...events, ...recurringEvents].sort((a, b) => getEventSortValue(a) - getEventSortValue(b));
+    return [...events, ...recurringEvents].sort(
+      (a, b) => getEventSortValue(a) - getEventSortValue(b)
+    );
   }, [events, recurringEvents]);
 
   const filteredMembers = useMemo(() => {
@@ -721,10 +723,10 @@ export default function App() {
                       {getField(event, ["title", "event_title"], "Untitled event")}
                     </div>
                     <div style={styles.listMeta}>
-                      {formatDateTime(
-                        getField(event, ["event_date", "date"]),
-                        getField(event, ["event_time", "time"])
-                      )}
+                      Date: {formatDate(getField(event, ["event_date", "date"]))}
+                    </div>
+                    <div style={styles.listMeta}>
+                      Time: {getField(event, ["event_time", "time"]) || "—"}
                     </div>
                     {getField(event, ["location"]) && (
                       <div style={styles.listMeta}>{getField(event, ["location"])}</div>
@@ -769,25 +771,31 @@ export default function App() {
                   <div style={styles.listTitle}>
                     {getField(event, ["title", "event_title"], "Untitled event")}
                   </div>
+
                   <div style={styles.listMeta}>
-                    {formatDateTime(
-                      getField(event, ["event_date", "date"]),
-                      getField(event, ["event_time", "time"])
-                    )}
+                    Date: {formatDate(getField(event, ["event_date", "date"]))}
                   </div>
+
+                  <div style={styles.listMeta}>
+                    Time: {getField(event, ["event_time", "time"]) || "—"}
+                  </div>
+
                   {getField(event, ["location"]) && (
                     <div style={styles.listMeta}>
                       Location: {getField(event, ["location"])}
                     </div>
                   )}
+
                   {getField(event, ["notes", "description"]) && (
                     <div style={styles.paragraph}>
                       {getField(event, ["notes", "description"])}
                     </div>
                   )}
+
                   {event.isRecurring && (
                     <div style={styles.recurringBadge}>Recurring</div>
                   )}
+
                   {isAdmin && (
                     <button
                       style={styles.deleteButton}
@@ -1022,18 +1030,23 @@ export default function App() {
                 onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
                 style={styles.input}
               />
+
+              <label style={styles.fieldLabel}>Date</label>
               <input
                 type="date"
                 value={eventForm.event_date}
                 onChange={(e) => setEventForm({ ...eventForm, event_date: e.target.value })}
                 style={styles.input}
               />
+
+              <label style={styles.fieldLabel}>Time</label>
               <input
                 type="time"
                 value={eventForm.event_time}
                 onChange={(e) => setEventForm({ ...eventForm, event_time: e.target.value })}
                 style={styles.input}
               />
+
               <input
                 type="text"
                 placeholder="Location"
@@ -1434,5 +1447,12 @@ const styles = {
     color: "#666",
     fontSize: 13,
     lineHeight: 1.4,
+  },
+  fieldLabel: {
+    display: "block",
+    marginBottom: 4,
+    color: "#5b1d2a",
+    fontSize: 14,
+    fontWeight: 700,
   },
 };
