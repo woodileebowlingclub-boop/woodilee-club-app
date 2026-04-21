@@ -3,9 +3,6 @@ import { supabase } from "./lib/supabase";
 
 const MEMBER_PIN = "1911";
 const ADMIN_PIN = "1954";
-const CLUB_NAME = "Woodilee Bowling Club";
-const CLUB_SUBTITLE = "Members diary, notices and club information";
-const DEFAULT_RECUR_UNTIL = "2026-10-03";
 
 const TABS = [
   { key: "home", label: "Home" },
@@ -31,60 +28,64 @@ function getField(item, keys, fallback = "") {
   return fallback;
 }
 
-function formatDate(dateStr) {
-  if (!dateStr) return "";
-  const d = new Date(`${dateStr}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return safeString(dateStr);
-  return d.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
+function parseDateValue(value) {
+  if (!value) return null;
+  const text = String(value).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    const d = new Date(`${text}T12:00:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  const parsed = new Date(text);
+  if (!Number.isNaN(parsed.getTime())) return parsed;
+
+  const parts = text.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})$/);
+  if (parts) {
+    const [, day, monthText, year] = parts;
+    const d = new Date(`${day} ${monthText} ${year} 12:00:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  return null;
+}
+
+function formatDisplayDate(value) {
+  if (!value) return "";
+  const parsed = parseDateValue(value);
+  if (!parsed) return String(value);
+
+  return parsed.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
     year: "numeric",
   });
 }
 
-function formatDateTime(dateStr, timeStr) {
-  const datePart = formatDate(dateStr);
-  const timePart = safeString(timeStr);
-  if (datePart && timePart) return `${datePart} • ${timePart}`;
-  return datePart || timePart || "";
+function normaliseTime(value) {
+  if (!value) return "";
+  const text = String(value).trim();
+  if (/^\d{2}:\d{2}:\d{2}$/.test(text)) return text.slice(0, 5);
+  return text;
 }
 
-function parseDateOnly(dateStr) {
-  return new Date(`${dateStr}T12:00:00`);
-}
-
-function toIsoDate(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function buildWeeklyDates(startDateStr, endDateStr) {
-  const dates = [];
-  const start = parseDateOnly(startDateStr);
-  const end = parseDateOnly(endDateStr);
-
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
-    return dates;
-  }
-
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 7)) {
-    dates.push(toIsoDate(d));
-  }
-
-  return dates;
+function getEventDisplayDate(event) {
+  const eventDate = getField(event, ["event_date"], "");
+  const dateText = getField(event, ["date_text"], "");
+  return formatDisplayDate(eventDate || dateText);
 }
 
 function getEventSortValue(event) {
-  const dateStr = getField(event, ["event_date", "date"], "9999-12-31");
-  const timeStr = getField(event, ["event_time", "time"], "23:59");
-  return new Date(`${dateStr}T${timeStr || "23:59"}:00`).getTime();
+  const eventDate = getField(event, ["event_date"], "");
+  const dateText = getField(event, ["date_text"], "");
+  const raw = eventDate || dateText;
+  const parsed = parseDateValue(raw);
+  return parsed ? parsed.getTime() : Number.MAX_SAFE_INTEGER;
 }
 
 export default function App() {
-  const [accessMode, setAccessMode] = useState(null);
   const [pinInput, setPinInput] = useState("");
+  const [accessMode, setAccessMode] = useState(null);
   const [activeTab, setActiveTab] = useState("home");
 
   const [loading, setLoading] = useState(true);
@@ -103,41 +104,31 @@ export default function App() {
 
   const [noticeForm, setNoticeForm] = useState({
     title: "",
-    text: "",
-    important: false,
+    content: "",
   });
 
   const [eventForm, setEventForm] = useState({
     title: "",
+    date_text: "",
     event_date: "",
     event_time: "",
-    location: "",
-    notes: "",
-    isRecurring: false,
-    recurring_until: DEFAULT_RECUR_UNTIL,
+    note: "",
   });
 
   const [memberForm, setMemberForm] = useState({
     name: "",
     section: "Gents",
     phone: "",
-    email: "",
   });
 
   const [officeForm, setOfficeForm] = useState({
     role: "",
     name: "",
-    phone: "",
-    email: "",
     display_order: "",
   });
 
   const [coachForm, setCoachForm] = useState({
     name: "",
-    role: "",
-    phone: "",
-    email: "",
-    notes: "",
   });
 
   const [documentForm, setDocumentForm] = useState({
@@ -145,6 +136,9 @@ export default function App() {
     file_url: "",
     description: "",
   });
+
+  const isLoggedIn = accessMode === "member" || accessMode === "admin";
+  const isAdmin = accessMode === "admin";
 
   useEffect(() => {
     loadAll();
@@ -162,12 +156,12 @@ export default function App() {
       coachesRes,
       docsRes,
     ] = await Promise.all([
-      supabase.from("events").select("*").order("event_date", { ascending: true }),
-      supabase.from("information_points").select("*").order("id", { ascending: false }),
-      supabase.from("members").select("*").order("name", { ascending: true }),
-      supabase.from("office_bearers").select("*").order("display_order", { ascending: true }),
-      supabase.from("club_coaches").select("*").order("name", { ascending: true }),
-      supabase.from("documents").select("*").order("id", { ascending: false }),
+      supabase.from("events").select("*"),
+      supabase.from("information_posts").select("*"),
+      supabase.from("members").select("*"),
+      supabase.from("office_bearers").select("*"),
+      supabase.from("club_coaches").select("*"),
+      supabase.from("documents").select("*"),
     ]);
 
     const errors = [
@@ -179,11 +173,9 @@ export default function App() {
       docsRes.error,
     ]
       .filter(Boolean)
-      .map((err) => err.message);
+      .map((e) => e.message);
 
-    if (errors.length > 0) {
-      setErrorMessage(errors[0]);
-    }
+    if (errors.length > 0) setErrorMessage(errors[0]);
 
     setEvents(eventsRes.data || []);
     setNotices(noticesRes.data || []);
@@ -199,61 +191,9 @@ export default function App() {
     setSuccessMessage("");
   }
 
-  function showSaved(message = "Saved") {
+  function showSaved(message) {
     setSuccessMessage(message);
     setTimeout(() => setSuccessMessage(""), 2500);
-  }
-
-  function resetEventForm() {
-    setEventForm({
-      title: "",
-      event_date: "",
-      event_time: "",
-      location: "",
-      notes: "",
-      isRecurring: false,
-      recurring_until: DEFAULT_RECUR_UNTIL,
-    });
-  }
-
-  function usePreset(type) {
-    if (type === "monday") {
-      setEventForm({
-        title: "Monday Points Night",
-        event_date: "2026-04-20",
-        event_time: "18:45",
-        location: "",
-        notes: "On the green for 6.45pm. Please be there for 6.30pm prompt.",
-        isRecurring: true,
-        recurring_until: DEFAULT_RECUR_UNTIL,
-      });
-      return;
-    }
-
-    if (type === "tuesday") {
-      setEventForm({
-        title: "Vernett Trophy",
-        event_date: "2026-04-21",
-        event_time: "",
-        location: "",
-        notes: "",
-        isRecurring: true,
-        recurring_until: DEFAULT_RECUR_UNTIL,
-      });
-      return;
-    }
-
-    if (type === "thursday") {
-      setEventForm({
-        title: "Thursday Bounce Night",
-        event_date: "2026-04-23",
-        event_time: "",
-        location: "",
-        notes: "",
-        isRecurring: true,
-        recurring_until: DEFAULT_RECUR_UNTIL,
-      });
-    }
   }
 
   function handleLogin(type) {
@@ -281,30 +221,26 @@ export default function App() {
 
   function handleLogout() {
     setAccessMode(null);
-    setActiveTab("home");
     setPinInput("");
+    setActiveTab("home");
   }
 
   async function addNotice() {
     const title = noticeForm.title.trim();
-    const text = noticeForm.text.trim();
+    const content = noticeForm.content.trim();
 
-    if (!title || !text) {
-      alert("Enter a notice title and text");
+    if (!title || !content) {
+      alert("Enter notice title and content");
       return;
     }
 
     setSaving(true);
     clearMessages();
 
-    const payload = {
+    const { error } = await supabase.from("information_posts").insert({
       title,
-      text,
-      important: noticeForm.important,
-      created_at: new Date().toISOString(),
-    };
-
-    const { error } = await supabase.from("information_points").insert(payload);
+      content,
+    });
 
     if (error) {
       setErrorMessage(error.message || "Failed to add notice");
@@ -312,7 +248,7 @@ export default function App() {
       return;
     }
 
-    setNoticeForm({ title: "", text: "", important: false });
+    setNoticeForm({ title: "", content: "" });
     await loadAll();
     setSaving(false);
     showSaved("Notice added");
@@ -324,7 +260,7 @@ export default function App() {
     setSaving(true);
     clearMessages();
 
-    const { error } = await supabase.from("information_points").delete().eq("id", id);
+    const { error } = await supabase.from("information_posts").delete().eq("id", id);
 
     if (error) {
       setErrorMessage(error.message || "Failed to delete notice");
@@ -339,77 +275,45 @@ export default function App() {
 
   async function addEvent() {
     const title = eventForm.title.trim();
-    const eventDate = eventForm.event_date;
-    const eventTime = eventForm.event_time || null;
-    const location = eventForm.location.trim() || null;
-    const notes = eventForm.notes.trim() || null;
+    const dateText = eventForm.date_text.trim();
+    const eventDate = eventForm.event_date.trim();
+    const eventTime = eventForm.event_time.trim();
+    const note = eventForm.note.trim();
 
-    if (!title || !eventDate) {
-      alert("Enter an event title and date");
-      setSaving(false);
+    if (!title) {
+      alert("Enter event title");
       return;
     }
 
     setSaving(true);
     clearMessages();
 
-    if (eventForm.isRecurring) {
-      const recurringUntil = eventForm.recurring_until;
-
-      if (!recurringUntil) {
-        setErrorMessage("Please enter a recurring until date.");
-        setSaving(false);
-        return;
-      }
-
-      const weeklyDates = buildWeeklyDates(eventDate, recurringUntil);
-
-      if (weeklyDates.length === 0) {
-        setErrorMessage("Recurring dates could not be created. Check the start date and end date.");
-        setSaving(false);
-        return;
-      }
-
-      const payloads = weeklyDates.map((date) => ({
-        title,
-        event_date: date,
-        event_time: eventTime,
-        location,
-        notes,
-      }));
-
-      const { error } = await supabase.from("events").insert(payloads);
-
-      if (error) {
-        setErrorMessage(error.message || "Failed to add recurring events");
-        setSaving(false);
-        return;
-      }
-
-      resetEventForm();
-      await loadAll();
-      setSaving(false);
-      showSaved(`Recurring diary entries added (${weeklyDates.length})`);
-      return;
-    }
-
     const payload = {
       title,
-      event_date: eventDate,
-      event_time: eventTime,
-      location,
-      notes,
+      date_text: dateText || (eventDate ? formatDisplayDate(eventDate) : null),
+      event_date: eventDate || null,
+      event_time: eventTime || null,
+      note: note || null,
+      notes: note || null,
+      content: note || null,
     };
 
     const { error } = await supabase.from("events").insert(payload);
 
     if (error) {
-      setErrorMessage(error.message || "Failed to add event");
+      setErrorMessage(error.message || "Failed to add diary entry");
       setSaving(false);
       return;
     }
 
-    resetEventForm();
+    setEventForm({
+      title: "",
+      date_text: "",
+      event_date: "",
+      event_time: "",
+      note: "",
+    });
+
     await loadAll();
     setSaving(false);
     showSaved("Diary entry added");
@@ -424,7 +328,7 @@ export default function App() {
     const { error } = await supabase.from("events").delete().eq("id", id);
 
     if (error) {
-      setErrorMessage(error.message || "Failed to delete event");
+      setErrorMessage(error.message || "Failed to delete diary entry");
       setSaving(false);
       return;
     }
@@ -445,14 +349,11 @@ export default function App() {
     setSaving(true);
     clearMessages();
 
-    const payload = {
+    const { error } = await supabase.from("members").insert({
       name,
       section: memberForm.section,
       phone: memberForm.phone.trim() || null,
-      email: memberForm.email.trim() || null,
-    };
-
-    const { error } = await supabase.from("members").insert(payload);
+    });
 
     if (error) {
       setErrorMessage(error.message || "Failed to add member");
@@ -460,7 +361,12 @@ export default function App() {
       return;
     }
 
-    setMemberForm({ name: "", section: "Gents", phone: "", email: "" });
+    setMemberForm({
+      name: "",
+      section: "Gents",
+      phone: "",
+    });
+
     await loadAll();
     setSaving(false);
     showSaved("Member added");
@@ -497,17 +403,11 @@ export default function App() {
     setSaving(true);
     clearMessages();
 
-    const payload = {
+    const { error } = await supabase.from("office_bearers").insert({
       role,
       name,
-      phone: officeForm.phone.trim() || null,
-      email: officeForm.email.trim() || null,
-      display_order: officeForm.display_order
-        ? Number(officeForm.display_order)
-        : officeBearers.length + 1,
-    };
-
-    const { error } = await supabase.from("office_bearers").insert(payload);
+      display_order: officeForm.display_order ? Number(officeForm.display_order) : null,
+    });
 
     if (error) {
       setErrorMessage(error.message || "Failed to add office bearer");
@@ -515,7 +415,12 @@ export default function App() {
       return;
     }
 
-    setOfficeForm({ role: "", name: "", phone: "", email: "", display_order: "" });
+    setOfficeForm({
+      role: "",
+      name: "",
+      display_order: "",
+    });
+
     await loadAll();
     setSaving(false);
     showSaved("Office bearer added");
@@ -551,15 +456,9 @@ export default function App() {
     setSaving(true);
     clearMessages();
 
-    const payload = {
+    const { error } = await supabase.from("club_coaches").insert({
       name,
-      role: coachForm.role.trim() || null,
-      phone: coachForm.phone.trim() || null,
-      email: coachForm.email.trim() || null,
-      notes: coachForm.notes.trim() || null,
-    };
-
-    const { error } = await supabase.from("club_coaches").insert(payload);
+    });
 
     if (error) {
       setErrorMessage(error.message || "Failed to add coach");
@@ -567,7 +466,7 @@ export default function App() {
       return;
     }
 
-    setCoachForm({ name: "", role: "", phone: "", email: "", notes: "" });
+    setCoachForm({ name: "" });
     await loadAll();
     setSaving(false);
     showSaved("Coach added");
@@ -603,13 +502,11 @@ export default function App() {
     setSaving(true);
     clearMessages();
 
-    const payload = {
+    const { error } = await supabase.from("documents").insert({
       title,
       file_url: documentForm.file_url.trim() || null,
       description: documentForm.description.trim() || null,
-    };
-
-    const { error } = await supabase.from("documents").insert(payload);
+    });
 
     if (error) {
       setErrorMessage(error.message || "Failed to add document");
@@ -617,7 +514,12 @@ export default function App() {
       return;
     }
 
-    setDocumentForm({ title: "", file_url: "", description: "" });
+    setDocumentForm({
+      title: "",
+      file_url: "",
+      description: "",
+    });
+
     await loadAll();
     setSaving(false);
     showSaved("Document added");
@@ -642,18 +544,31 @@ export default function App() {
     showSaved("Document deleted");
   }
 
-  const combinedEvents = useMemo(() => {
+  const sortedEvents = useMemo(() => {
     return [...events].sort((a, b) => getEventSortValue(a) - getEventSortValue(b));
   }, [events]);
+
+  const upcomingEvents = useMemo(() => {
+    return sortedEvents.slice(0, 6);
+  }, [sortedEvents]);
+
+  const sortedNotices = useMemo(() => {
+    return [...notices].sort((a, b) => {
+      const aDate = getField(a, ["created_at"], "");
+      const bDate = getField(b, ["created_at"], "");
+      return String(bDate).localeCompare(String(aDate));
+    });
+  }, [notices]);
 
   const filteredMembers = useMemo(() => {
     const search = memberSearch.trim().toLowerCase();
     if (!search) return members;
 
-    return members.filter((member) => {
-      const name = safeString(getField(member, ["name"])).toLowerCase();
-      const section = safeString(getField(member, ["section", "member_type"])).toLowerCase();
-      return name.includes(search) || section.includes(search);
+    return members.filter((m) => {
+      const name = safeString(getField(m, ["name"], "")).toLowerCase();
+      const section = safeString(getField(m, ["section"], "")).toLowerCase();
+      const phone = safeString(getField(m, ["phone"], "")).toLowerCase();
+      return name.includes(search) || section.includes(search) || phone.includes(search);
     });
   }, [members, memberSearch]);
 
@@ -666,50 +581,65 @@ export default function App() {
     };
 
     filteredMembers.forEach((member) => {
-      const section = safeString(getField(member, ["section", "member_type"], "Other"));
-      if (groups[section]) {
-        groups[section].push(member);
-      } else {
-        groups.Other.push(member);
-      }
+      const section = safeString(getField(member, ["section"], "Other"));
+      if (groups[section]) groups[section].push(member);
+      else groups.Other.push(member);
     });
 
     return groups;
   }, [filteredMembers]);
 
-  const upcomingEvents = useMemo(() => {
-    return [...combinedEvents].slice(0, 5);
-  }, [combinedEvents]);
-
-  const sortedNotices = useMemo(() => {
-    return [...notices].sort((a, b) => {
-      const aImportant = !!getField(a, ["important", "is_important"], false);
-      const bImportant = !!getField(b, ["important", "is_important"], false);
-      if (aImportant !== bImportant) return aImportant ? -1 : 1;
-      return Number(getField(b, ["id"], 0)) - Number(getField(a, ["id"], 0));
+  const sortedOfficeBearers = useMemo(() => {
+    return [...officeBearers].sort((a, b) => {
+      const aOrder = Number(getField(a, ["display_order"], 9999));
+      const bOrder = Number(getField(b, ["display_order"], 9999));
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return safeString(getField(a, ["role"], "")).localeCompare(
+        safeString(getField(b, ["role"], ""))
+      );
     });
-  }, [notices]);
+  }, [officeBearers]);
 
-  const isLoggedIn = accessMode === "member" || accessMode === "admin";
-  const isAdmin = accessMode === "admin";
+  function renderEventCard(event, showDelete = false) {
+    const title = getField(event, ["title"], "Untitled event");
+    const date = getEventDisplayDate(event);
+    const time = normaliseTime(getField(event, ["event_time"], ""));
+    const note = getField(event, ["note", "notes", "content"], "");
 
-  return (
-    <div style={styles.page}>
-      <div style={styles.wrap}>
-        <div style={styles.headerCard}>
-          <h1 style={styles.title}>{CLUB_NAME}</h1>
-          <p style={styles.subtitle}>{CLUB_SUBTITLE}</p>
+    return (
+      <div key={event.id} style={styles.listItem}>
+        <div style={styles.listTitle}>{title}</div>
+        {(date || time) && (
+          <div style={styles.listMeta}>
+            {date}
+            {date && time ? " • " : ""}
+            {time}
+          </div>
+        )}
+        {note && <div style={styles.paragraph}>{note}</div>}
+        {showDelete && (
+          <button style={styles.deleteButton} onClick={() => deleteEvent(event.id)}>
+            Delete
+          </button>
+        )}
+      </div>
+    );
+  }
 
-          {!isLoggedIn ? (
+  if (!isLoggedIn) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.wrap}>
+          <div style={styles.headerCard}>
+            <h1 style={styles.title}>Woodilee Bowling Club</h1>
+            <p style={styles.subtitle}>Members diary, notices and club information</p>
+
             <div style={styles.loginBox}>
               <input
                 type="password"
                 placeholder="Enter PIN"
                 value={pinInput}
                 onChange={(e) => setPinInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleLogin("member");
-                }}
                 style={styles.input}
               />
               <button style={styles.button} onClick={() => handleLogin("member")}>
@@ -719,75 +649,71 @@ export default function App() {
                 Admin Login
               </button>
             </div>
-          ) : (
-            <div style={styles.loggedInBar}>
-              <div style={styles.loggedInText}>
-                Logged in as <strong>{isAdmin ? "Admin" : "Member"}</strong>
-              </div>
-              <button style={styles.secondaryButton} onClick={handleLogout}>
-                Logout
-              </button>
+          </div>
+
+          {errorMessage && <div style={styles.errorCard}>{errorMessage}</div>}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.page}>
+      <div style={styles.wrap}>
+        <div style={styles.headerCard}>
+          <h1 style={styles.title}>Woodilee Bowling Club</h1>
+          <p style={styles.subtitle}>Members diary, notices and club information</p>
+
+          <div style={styles.loggedInBar}>
+            <div style={styles.loggedInText}>
+              Logged in as <strong>{isAdmin ? "Admin" : "Member"}</strong>
             </div>
+            <button style={styles.secondaryButton} onClick={handleLogout}>
+              Logout
+            </button>
+          </div>
+        </div>
+
+        <div style={styles.tabBar}>
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={activeTab === tab.key ? styles.activeTab : styles.tab}
+            >
+              {tab.label}
+            </button>
+          ))}
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab("admin")}
+              style={activeTab === "admin" ? styles.activeTab : styles.tab}
+            >
+              Admin
+            </button>
           )}
         </div>
 
-        {isLoggedIn && (
-          <div style={styles.tabBar}>
-            {TABS.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                style={activeTab === tab.key ? styles.activeTab : styles.tab}
-              >
-                {tab.label}
-              </button>
-            ))}
-            {isAdmin && (
-              <button
-                onClick={() => setActiveTab("admin")}
-                style={activeTab === "admin" ? styles.activeTab : styles.tab}
-              >
-                Admin
-              </button>
-            )}
-          </div>
-        )}
-
         {loading && <div style={styles.messageCard}>Loading…</div>}
-        {!loading && errorMessage && <div style={styles.errorCard}>{errorMessage}</div>}
-        {!loading && successMessage && <div style={styles.successCard}>{successMessage}</div>}
+        {errorMessage && <div style={styles.errorCard}>{errorMessage}</div>}
+        {successMessage && <div style={styles.successCard}>{successMessage}</div>}
 
-        {!loading && isLoggedIn && activeTab === "home" && (
+        {activeTab === "home" && (
           <div style={styles.grid}>
             <div style={styles.card}>
               <h3 style={styles.sectionTitle}>Welcome</h3>
               <p style={styles.paragraph}>
-                Welcome to the club app. Use the tabs above to view diary dates, notices, members,
-                office bearers, coaches and documents.
+                Welcome to the club app. Use the sections above for diary dates,
+                notices, members, office bearers, coaches and documents.
               </p>
             </div>
 
             <div style={styles.card}>
-              <h3 style={styles.sectionTitle}>Upcoming Diary</h3>
+              <h3 style={styles.sectionTitle}>Upcoming Events</h3>
               {upcomingEvents.length === 0 ? (
-                <p style={styles.paragraph}>No diary entries yet.</p>
+                <p style={styles.paragraph}>No upcoming events yet.</p>
               ) : (
-                upcomingEvents.map((event) => (
-                  <div key={event.id} style={styles.listItem}>
-                    <div style={styles.listTitle}>
-                      {getField(event, ["title", "event_title"], "Untitled event")}
-                    </div>
-                    <div style={styles.listMeta}>
-                      {formatDateTime(
-                        getField(event, ["event_date", "date"]),
-                        getField(event, ["event_time", "time"])
-                      )}
-                    </div>
-                    {getField(event, ["location"]) && (
-                      <div style={styles.listMeta}>{getField(event, ["location"])}</div>
-                    )}
-                  </div>
-                ))
+                upcomingEvents.map((event) => renderEventCard(event))
               )}
             </div>
 
@@ -798,11 +724,8 @@ export default function App() {
               ) : (
                 sortedNotices.slice(0, 5).map((notice) => (
                   <div key={notice.id} style={styles.listItem}>
-                    <div style={styles.listTitle}>
-                      {getField(notice, ["title"], "Notice")}
-                      {getField(notice, ["important"], false) ? " • Important" : ""}
-                    </div>
-                    <div style={styles.paragraph}>{getField(notice, ["text"], "")}</div>
+                    <div style={styles.listTitle}>{getField(notice, ["title"], "Notice")}</div>
+                    <div style={styles.paragraph}>{getField(notice, ["content"], "")}</div>
                   </div>
                 ))
               )}
@@ -810,39 +733,18 @@ export default function App() {
           </div>
         )}
 
-        {!loading && isLoggedIn && activeTab === "diary" && (
+        {activeTab === "diary" && (
           <div style={styles.card}>
             <h3 style={styles.sectionTitle}>Diary</h3>
-            {combinedEvents.length === 0 ? (
+            {sortedEvents.length === 0 ? (
               <p style={styles.paragraph}>No diary entries yet.</p>
             ) : (
-              combinedEvents.map((event) => (
-                <div key={event.id} style={styles.listItem}>
-                  <div style={styles.listTitle}>{getField(event, ["title"], "Untitled event")}</div>
-                  <div style={styles.listMeta}>
-                    {formatDateTime(
-                      getField(event, ["event_date"]),
-                      getField(event, ["event_time"])
-                    )}
-                  </div>
-                  {getField(event, ["location"]) && (
-                    <div style={styles.listMeta}>Location: {getField(event, ["location"])}</div>
-                  )}
-                  {getField(event, ["notes"]) && (
-                    <div style={styles.paragraph}>{getField(event, ["notes"])}</div>
-                  )}
-                  {isAdmin && (
-                    <button style={styles.deleteButton} onClick={() => deleteEvent(event.id)}>
-                      Delete
-                    </button>
-                  )}
-                </div>
-              ))
+              sortedEvents.map((event) => renderEventCard(event, isAdmin))
             )}
           </div>
         )}
 
-        {!loading && isLoggedIn && activeTab === "notices" && (
+        {activeTab === "notices" && (
           <div style={styles.card}>
             <h3 style={styles.sectionTitle}>Notices</h3>
             {sortedNotices.length === 0 ? (
@@ -850,11 +752,8 @@ export default function App() {
             ) : (
               sortedNotices.map((notice) => (
                 <div key={notice.id} style={styles.listItem}>
-                  <div style={styles.listTitle}>
-                    {getField(notice, ["title"], "Notice")}
-                    {getField(notice, ["important"], false) ? " • Important" : ""}
-                  </div>
-                  <div style={styles.paragraph}>{getField(notice, ["text"], "")}</div>
+                  <div style={styles.listTitle}>{getField(notice, ["title"], "Notice")}</div>
+                  <div style={styles.paragraph}>{getField(notice, ["content"], "")}</div>
                   {isAdmin && (
                     <button style={styles.deleteButton} onClick={() => deleteNotice(notice.id)}>
                       Delete
@@ -866,7 +765,7 @@ export default function App() {
           </div>
         )}
 
-        {!loading && isLoggedIn && activeTab === "members" && (
+        {activeTab === "members" && (
           <div style={styles.card}>
             <h3 style={styles.sectionTitle}>Members</h3>
             <input
@@ -874,7 +773,7 @@ export default function App() {
               placeholder="Search members"
               value={memberSearch}
               onChange={(e) => setMemberSearch(e.target.value)}
-              style={{ ...styles.input, marginBottom: 16, maxWidth: 320 }}
+              style={{ ...styles.input, marginBottom: 16, maxWidth: 360 }}
             />
 
             {Object.entries(groupedMembers).map(([groupName, groupItems]) => (
@@ -889,8 +788,8 @@ export default function App() {
                       {getField(member, ["phone"]) && (
                         <div style={styles.listMeta}>Phone: {getField(member, ["phone"])}</div>
                       )}
-                      {getField(member, ["email"]) && (
-                        <div style={styles.listMeta}>Email: {getField(member, ["email"])}</div>
+                      {getField(member, ["section"]) && (
+                        <div style={styles.listMeta}>Section: {getField(member, ["section"])}</div>
                       )}
                       {isAdmin && (
                         <button style={styles.deleteButton} onClick={() => deleteMember(member.id)}>
@@ -905,24 +804,21 @@ export default function App() {
           </div>
         )}
 
-        {!loading && isLoggedIn && activeTab === "office" && (
+        {activeTab === "office" && (
           <div style={styles.card}>
             <h3 style={styles.sectionTitle}>Office Bearers</h3>
-            {officeBearers.length === 0 ? (
+            {sortedOfficeBearers.length === 0 ? (
               <p style={styles.paragraph}>No office bearers entered yet.</p>
             ) : (
-              officeBearers.map((item) => (
+              sortedOfficeBearers.map((item) => (
                 <div key={item.id} style={styles.listItem}>
                   <div style={styles.listTitle}>{getField(item, ["role"], "Role")}</div>
                   <div style={styles.listMeta}>{getField(item, ["name"], "")}</div>
-                  {getField(item, ["phone"]) && (
-                    <div style={styles.listMeta}>Phone: {getField(item, ["phone"])}</div>
-                  )}
-                  {getField(item, ["email"]) && (
-                    <div style={styles.listMeta}>Email: {getField(item, ["email"])}</div>
-                  )}
                   {isAdmin && (
-                    <button style={styles.deleteButton} onClick={() => deleteOfficeBearer(item.id)}>
+                    <button
+                      style={styles.deleteButton}
+                      onClick={() => deleteOfficeBearer(item.id)}
+                    >
                       Delete
                     </button>
                   )}
@@ -932,7 +828,7 @@ export default function App() {
           </div>
         )}
 
-        {!loading && isLoggedIn && activeTab === "coaches" && (
+        {activeTab === "coaches" && (
           <div style={styles.card}>
             <h3 style={styles.sectionTitle}>Club Coaches</h3>
             {coaches.length === 0 ? (
@@ -941,18 +837,6 @@ export default function App() {
               coaches.map((coach) => (
                 <div key={coach.id} style={styles.listItem}>
                   <div style={styles.listTitle}>{getField(coach, ["name"], "")}</div>
-                  {getField(coach, ["role"]) && (
-                    <div style={styles.listMeta}>{getField(coach, ["role"])}</div>
-                  )}
-                  {getField(coach, ["phone"]) && (
-                    <div style={styles.listMeta}>Phone: {getField(coach, ["phone"])}</div>
-                  )}
-                  {getField(coach, ["email"]) && (
-                    <div style={styles.listMeta}>Email: {getField(coach, ["email"])}</div>
-                  )}
-                  {getField(coach, ["notes"]) && (
-                    <div style={styles.paragraph}>{getField(coach, ["notes"])}</div>
-                  )}
                   {isAdmin && (
                     <button style={styles.deleteButton} onClick={() => deleteCoach(coach.id)}>
                       Delete
@@ -964,7 +848,7 @@ export default function App() {
           </div>
         )}
 
-        {!loading && isLoggedIn && activeTab === "documents" && (
+        {activeTab === "documents" && (
           <div style={styles.card}>
             <h3 style={styles.sectionTitle}>Documents</h3>
             {documents.length === 0 ? (
@@ -975,8 +859,8 @@ export default function App() {
                 return (
                   <div key={doc.id} style={styles.listItem}>
                     <div style={styles.listTitle}>{getField(doc, ["title"], "Document")}</div>
-                    {getField(doc, ["description"]) && (
-                      <div style={styles.paragraph}>{getField(doc, ["description"])}</div>
+                    {getField(doc, ["description"], "") && (
+                      <div style={styles.paragraph}>{getField(doc, ["description"], "")}</div>
                     )}
                     {url ? (
                       <a href={url} target="_blank" rel="noreferrer" style={styles.link}>
@@ -997,281 +881,164 @@ export default function App() {
           </div>
         )}
 
-        {!loading && isAdmin && activeTab === "admin" && (
-          <div style={styles.adminStack}>
-            <div style={styles.grid}>
-              <div style={styles.card}>
-                <h3 style={styles.sectionTitle}>Add Notice</h3>
-                <input
-                  type="text"
-                  placeholder="Notice title"
-                  value={noticeForm.title}
-                  onChange={(e) => setNoticeForm({ ...noticeForm, title: e.target.value })}
-                  style={styles.input}
-                />
-                <textarea
-                  placeholder="Notice text"
-                  value={noticeForm.text}
-                  onChange={(e) => setNoticeForm({ ...noticeForm, text: e.target.value })}
-                  style={styles.textarea}
-                />
-                <label style={styles.checkboxRow}>
-                  <input
-                    type="checkbox"
-                    checked={noticeForm.important}
-                    onChange={(e) => setNoticeForm({ ...noticeForm, important: e.target.checked })}
-                  />
-                  Important notice
-                </label>
-                <button style={styles.button} onClick={addNotice} disabled={saving}>
-                  Save Notice
-                </button>
-              </div>
+        {isAdmin && activeTab === "admin" && (
+          <div style={styles.grid}>
+            <div style={styles.card}>
+              <h3 style={styles.sectionTitle}>Add Notice</h3>
+              <input
+                type="text"
+                placeholder="Notice title"
+                value={noticeForm.title}
+                onChange={(e) => setNoticeForm({ ...noticeForm, title: e.target.value })}
+                style={styles.input}
+              />
+              <textarea
+                placeholder="Notice content"
+                value={noticeForm.content}
+                onChange={(e) => setNoticeForm({ ...noticeForm, content: e.target.value })}
+                style={styles.textarea}
+              />
+              <button style={styles.button} onClick={addNotice} disabled={saving}>
+                Save Notice
+              </button>
+            </div>
 
-              <div style={styles.card}>
-                <h3 style={styles.sectionTitle}>Add Diary Entry</h3>
+            <div style={styles.card}>
+              <h3 style={styles.sectionTitle}>Add Diary Entry</h3>
+              <input
+                type="text"
+                placeholder="Title"
+                value={eventForm.title}
+                onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
+                style={styles.input}
+              />
+              <input
+                type="text"
+                placeholder="Display date e.g. 29 Aug 2026"
+                value={eventForm.date_text}
+                onChange={(e) => setEventForm({ ...eventForm, date_text: e.target.value })}
+                style={styles.input}
+              />
+              <input
+                type="date"
+                value={eventForm.event_date}
+                onChange={(e) => setEventForm({ ...eventForm, event_date: e.target.value })}
+                style={styles.input}
+              />
+              <input
+                type="time"
+                value={eventForm.event_time}
+                onChange={(e) => setEventForm({ ...eventForm, event_time: e.target.value })}
+                style={styles.input}
+              />
+              <textarea
+                placeholder="Note"
+                value={eventForm.note}
+                onChange={(e) => setEventForm({ ...eventForm, note: e.target.value })}
+                style={styles.textarea}
+              />
+              <button style={styles.button} onClick={addEvent} disabled={saving}>
+                Save Diary Entry
+              </button>
+            </div>
 
-                <div style={styles.presetRow}>
-                  <button type="button" style={styles.smallButton} onClick={() => usePreset("monday")}>
-                    Monday Points
-                  </button>
-                  <button type="button" style={styles.smallButton} onClick={() => usePreset("tuesday")}>
-                    Vernett Trophy
-                  </button>
-                  <button type="button" style={styles.smallButton} onClick={() => usePreset("thursday")}>
-                    Thursday Bounce
-                  </button>
-                </div>
+            <div style={styles.card}>
+              <h3 style={styles.sectionTitle}>Add Member</h3>
+              <input
+                type="text"
+                placeholder="Name"
+                value={memberForm.name}
+                onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })}
+                style={styles.input}
+              />
+              <select
+                value={memberForm.section}
+                onChange={(e) => setMemberForm({ ...memberForm, section: e.target.value })}
+                style={styles.input}
+              >
+                <option>Gents</option>
+                <option>Ladies</option>
+                <option>Associate</option>
+              </select>
+              <input
+                type="text"
+                placeholder="Phone"
+                value={memberForm.phone}
+                onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })}
+                style={styles.input}
+              />
+              <button style={styles.button} onClick={addMember} disabled={saving}>
+                Save Member
+              </button>
+            </div>
 
-                <input
-                  type="text"
-                  placeholder="Event title"
-                  value={eventForm.title}
-                  onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
-                  style={styles.input}
-                />
+            <div style={styles.card}>
+              <h3 style={styles.sectionTitle}>Add Office Bearer</h3>
+              <input
+                type="text"
+                placeholder="Role"
+                value={officeForm.role}
+                onChange={(e) => setOfficeForm({ ...officeForm, role: e.target.value })}
+                style={styles.input}
+              />
+              <input
+                type="text"
+                placeholder="Name"
+                value={officeForm.name}
+                onChange={(e) => setOfficeForm({ ...officeForm, name: e.target.value })}
+                style={styles.input}
+              />
+              <input
+                type="number"
+                placeholder="Display order"
+                value={officeForm.display_order}
+                onChange={(e) => setOfficeForm({ ...officeForm, display_order: e.target.value })}
+                style={styles.input}
+              />
+              <button style={styles.button} onClick={addOfficeBearer} disabled={saving}>
+                Save Office Bearer
+              </button>
+            </div>
 
-                <label style={styles.fieldLabel}>Date</label>
-                <input
-                  type="date"
-                  value={eventForm.event_date}
-                  onChange={(e) => setEventForm({ ...eventForm, event_date: e.target.value })}
-                  style={styles.input}
-                />
+            <div style={styles.card}>
+              <h3 style={styles.sectionTitle}>Add Coach</h3>
+              <input
+                type="text"
+                placeholder="Coach name"
+                value={coachForm.name}
+                onChange={(e) => setCoachForm({ ...coachForm, name: e.target.value })}
+                style={styles.input}
+              />
+              <button style={styles.button} onClick={addCoach} disabled={saving}>
+                Save Coach
+              </button>
+            </div>
 
-                <label style={styles.fieldLabel}>Time</label>
-                <input
-                  type="time"
-                  value={eventForm.event_time}
-                  onChange={(e) => setEventForm({ ...eventForm, event_time: e.target.value })}
-                  style={styles.input}
-                />
-
-                <input
-                  type="text"
-                  placeholder="Location"
-                  value={eventForm.location}
-                  onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}
-                  style={styles.input}
-                />
-
-                <textarea
-                  placeholder="Notes"
-                  value={eventForm.notes}
-                  onChange={(e) => setEventForm({ ...eventForm, notes: e.target.value })}
-                  style={styles.textarea}
-                />
-
-                <label style={styles.checkboxRow}>
-                  <input
-                    type="checkbox"
-                    checked={eventForm.isRecurring}
-                    onChange={(e) =>
-                      setEventForm({ ...eventForm, isRecurring: e.target.checked })
-                    }
-                  />
-                  Recurring weekly
-                </label>
-
-                {eventForm.isRecurring && (
-                  <>
-                    <label style={styles.fieldLabel}>Recurring until</label>
-                    <input
-                      type="date"
-                      value={eventForm.recurring_until}
-                      onChange={(e) =>
-                        setEventForm({ ...eventForm, recurring_until: e.target.value })
-                      }
-                      style={styles.input}
-                    />
-                  </>
-                )}
-
-                <div style={styles.helpText}>
-                  Tick <strong>Recurring weekly</strong> to create the same event every 7 days from the chosen start date until the end date.
-                </div>
-
-                <div style={styles.buttonRow}>
-                  <button style={styles.button} onClick={addEvent} disabled={saving}>
-                    Save Diary Entry
-                  </button>
-                  <button
-                    type="button"
-                    style={styles.secondaryButton}
-                    onClick={resetEventForm}
-                    disabled={saving}
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-
-              <div style={styles.card}>
-                <h3 style={styles.sectionTitle}>Add Member</h3>
-                <input
-                  type="text"
-                  placeholder="Full name"
-                  value={memberForm.name}
-                  onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })}
-                  style={styles.input}
-                />
-                <select
-                  value={memberForm.section}
-                  onChange={(e) => setMemberForm({ ...memberForm, section: e.target.value })}
-                  style={styles.input}
-                >
-                  <option>Gents</option>
-                  <option>Ladies</option>
-                  <option>Associate</option>
-                </select>
-                <input
-                  type="text"
-                  placeholder="Phone"
-                  value={memberForm.phone}
-                  onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })}
-                  style={styles.input}
-                />
-                <input
-                  type="text"
-                  placeholder="Email"
-                  value={memberForm.email}
-                  onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })}
-                  style={styles.input}
-                />
-                <button style={styles.button} onClick={addMember} disabled={saving}>
-                  Save Member
-                </button>
-              </div>
-
-              <div style={styles.card}>
-                <h3 style={styles.sectionTitle}>Add Office Bearer</h3>
-                <input
-                  type="text"
-                  placeholder="Role"
-                  value={officeForm.role}
-                  onChange={(e) => setOfficeForm({ ...officeForm, role: e.target.value })}
-                  style={styles.input}
-                />
-                <input
-                  type="text"
-                  placeholder="Name"
-                  value={officeForm.name}
-                  onChange={(e) => setOfficeForm({ ...officeForm, name: e.target.value })}
-                  style={styles.input}
-                />
-                <input
-                  type="number"
-                  placeholder="Display order"
-                  value={officeForm.display_order}
-                  onChange={(e) => setOfficeForm({ ...officeForm, display_order: e.target.value })}
-                  style={styles.input}
-                />
-                <input
-                  type="text"
-                  placeholder="Phone"
-                  value={officeForm.phone}
-                  onChange={(e) => setOfficeForm({ ...officeForm, phone: e.target.value })}
-                  style={styles.input}
-                />
-                <input
-                  type="text"
-                  placeholder="Email"
-                  value={officeForm.email}
-                  onChange={(e) => setOfficeForm({ ...officeForm, email: e.target.value })}
-                  style={styles.input}
-                />
-                <button style={styles.button} onClick={addOfficeBearer} disabled={saving}>
-                  Save Office Bearer
-                </button>
-              </div>
-
-              <div style={styles.card}>
-                <h3 style={styles.sectionTitle}>Add Coach</h3>
-                <input
-                  type="text"
-                  placeholder="Name"
-                  value={coachForm.name}
-                  onChange={(e) => setCoachForm({ ...coachForm, name: e.target.value })}
-                  style={styles.input}
-                />
-                <input
-                  type="text"
-                  placeholder="Role"
-                  value={coachForm.role}
-                  onChange={(e) => setCoachForm({ ...coachForm, role: e.target.value })}
-                  style={styles.input}
-                />
-                <input
-                  type="text"
-                  placeholder="Phone"
-                  value={coachForm.phone}
-                  onChange={(e) => setCoachForm({ ...coachForm, phone: e.target.value })}
-                  style={styles.input}
-                />
-                <input
-                  type="text"
-                  placeholder="Email"
-                  value={coachForm.email}
-                  onChange={(e) => setCoachForm({ ...coachForm, email: e.target.value })}
-                  style={styles.input}
-                />
-                <textarea
-                  placeholder="Notes"
-                  value={coachForm.notes}
-                  onChange={(e) => setCoachForm({ ...coachForm, notes: e.target.value })}
-                  style={styles.textarea}
-                />
-                <button style={styles.button} onClick={addCoach} disabled={saving}>
-                  Save Coach
-                </button>
-              </div>
-
-              <div style={styles.card}>
-                <h3 style={styles.sectionTitle}>Add Document</h3>
-                <input
-                  type="text"
-                  placeholder="Document title"
-                  value={documentForm.title}
-                  onChange={(e) => setDocumentForm({ ...documentForm, title: e.target.value })}
-                  style={styles.input}
-                />
-                <input
-                  type="text"
-                  placeholder="Document link"
-                  value={documentForm.file_url}
-                  onChange={(e) => setDocumentForm({ ...documentForm, file_url: e.target.value })}
-                  style={styles.input}
-                />
-                <textarea
-                  placeholder="Description"
-                  value={documentForm.description}
-                  onChange={(e) => setDocumentForm({ ...documentForm, description: e.target.value })}
-                  style={styles.textarea}
-                />
-                <button style={styles.button} onClick={addDocument} disabled={saving}>
-                  Save Document
-                </button>
-              </div>
+            <div style={styles.card}>
+              <h3 style={styles.sectionTitle}>Add Document</h3>
+              <input
+                type="text"
+                placeholder="Title"
+                value={documentForm.title}
+                onChange={(e) => setDocumentForm({ ...documentForm, title: e.target.value })}
+                style={styles.input}
+              />
+              <input
+                type="text"
+                placeholder="Document link"
+                value={documentForm.file_url}
+                onChange={(e) => setDocumentForm({ ...documentForm, file_url: e.target.value })}
+                style={styles.input}
+              />
+              <textarea
+                placeholder="Description"
+                value={documentForm.description}
+                onChange={(e) => setDocumentForm({ ...documentForm, description: e.target.value })}
+                style={styles.textarea}
+              />
+              <button style={styles.button} onClick={addDocument} disabled={saving}>
+                Save Document
+              </button>
             </div>
           </div>
         )}
@@ -1283,27 +1050,27 @@ export default function App() {
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "linear-gradient(180deg, #5b1d2a 0%, #7a2638 55%, #a33a4d 100%)",
+    background: "linear-gradient(180deg, #6f1f32 0%, #8d3045 55%, #a84758 100%)",
     padding: 16,
     fontFamily: "Arial, sans-serif",
     color: "#222",
   },
   wrap: {
-    maxWidth: 1200,
+    maxWidth: 1180,
     margin: "0 auto",
   },
   headerCard: {
     background: "#fff",
     borderRadius: 20,
-    padding: 20,
+    padding: 22,
     boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
     marginBottom: 16,
   },
   title: {
     margin: 0,
+    fontSize: 34,
     color: "#7a2638",
-    fontSize: 32,
-    lineHeight: 1.15,
+    lineHeight: 1.1,
   },
   subtitle: {
     marginTop: 8,
@@ -1315,7 +1082,7 @@ const styles = {
     display: "flex",
     gap: 10,
     flexWrap: "wrap",
-    marginTop: 18,
+    marginTop: 20,
     alignItems: "center",
   },
   loggedInBar: {
@@ -1332,36 +1099,31 @@ const styles = {
   },
   tabBar: {
     display: "flex",
-    gap: 8,
+    gap: 10,
     flexWrap: "wrap",
     marginBottom: 16,
   },
   tab: {
-    padding: "10px 14px",
-    borderRadius: 10,
+    padding: "12px 18px",
+    borderRadius: 12,
     border: "none",
     background: "#f1d8de",
     color: "#5b1d2a",
-    cursor: "pointer",
     fontWeight: 700,
+    cursor: "pointer",
   },
   activeTab: {
-    padding: "10px 14px",
-    borderRadius: 10,
+    padding: "12px 18px",
+    borderRadius: 12,
     border: "none",
     background: "#7a2638",
     color: "#fff",
-    cursor: "pointer",
     fontWeight: 700,
+    cursor: "pointer",
   },
   grid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-    gap: 16,
-  },
-  adminStack: {
-    display: "flex",
-    flexDirection: "column",
+    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
     gap: 16,
   },
   card: {
@@ -1391,7 +1153,7 @@ const styles = {
   listItem: {
     border: "1px solid #e5d7db",
     borderRadius: 12,
-    padding: 12,
+    padding: 14,
     marginBottom: 12,
     background: "#fffafc",
   },
@@ -1399,10 +1161,11 @@ const styles = {
     fontWeight: 700,
     color: "#5b1d2a",
     marginBottom: 4,
+    fontSize: 17,
   },
   listMeta: {
     color: "#555",
-    fontSize: 14,
+    fontSize: 15,
     marginBottom: 4,
   },
   input: {
@@ -1444,16 +1207,6 @@ const styles = {
     cursor: "pointer",
     fontWeight: 700,
   },
-  smallButton: {
-    padding: "8px 10px",
-    borderRadius: 8,
-    border: "none",
-    background: "#b65b14",
-    color: "#fff",
-    cursor: "pointer",
-    fontWeight: 700,
-    fontSize: 13,
-  },
   deleteButton: {
     marginTop: 8,
     padding: "8px 12px",
@@ -1463,13 +1216,6 @@ const styles = {
     color: "#fff",
     cursor: "pointer",
     fontWeight: 700,
-  },
-  checkboxRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 12,
-    color: "#333",
   },
   link: {
     color: "#7a2638",
@@ -1502,31 +1248,5 @@ const styles = {
     marginBottom: 16,
     color: "#1f6b2d",
     fontWeight: 700,
-  },
-  fieldLabel: {
-    display: "block",
-    marginBottom: 4,
-    color: "#5b1d2a",
-    fontSize: 14,
-    fontWeight: 700,
-  },
-  helpText: {
-    marginTop: 8,
-    marginBottom: 12,
-    color: "#666",
-    fontSize: 13,
-    lineHeight: 1.4,
-  },
-  presetRow: {
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-    marginBottom: 12,
-  },
-  buttonRow: {
-    display: "flex",
-    gap: 10,
-    flexWrap: "wrap",
-    marginTop: 8,
   },
 };
