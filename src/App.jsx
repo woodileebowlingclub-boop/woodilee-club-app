@@ -5,6 +5,7 @@ const MEMBER_PIN = "1911";
 const ADMIN_PIN = "1954";
 const CLUB_NAME = "Woodilee Bowling Club";
 const CLUB_SUBTITLE = "Members diary, notices and club information";
+const DEFAULT_RECUR_UNTIL = "2026-10-03";
 
 const TABS = [
   { key: "home", label: "Home" },
@@ -32,7 +33,7 @@ function getField(item, keys, fallback = "") {
 
 function formatDate(dateStr) {
   if (!dateStr) return "";
-  const d = new Date(dateStr);
+  const d = new Date(`${dateStr}T12:00:00`);
   if (Number.isNaN(d.getTime())) return safeString(dateStr);
   return d.toLocaleDateString("en-GB", {
     day: "2-digit",
@@ -46,6 +47,39 @@ function formatDateTime(dateStr, timeStr) {
   const timePart = safeString(timeStr);
   if (datePart && timePart) return `${datePart} • ${timePart}`;
   return datePart || timePart || "";
+}
+
+function parseDateOnly(dateStr) {
+  return new Date(`${dateStr}T12:00:00`);
+}
+
+function toIsoDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function buildWeeklyDates(startDateStr, endDateStr) {
+  const dates = [];
+  const start = parseDateOnly(startDateStr);
+  const end = parseDateOnly(endDateStr);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+    return dates;
+  }
+
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 7)) {
+    dates.push(toIsoDate(d));
+  }
+
+  return dates;
+}
+
+function getEventSortValue(event) {
+  const dateStr = getField(event, ["event_date", "date"], "9999-12-31");
+  const timeStr = getField(event, ["event_time", "time"], "23:59");
+  return new Date(`${dateStr}T${timeStr || "23:59"}:00`).getTime();
 }
 
 export default function App() {
@@ -72,19 +106,24 @@ export default function App() {
     text: "",
     important: false,
   });
+
   const [eventForm, setEventForm] = useState({
     title: "",
     event_date: "",
     event_time: "",
     location: "",
     notes: "",
+    isRecurring: false,
+    recurring_until: DEFAULT_RECUR_UNTIL,
   });
+
   const [memberForm, setMemberForm] = useState({
     full_name: "",
     section: "Gents",
     phone: "",
     email: "",
   });
+
   const [officeForm, setOfficeForm] = useState({
     role: "",
     name: "",
@@ -92,6 +131,7 @@ export default function App() {
     email: "",
     display_order: "",
   });
+
   const [coachForm, setCoachForm] = useState({
     name: "",
     role: "",
@@ -99,6 +139,7 @@ export default function App() {
     email: "",
     notes: "",
   });
+
   const [documentForm, setDocumentForm] = useState({
     title: "",
     file_url: "",
@@ -129,7 +170,14 @@ export default function App() {
       supabase.from("documents").select("*").order("id", { ascending: false }),
     ]);
 
-    const errors = [eventsRes.error, noticesRes.error, membersRes.error, officeRes.error, coachesRes.error, docsRes.error]
+    const errors = [
+      eventsRes.error,
+      noticesRes.error,
+      membersRes.error,
+      officeRes.error,
+      coachesRes.error,
+      docsRes.error,
+    ]
       .filter(Boolean)
       .map((err) => err.message);
 
@@ -154,6 +202,58 @@ export default function App() {
   function showSaved(message = "Saved") {
     setSuccessMessage(message);
     setTimeout(() => setSuccessMessage(""), 2500);
+  }
+
+  function resetEventForm() {
+    setEventForm({
+      title: "",
+      event_date: "",
+      event_time: "",
+      location: "",
+      notes: "",
+      isRecurring: false,
+      recurring_until: DEFAULT_RECUR_UNTIL,
+    });
+  }
+
+  function usePreset(type) {
+    if (type === "monday") {
+      setEventForm({
+        title: "Monday Points Night",
+        event_date: "2026-04-20",
+        event_time: "18:45",
+        location: "",
+        notes: "On the green for 6.45pm. Please be there for 6.30pm prompt.",
+        isRecurring: true,
+        recurring_until: DEFAULT_RECUR_UNTIL,
+      });
+      return;
+    }
+
+    if (type === "tuesday") {
+      setEventForm({
+        title: "Vernett Trophy",
+        event_date: "2026-04-21",
+        event_time: "",
+        location: "",
+        notes: "",
+        isRecurring: true,
+        recurring_until: DEFAULT_RECUR_UNTIL,
+      });
+      return;
+    }
+
+    if (type === "thursday") {
+      setEventForm({
+        title: "Thursday Bounce Night",
+        event_date: "2026-04-23",
+        event_time: "",
+        location: "",
+        notes: "",
+        isRecurring: true,
+        recurring_until: DEFAULT_RECUR_UNTIL,
+      });
+    }
   }
 
   function handleLogin(type) {
@@ -220,6 +320,7 @@ export default function App() {
 
   async function deleteNotice(id) {
     if (!window.confirm("Delete this notice?")) return;
+
     setSaving(true);
     clearMessages();
 
@@ -238,7 +339,12 @@ export default function App() {
 
   async function addEvent() {
     const title = eventForm.title.trim();
-    if (!title || !eventForm.event_date) {
+    const eventDate = eventForm.event_date;
+    const eventTime = eventForm.event_time || null;
+    const location = eventForm.location.trim() || null;
+    const notes = eventForm.notes.trim() || null;
+
+    if (!title || !eventDate) {
       alert("Enter an event title and date");
       return;
     }
@@ -246,12 +352,52 @@ export default function App() {
     setSaving(true);
     clearMessages();
 
+    if (eventForm.isRecurring) {
+      const recurringUntil = eventForm.recurring_until;
+
+      if (!recurringUntil) {
+        setErrorMessage("Please enter a recurring until date.");
+        setSaving(false);
+        return;
+      }
+
+      const weeklyDates = buildWeeklyDates(eventDate, recurringUntil);
+
+      if (weeklyDates.length === 0) {
+        setErrorMessage("Recurring dates could not be created. Check the start date and end date.");
+        setSaving(false);
+        return;
+      }
+
+      const payloads = weeklyDates.map((date) => ({
+        title,
+        event_date: date,
+        event_time: eventTime,
+        location,
+        notes,
+      }));
+
+      const { error } = await supabase.from("events").insert(payloads);
+
+      if (error) {
+        setErrorMessage(error.message || "Failed to add recurring events");
+        setSaving(false);
+        return;
+      }
+
+      resetEventForm();
+      await loadAll();
+      setSaving(false);
+      showSaved(`Recurring diary entries added (${weeklyDates.length})`);
+      return;
+    }
+
     const payload = {
       title,
-      event_date: eventForm.event_date,
-      event_time: eventForm.event_time || null,
-      location: eventForm.location.trim() || null,
-      notes: eventForm.notes.trim() || null,
+      event_date: eventDate,
+      event_time: eventTime,
+      location,
+      notes,
     };
 
     const { error } = await supabase.from("events").insert(payload);
@@ -262,14 +408,15 @@ export default function App() {
       return;
     }
 
-    setEventForm({ title: "", event_date: "", event_time: "", location: "", notes: "" });
+    resetEventForm();
     await loadAll();
     setSaving(false);
-    showSaved("Event added");
+    showSaved("Diary entry added");
   }
 
   async function deleteEvent(id) {
     if (!window.confirm("Delete this diary entry?")) return;
+
     setSaving(true);
     clearMessages();
 
@@ -288,6 +435,7 @@ export default function App() {
 
   async function addMember() {
     const full_name = memberForm.full_name.trim();
+
     if (!full_name) {
       alert("Enter member name");
       return;
@@ -319,6 +467,7 @@ export default function App() {
 
   async function deleteMember(id) {
     if (!window.confirm("Delete this member?")) return;
+
     setSaving(true);
     clearMessages();
 
@@ -338,6 +487,7 @@ export default function App() {
   async function addOfficeBearer() {
     const role = officeForm.role.trim();
     const name = officeForm.name.trim();
+
     if (!role || !name) {
       alert("Enter role and name");
       return;
@@ -351,7 +501,9 @@ export default function App() {
       name,
       phone: officeForm.phone.trim() || null,
       email: officeForm.email.trim() || null,
-      display_order: officeForm.display_order ? Number(officeForm.display_order) : officeBearers.length + 1,
+      display_order: officeForm.display_order
+        ? Number(officeForm.display_order)
+        : officeBearers.length + 1,
     };
 
     const { error } = await supabase.from("office_bearers").insert(payload);
@@ -370,6 +522,7 @@ export default function App() {
 
   async function deleteOfficeBearer(id) {
     if (!window.confirm("Delete this office bearer?")) return;
+
     setSaving(true);
     clearMessages();
 
@@ -388,6 +541,7 @@ export default function App() {
 
   async function addCoach() {
     const name = coachForm.name.trim();
+
     if (!name) {
       alert("Enter coach name");
       return;
@@ -420,6 +574,7 @@ export default function App() {
 
   async function deleteCoach(id) {
     if (!window.confirm("Delete this coach?")) return;
+
     setSaving(true);
     clearMessages();
 
@@ -438,6 +593,7 @@ export default function App() {
 
   async function addDocument() {
     const title = documentForm.title.trim();
+
     if (!title) {
       alert("Enter document title");
       return;
@@ -468,6 +624,7 @@ export default function App() {
 
   async function deleteDocument(id) {
     if (!window.confirm("Delete this document?")) return;
+
     setSaving(true);
     clearMessages();
 
@@ -484,9 +641,14 @@ export default function App() {
     showSaved("Document deleted");
   }
 
+  const combinedEvents = useMemo(() => {
+    return [...events].sort((a, b) => getEventSortValue(a) - getEventSortValue(b));
+  }, [events]);
+
   const filteredMembers = useMemo(() => {
     const search = memberSearch.trim().toLowerCase();
     if (!search) return members;
+
     return members.filter((member) => {
       const name = safeString(getField(member, ["full_name", "name"])).toLowerCase();
       const section = safeString(getField(member, ["section", "member_type"])).toLowerCase();
@@ -515,10 +677,8 @@ export default function App() {
   }, [filteredMembers]);
 
   const upcomingEvents = useMemo(() => {
-    return [...events]
-      .sort((a, b) => new Date(getField(a, ["event_date", "date"])) - new Date(getField(b, ["event_date", "date"])))
-      .slice(0, 5);
-  }, [events]);
+    return [...combinedEvents].slice(0, 5);
+  }, [combinedEvents]);
 
   const sortedNotices = useMemo(() => {
     return [...notices].sort((a, b) => {
@@ -551,15 +711,21 @@ export default function App() {
                 }}
                 style={styles.input}
               />
-              <button style={styles.button} onClick={() => handleLogin("member")}>Member Login</button>
-              <button style={styles.secondaryButton} onClick={() => handleLogin("admin")}>Admin Login</button>
+              <button style={styles.button} onClick={() => handleLogin("member")}>
+                Member Login
+              </button>
+              <button style={styles.secondaryButton} onClick={() => handleLogin("admin")}>
+                Admin Login
+              </button>
             </div>
           ) : (
             <div style={styles.loggedInBar}>
               <div style={styles.loggedInText}>
                 Logged in as <strong>{isAdmin ? "Admin" : "Member"}</strong>
               </div>
-              <button style={styles.secondaryButton} onClick={handleLogout}>Logout</button>
+              <button style={styles.secondaryButton} onClick={handleLogout}>
+                Logout
+              </button>
             </div>
           )}
         </div>
@@ -594,7 +760,10 @@ export default function App() {
           <div style={styles.grid}>
             <div style={styles.card}>
               <h3 style={styles.sectionTitle}>Welcome</h3>
-              <p style={styles.paragraph}>Welcome to the club app. Use the tabs above to view diary dates, notices, members, office bearers, coaches and documents.</p>
+              <p style={styles.paragraph}>
+                Welcome to the club app. Use the tabs above to view diary dates, notices, members,
+                office bearers, coaches and documents.
+              </p>
             </div>
 
             <div style={styles.card}>
@@ -604,9 +773,18 @@ export default function App() {
               ) : (
                 upcomingEvents.map((event) => (
                   <div key={event.id} style={styles.listItem}>
-                    <div style={styles.listTitle}>{getField(event, ["title", "event_title"], "Untitled event")}</div>
-                    <div style={styles.listMeta}>{formatDateTime(getField(event, ["event_date", "date"]), getField(event, ["event_time", "time"]))}</div>
-                    {getField(event, ["location"]) && <div style={styles.listMeta}>{getField(event, ["location"])}</div>}
+                    <div style={styles.listTitle}>
+                      {getField(event, ["title", "event_title"], "Untitled event")}
+                    </div>
+                    <div style={styles.listMeta}>
+                      {formatDateTime(
+                        getField(event, ["event_date", "date"]),
+                        getField(event, ["event_time", "time"])
+                      )}
+                    </div>
+                    {getField(event, ["location"]) && (
+                      <div style={styles.listMeta}>{getField(event, ["location"])}</div>
+                    )}
                   </div>
                 ))
               )}
@@ -623,7 +801,9 @@ export default function App() {
                       {getField(notice, ["title", "heading"], "Notice")}
                       {getField(notice, ["important", "is_important"], false) ? " • Important" : ""}
                     </div>
-                    <div style={styles.paragraph}>{getField(notice, ["text", "content", "description"], "")}</div>
+                    <div style={styles.paragraph}>
+                      {getField(notice, ["text", "content", "description"], "")}
+                    </div>
                   </div>
                 ))
               )}
@@ -634,22 +814,35 @@ export default function App() {
         {!loading && isLoggedIn && activeTab === "diary" && (
           <div style={styles.card}>
             <h3 style={styles.sectionTitle}>Diary</h3>
-            {events.length === 0 ? (
+            {combinedEvents.length === 0 ? (
               <p style={styles.paragraph}>No diary entries yet.</p>
             ) : (
-              [...events]
-                .sort((a, b) => new Date(getField(a, ["event_date", "date"])) - new Date(getField(b, ["event_date", "date"])))
-                .map((event) => (
-                  <div key={event.id} style={styles.listItem}>
-                    <div style={styles.listTitle}>{getField(event, ["title", "event_title"], "Untitled event")}</div>
-                    <div style={styles.listMeta}>{formatDateTime(getField(event, ["event_date", "date"]), getField(event, ["event_time", "time"]))}</div>
-                    {getField(event, ["location"]) && <div style={styles.listMeta}>Location: {getField(event, ["location"])}</div>}
-                    {getField(event, ["notes", "description"]) && <div style={styles.paragraph}>{getField(event, ["notes", "description"])}</div>}
-                    {isAdmin && (
-                      <button style={styles.deleteButton} onClick={() => deleteEvent(event.id)}>Delete</button>
+              combinedEvents.map((event) => (
+                <div key={event.id} style={styles.listItem}>
+                  <div style={styles.listTitle}>
+                    {getField(event, ["title", "event_title"], "Untitled event")}
+                  </div>
+                  <div style={styles.listMeta}>
+                    {formatDateTime(
+                      getField(event, ["event_date", "date"]),
+                      getField(event, ["event_time", "time"])
                     )}
                   </div>
-                ))
+                  {getField(event, ["location"]) && (
+                    <div style={styles.listMeta}>Location: {getField(event, ["location"])}</div>
+                  )}
+                  {getField(event, ["notes", "description"]) && (
+                    <div style={styles.paragraph}>
+                      {getField(event, ["notes", "description"])}
+                    </div>
+                  )}
+                  {isAdmin && (
+                    <button style={styles.deleteButton} onClick={() => deleteEvent(event.id)}>
+                      Delete
+                    </button>
+                  )}
+                </div>
+              ))
             )}
           </div>
         )}
@@ -666,9 +859,13 @@ export default function App() {
                     {getField(notice, ["title", "heading"], "Notice")}
                     {getField(notice, ["important", "is_important"], false) ? " • Important" : ""}
                   </div>
-                  <div style={styles.paragraph}>{getField(notice, ["text", "content", "description"], "")}</div>
+                  <div style={styles.paragraph}>
+                    {getField(notice, ["text", "content", "description"], "")}
+                  </div>
                   {isAdmin && (
-                    <button style={styles.deleteButton} onClick={() => deleteNotice(notice.id)}>Delete</button>
+                    <button style={styles.deleteButton} onClick={() => deleteNotice(notice.id)}>
+                      Delete
+                    </button>
                   )}
                 </div>
               ))
@@ -695,11 +892,19 @@ export default function App() {
                 ) : (
                   groupItems.map((member) => (
                     <div key={member.id} style={styles.listItem}>
-                      <div style={styles.listTitle}>{getField(member, ["full_name", "name"], "Unnamed member")}</div>
-                      {getField(member, ["phone"]) && <div style={styles.listMeta}>Phone: {getField(member, ["phone"])}</div>}
-                      {getField(member, ["email"]) && <div style={styles.listMeta}>Email: {getField(member, ["email"])}</div>}
+                      <div style={styles.listTitle}>
+                        {getField(member, ["full_name", "name"], "Unnamed member")}
+                      </div>
+                      {getField(member, ["phone"]) && (
+                        <div style={styles.listMeta}>Phone: {getField(member, ["phone"])}</div>
+                      )}
+                      {getField(member, ["email"]) && (
+                        <div style={styles.listMeta}>Email: {getField(member, ["email"])}</div>
+                      )}
                       {isAdmin && (
-                        <button style={styles.deleteButton} onClick={() => deleteMember(member.id)}>Delete</button>
+                        <button style={styles.deleteButton} onClick={() => deleteMember(member.id)}>
+                          Delete
+                        </button>
                       )}
                     </div>
                   ))
@@ -719,10 +924,19 @@ export default function App() {
                 <div key={item.id} style={styles.listItem}>
                   <div style={styles.listTitle}>{getField(item, ["role", "title"], "Role")}</div>
                   <div style={styles.listMeta}>{getField(item, ["name", "person_name"], "")}</div>
-                  {getField(item, ["phone"]) && <div style={styles.listMeta}>Phone: {getField(item, ["phone"])}</div>}
-                  {getField(item, ["email"]) && <div style={styles.listMeta}>Email: {getField(item, ["email"])}</div>}
+                  {getField(item, ["phone"]) && (
+                    <div style={styles.listMeta}>Phone: {getField(item, ["phone"])}</div>
+                  )}
+                  {getField(item, ["email"]) && (
+                    <div style={styles.listMeta}>Email: {getField(item, ["email"])}</div>
+                  )}
                   {isAdmin && (
-                    <button style={styles.deleteButton} onClick={() => deleteOfficeBearer(item.id)}>Delete</button>
+                    <button
+                      style={styles.deleteButton}
+                      onClick={() => deleteOfficeBearer(item.id)}
+                    >
+                      Delete
+                    </button>
                   )}
                 </div>
               ))
@@ -739,12 +953,22 @@ export default function App() {
               coaches.map((coach) => (
                 <div key={coach.id} style={styles.listItem}>
                   <div style={styles.listTitle}>{getField(coach, ["name"], "")}</div>
-                  {getField(coach, ["role"]) && <div style={styles.listMeta}>{getField(coach, ["role"])}</div>}
-                  {getField(coach, ["phone"]) && <div style={styles.listMeta}>Phone: {getField(coach, ["phone"])}</div>}
-                  {getField(coach, ["email"]) && <div style={styles.listMeta}>Email: {getField(coach, ["email"])}</div>}
-                  {getField(coach, ["notes"]) && <div style={styles.paragraph}>{getField(coach, ["notes"])}</div>}
+                  {getField(coach, ["role"]) && (
+                    <div style={styles.listMeta}>{getField(coach, ["role"])}</div>
+                  )}
+                  {getField(coach, ["phone"]) && (
+                    <div style={styles.listMeta}>Phone: {getField(coach, ["phone"])}</div>
+                  )}
+                  {getField(coach, ["email"]) && (
+                    <div style={styles.listMeta}>Email: {getField(coach, ["email"])}</div>
+                  )}
+                  {getField(coach, ["notes"]) && (
+                    <div style={styles.paragraph}>{getField(coach, ["notes"])}</div>
+                  )}
                   {isAdmin && (
-                    <button style={styles.deleteButton} onClick={() => deleteCoach(coach.id)}>Delete</button>
+                    <button style={styles.deleteButton} onClick={() => deleteCoach(coach.id)}>
+                      Delete
+                    </button>
                   )}
                 </div>
               ))
@@ -762,8 +986,14 @@ export default function App() {
                 const url = getField(doc, ["file_url", "url", "link"], "");
                 return (
                   <div key={doc.id} style={styles.listItem}>
-                    <div style={styles.listTitle}>{getField(doc, ["title", "name"], "Document")}</div>
-                    {getField(doc, ["description", "notes"]) && <div style={styles.paragraph}>{getField(doc, ["description", "notes"])}</div>}
+                    <div style={styles.listTitle}>
+                      {getField(doc, ["title", "name"], "Document")}
+                    </div>
+                    {getField(doc, ["description", "notes"]) && (
+                      <div style={styles.paragraph}>
+                        {getField(doc, ["description", "notes"])}
+                      </div>
+                    )}
                     {url ? (
                       <a href={url} target="_blank" rel="noreferrer" style={styles.link}>
                         Open document
@@ -772,7 +1002,9 @@ export default function App() {
                       <div style={styles.listMeta}>No link added</div>
                     )}
                     {isAdmin && (
-                      <button style={styles.deleteButton} onClick={() => deleteDocument(doc.id)}>Delete</button>
+                      <button style={styles.deleteButton} onClick={() => deleteDocument(doc.id)}>
+                        Delete
+                      </button>
                     )}
                   </div>
                 );
@@ -782,207 +1014,405 @@ export default function App() {
         )}
 
         {!loading && isAdmin && activeTab === "admin" && (
-          <div style={styles.grid}>
-            <div style={styles.card}>
-              <h3 style={styles.sectionTitle}>Add Notice</h3>
-              <input
-                type="text"
-                placeholder="Notice title"
-                value={noticeForm.title}
-                onChange={(e) => setNoticeForm({ ...noticeForm, title: e.target.value })}
-                style={styles.input}
-              />
-              <textarea
-                placeholder="Notice text"
-                value={noticeForm.text}
-                onChange={(e) => setNoticeForm({ ...noticeForm, text: e.target.value })}
-                style={styles.textarea}
-              />
-              <label style={styles.checkboxRow}>
+          <div style={styles.adminStack}>
+            <div style={styles.grid}>
+              <div style={styles.card}>
+                <h3 style={styles.sectionTitle}>Add Notice</h3>
                 <input
-                  type="checkbox"
-                  checked={noticeForm.important}
-                  onChange={(e) => setNoticeForm({ ...noticeForm, important: e.target.checked })}
+                  type="text"
+                  placeholder="Notice title"
+                  value={noticeForm.title}
+                  onChange={(e) => setNoticeForm({ ...noticeForm, title: e.target.value })}
+                  style={styles.input}
                 />
-                Important notice
-              </label>
-              <button style={styles.button} onClick={addNotice} disabled={saving}>Save Notice</button>
+                <textarea
+                  placeholder="Notice text"
+                  value={noticeForm.text}
+                  onChange={(e) => setNoticeForm({ ...noticeForm, text: e.target.value })}
+                  style={styles.textarea}
+                />
+                <label style={styles.checkboxRow}>
+                  <input
+                    type="checkbox"
+                    checked={noticeForm.important}
+                    onChange={(e) => setNoticeForm({ ...noticeForm, important: e.target.checked })}
+                  />
+                  Important notice
+                </label>
+                <button style={styles.button} onClick={addNotice} disabled={saving}>
+                  Save Notice
+                </button>
+              </div>
+
+              <div style={styles.card}>
+                <h3 style={styles.sectionTitle}>Add Diary Entry</h3>
+
+                <div style={styles.presetRow}>
+                  <button type="button" style={styles.smallButton} onClick={() => usePreset("monday")}>
+                    Monday Points
+                  </button>
+                  <button type="button" style={styles.smallButton} onClick={() => usePreset("tuesday")}>
+                    Vernett Trophy
+                  </button>
+                  <button type="button" style={styles.smallButton} onClick={() => usePreset("thursday")}>
+                    Thursday Bounce
+                  </button>
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="Event title"
+                  value={eventForm.title}
+                  onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
+                  style={styles.input}
+                />
+
+                <label style={styles.fieldLabel}>Date</label>
+                <input
+                  type="date"
+                  value={eventForm.event_date}
+                  onChange={(e) => setEventForm({ ...eventForm, event_date: e.target.value })}
+                  style={styles.input}
+                />
+
+                <label style={styles.fieldLabel}>Time</label>
+                <input
+                  type="time"
+                  value={eventForm.event_time}
+                  onChange={(e) => setEventForm({ ...eventForm, event_time: e.target.value })}
+                  style={styles.input}
+                />
+
+                <input
+                  type="text"
+                  placeholder="Location"
+                  value={eventForm.location}
+                  onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}
+                  style={styles.input}
+                />
+
+                <textarea
+                  placeholder="Notes"
+                  value={eventForm.notes}
+                  onChange={(e) => setEventForm({ ...eventForm, notes: e.target.value })}
+                  style={styles.textarea}
+                />
+
+                <label style={styles.checkboxRow}>
+                  <input
+                    type="checkbox"
+                    checked={eventForm.isRecurring}
+                    onChange={(e) =>
+                      setEventForm({ ...eventForm, isRecurring: e.target.checked })
+                    }
+                  />
+                  Recurring weekly
+                </label>
+
+                {eventForm.isRecurring && (
+                  <>
+                    <label style={styles.fieldLabel}>Recurring until</label>
+                    <input
+                      type="date"
+                      value={eventForm.recurring_until}
+                      onChange={(e) =>
+                        setEventForm({ ...eventForm, recurring_until: e.target.value })
+                      }
+                      style={styles.input}
+                    />
+                  </>
+                )}
+
+                <div style={styles.helpText}>
+                  Tick <strong>Recurring weekly</strong> to create the same event every 7 days from the chosen start date until the end date.
+                </div>
+
+                <div style={styles.buttonRow}>
+                  <button style={styles.button} onClick={addEvent} disabled={saving}>
+                    Save Diary Entry
+                  </button>
+                  <button
+                    type="button"
+                    style={styles.secondaryButton}
+                    onClick={resetEventForm}
+                    disabled={saving}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+
+              <div style={styles.card}>
+                <h3 style={styles.sectionTitle}>Add Member</h3>
+                <input
+                  type="text"
+                  placeholder="Full name"
+                  value={memberForm.full_name}
+                  onChange={(e) => setMemberForm({ ...memberForm, full_name: e.target.value })}
+                  style={styles.input}
+                />
+                <select
+                  value={memberForm.section}
+                  onChange={(e) => setMemberForm({ ...memberForm, section: e.target.value })}
+                  style={styles.input}
+                >
+                  <option>Gents</option>
+                  <option>Ladies</option>
+                  <option>Associate</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="Phone"
+                  value={memberForm.phone}
+                  onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })}
+                  style={styles.input}
+                />
+                <input
+                  type="text"
+                  placeholder="Email"
+                  value={memberForm.email}
+                  onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })}
+                  style={styles.input}
+                />
+                <button style={styles.button} onClick={addMember} disabled={saving}>
+                  Save Member
+                </button>
+              </div>
+
+              <div style={styles.card}>
+                <h3 style={styles.sectionTitle}>Add Office Bearer</h3>
+                <input
+                  type="text"
+                  placeholder="Role"
+                  value={officeForm.role}
+                  onChange={(e) => setOfficeForm({ ...officeForm, role: e.target.value })}
+                  style={styles.input}
+                />
+                <input
+                  type="text"
+                  placeholder="Name"
+                  value={officeForm.name}
+                  onChange={(e) => setOfficeForm({ ...officeForm, name: e.target.value })}
+                  style={styles.input}
+                />
+                <input
+                  type="number"
+                  placeholder="Display order"
+                  value={officeForm.display_order}
+                  onChange={(e) => setOfficeForm({ ...officeForm, display_order: e.target.value })}
+                  style={styles.input}
+                />
+                <input
+                  type="text"
+                  placeholder="Phone"
+                  value={officeForm.phone}
+                  onChange={(e) => setOfficeForm({ ...officeForm, phone: e.target.value })}
+                  style={styles.input}
+                />
+                <input
+                  type="text"
+                  placeholder="Email"
+                  value={officeForm.email}
+                  onChange={(e) => setOfficeForm({ ...officeForm, email: e.target.value })}
+                  style={styles.input}
+                />
+                <button style={styles.button} onClick={addOfficeBearer} disabled={saving}>
+                  Save Office Bearer
+                </button>
+              </div>
+
+              <div style={styles.card}>
+                <h3 style={styles.sectionTitle}>Add Coach</h3>
+                <input
+                  type="text"
+                  placeholder="Name"
+                  value={coachForm.name}
+                  onChange={(e) => setCoachForm({ ...coachForm, name: e.target.value })}
+                  style={styles.input}
+                />
+                <input
+                  type="text"
+                  placeholder="Role"
+                  value={coachForm.role}
+                  onChange={(e) => setCoachForm({ ...coachForm, role: e.target.value })}
+                  style={styles.input}
+                />
+                <input
+                  type="text"
+                  placeholder="Phone"
+                  value={coachForm.phone}
+                  onChange={(e) => setCoachForm({ ...coachForm, phone: e.target.value })}
+                  style={styles.input}
+                />
+                <input
+                  type="text"
+                  placeholder="Email"
+                  value={coachForm.email}
+                  onChange={(e) => setCoachForm({ ...coachForm, email: e.target.value })}
+                  style={styles.input}
+                />
+                <textarea
+                  placeholder="Notes"
+                  value={coachForm.notes}
+                  onChange={(e) => setCoachForm({ ...coachForm, notes: e.target.value })}
+                  style={styles.textarea}
+                />
+                <button style={styles.button} onClick={addCoach} disabled={saving}>
+                  Save Coach
+                </button>
+              </div>
+
+              <div style={styles.card}>
+                <h3 style={styles.sectionTitle}>Add Document</h3>
+                <input
+                  type="text"
+                  placeholder="Document title"
+                  value={documentForm.title}
+                  onChange={(e) => setDocumentForm({ ...documentForm, title: e.target.value })}
+                  style={styles.input}
+                />
+                <input
+                  type="text"
+                  placeholder="Document link"
+                  value={documentForm.file_url}
+                  onChange={(e) => setDocumentForm({ ...documentForm, file_url: e.target.value })}
+                  style={styles.input}
+                />
+                <textarea
+                  placeholder="Description"
+                  value={documentForm.description}
+                  onChange={(e) => setDocumentForm({ ...documentForm, description: e.target.value })}
+                  style={styles.textarea}
+                />
+                <button style={styles.button} onClick={addDocument} disabled={saving}>
+                  Save Document
+                </button>
+              </div>
             </div>
 
-            <div style={styles.card}>
-              <h3 style={styles.sectionTitle}>Add Diary Entry</h3>
-              <input
-                type="text"
-                placeholder="Event title"
-                value={eventForm.title}
-                onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
-                style={styles.input}
-              />
-              <input
-                type="date"
-                value={eventForm.event_date}
-                onChange={(e) => setEventForm({ ...eventForm, event_date: e.target.value })}
-                style={styles.input}
-              />
-              <input
-                type="time"
-                value={eventForm.event_time}
-                onChange={(e) => setEventForm({ ...eventForm, event_time: e.target.value })}
-                style={styles.input}
-              />
-              <input
-                type="text"
-                placeholder="Location"
-                value={eventForm.location}
-                onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}
-                style={styles.input}
-              />
-              <textarea
-                placeholder="Notes"
-                value={eventForm.notes}
-                onChange={(e) => setEventForm({ ...eventForm, notes: e.target.value })}
-                style={styles.textarea}
-              />
-              <button style={styles.button} onClick={addEvent} disabled={saving}>Save Diary Entry</button>
-            </div>
+            <div style={styles.grid}>
+              <div style={styles.card}>
+                <h3 style={styles.sectionTitle}>Existing Diary Entries</h3>
+                {combinedEvents.length === 0 ? (
+                  <p style={styles.paragraph}>No diary entries yet.</p>
+                ) : (
+                  combinedEvents.map((event) => (
+                    <div key={event.id} style={styles.listItem}>
+                      <div style={styles.listTitle}>
+                        {getField(event, ["title", "event_title"], "Untitled event")}
+                      </div>
+                      <div style={styles.listMeta}>
+                        {formatDateTime(
+                          getField(event, ["event_date", "date"]),
+                          getField(event, ["event_time", "time"])
+                        )}
+                      </div>
+                      {getField(event, ["location"]) && (
+                        <div style={styles.listMeta}>{getField(event, ["location"])}</div>
+                      )}
+                      <button style={styles.deleteButton} onClick={() => deleteEvent(event.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
 
-            <div style={styles.card}>
-              <h3 style={styles.sectionTitle}>Add Member</h3>
-              <input
-                type="text"
-                placeholder="Full name"
-                value={memberForm.full_name}
-                onChange={(e) => setMemberForm({ ...memberForm, full_name: e.target.value })}
-                style={styles.input}
-              />
-              <select
-                value={memberForm.section}
-                onChange={(e) => setMemberForm({ ...memberForm, section: e.target.value })}
-                style={styles.input}
-              >
-                <option>Gents</option>
-                <option>Ladies</option>
-                <option>Associate</option>
-              </select>
-              <input
-                type="text"
-                placeholder="Phone"
-                value={memberForm.phone}
-                onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })}
-                style={styles.input}
-              />
-              <input
-                type="text"
-                placeholder="Email"
-                value={memberForm.email}
-                onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })}
-                style={styles.input}
-              />
-              <button style={styles.button} onClick={addMember} disabled={saving}>Save Member</button>
-            </div>
+              <div style={styles.card}>
+                <h3 style={styles.sectionTitle}>Existing Notices</h3>
+                {sortedNotices.length === 0 ? (
+                  <p style={styles.paragraph}>No notices yet.</p>
+                ) : (
+                  sortedNotices.map((notice) => (
+                    <div key={notice.id} style={styles.listItem}>
+                      <div style={styles.listTitle}>
+                        {getField(notice, ["title", "heading"], "Notice")}
+                      </div>
+                      <div style={styles.paragraph}>
+                        {getField(notice, ["text", "content", "description"], "")}
+                      </div>
+                      <button style={styles.deleteButton} onClick={() => deleteNotice(notice.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
 
-            <div style={styles.card}>
-              <h3 style={styles.sectionTitle}>Add Office Bearer</h3>
-              <input
-                type="text"
-                placeholder="Role"
-                value={officeForm.role}
-                onChange={(e) => setOfficeForm({ ...officeForm, role: e.target.value })}
-                style={styles.input}
-              />
-              <input
-                type="text"
-                placeholder="Name"
-                value={officeForm.name}
-                onChange={(e) => setOfficeForm({ ...officeForm, name: e.target.value })}
-                style={styles.input}
-              />
-              <input
-                type="number"
-                placeholder="Display order"
-                value={officeForm.display_order}
-                onChange={(e) => setOfficeForm({ ...officeForm, display_order: e.target.value })}
-                style={styles.input}
-              />
-              <input
-                type="text"
-                placeholder="Phone"
-                value={officeForm.phone}
-                onChange={(e) => setOfficeForm({ ...officeForm, phone: e.target.value })}
-                style={styles.input}
-              />
-              <input
-                type="text"
-                placeholder="Email"
-                value={officeForm.email}
-                onChange={(e) => setOfficeForm({ ...officeForm, email: e.target.value })}
-                style={styles.input}
-              />
-              <button style={styles.button} onClick={addOfficeBearer} disabled={saving}>Save Office Bearer</button>
-            </div>
+              <div style={styles.card}>
+                <h3 style={styles.sectionTitle}>Existing Members</h3>
+                {members.length === 0 ? (
+                  <p style={styles.paragraph}>No members yet.</p>
+                ) : (
+                  members.map((member) => (
+                    <div key={member.id} style={styles.listItem}>
+                      <div style={styles.listTitle}>
+                        {getField(member, ["full_name", "name"], "Unnamed member")}
+                      </div>
+                      <div style={styles.listMeta}>
+                        {getField(member, ["section", "member_type"], "")}
+                      </div>
+                      <button style={styles.deleteButton} onClick={() => deleteMember(member.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
 
-            <div style={styles.card}>
-              <h3 style={styles.sectionTitle}>Add Coach</h3>
-              <input
-                type="text"
-                placeholder="Name"
-                value={coachForm.name}
-                onChange={(e) => setCoachForm({ ...coachForm, name: e.target.value })}
-                style={styles.input}
-              />
-              <input
-                type="text"
-                placeholder="Role"
-                value={coachForm.role}
-                onChange={(e) => setCoachForm({ ...coachForm, role: e.target.value })}
-                style={styles.input}
-              />
-              <input
-                type="text"
-                placeholder="Phone"
-                value={coachForm.phone}
-                onChange={(e) => setCoachForm({ ...coachForm, phone: e.target.value })}
-                style={styles.input}
-              />
-              <input
-                type="text"
-                placeholder="Email"
-                value={coachForm.email}
-                onChange={(e) => setCoachForm({ ...coachForm, email: e.target.value })}
-                style={styles.input}
-              />
-              <textarea
-                placeholder="Notes"
-                value={coachForm.notes}
-                onChange={(e) => setCoachForm({ ...coachForm, notes: e.target.value })}
-                style={styles.textarea}
-              />
-              <button style={styles.button} onClick={addCoach} disabled={saving}>Save Coach</button>
-            </div>
+              <div style={styles.card}>
+                <h3 style={styles.sectionTitle}>Existing Office Bearers</h3>
+                {officeBearers.length === 0 ? (
+                  <p style={styles.paragraph}>No office bearers yet.</p>
+                ) : (
+                  officeBearers.map((item) => (
+                    <div key={item.id} style={styles.listItem}>
+                      <div style={styles.listTitle}>{getField(item, ["role", "title"], "Role")}</div>
+                      <div style={styles.listMeta}>{getField(item, ["name", "person_name"], "")}</div>
+                      <button style={styles.deleteButton} onClick={() => deleteOfficeBearer(item.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
 
-            <div style={styles.card}>
-              <h3 style={styles.sectionTitle}>Add Document</h3>
-              <input
-                type="text"
-                placeholder="Document title"
-                value={documentForm.title}
-                onChange={(e) => setDocumentForm({ ...documentForm, title: e.target.value })}
-                style={styles.input}
-              />
-              <input
-                type="text"
-                placeholder="Document link"
-                value={documentForm.file_url}
-                onChange={(e) => setDocumentForm({ ...documentForm, file_url: e.target.value })}
-                style={styles.input}
-              />
-              <textarea
-                placeholder="Description"
-                value={documentForm.description}
-                onChange={(e) => setDocumentForm({ ...documentForm, description: e.target.value })}
-                style={styles.textarea}
-              />
-              <button style={styles.button} onClick={addDocument} disabled={saving}>Save Document</button>
+              <div style={styles.card}>
+                <h3 style={styles.sectionTitle}>Existing Coaches</h3>
+                {coaches.length === 0 ? (
+                  <p style={styles.paragraph}>No coaches yet.</p>
+                ) : (
+                  coaches.map((coach) => (
+                    <div key={coach.id} style={styles.listItem}>
+                      <div style={styles.listTitle}>{getField(coach, ["name"], "")}</div>
+                      {getField(coach, ["role"]) && (
+                        <div style={styles.listMeta}>{getField(coach, ["role"])}</div>
+                      )}
+                      <button style={styles.deleteButton} onClick={() => deleteCoach(coach.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div style={styles.card}>
+                <h3 style={styles.sectionTitle}>Existing Documents</h3>
+                {documents.length === 0 ? (
+                  <p style={styles.paragraph}>No documents yet.</p>
+                ) : (
+                  documents.map((doc) => (
+                    <div key={doc.id} style={styles.listItem}>
+                      <div style={styles.listTitle}>
+                        {getField(doc, ["title", "name"], "Document")}
+                      </div>
+                      <button style={styles.deleteButton} onClick={() => deleteDocument(doc.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -1070,6 +1500,11 @@ const styles = {
     gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
     gap: 16,
   },
+  adminStack: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 16,
+  },
   card: {
     background: "#fff",
     borderRadius: 18,
@@ -1150,6 +1585,16 @@ const styles = {
     cursor: "pointer",
     fontWeight: 700,
   },
+  smallButton: {
+    padding: "8px 10px",
+    borderRadius: 8,
+    border: "none",
+    background: "#b65b14",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 700,
+    fontSize: 13,
+  },
   deleteButton: {
     marginTop: 8,
     padding: "8px 12px",
@@ -1198,5 +1643,31 @@ const styles = {
     marginBottom: 16,
     color: "#1f6b2d",
     fontWeight: 700,
+  },
+  fieldLabel: {
+    display: "block",
+    marginBottom: 4,
+    color: "#5b1d2a",
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  helpText: {
+    marginTop: 8,
+    marginBottom: 12,
+    color: "#666",
+    fontSize: 13,
+    lineHeight: 1.4,
+  },
+  presetRow: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    marginBottom: 12,
+  },
+  buttonRow: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    marginTop: 8,
   },
 };
