@@ -9,7 +9,7 @@ const CLUB_SUBTITLE = "Members diary, notices and club information";
 const TABS = [
   { key: "home", label: "Home" },
   { key: "diary", label: "Diary" },
-  { key: "notices", label: "Notices" },
+  { key: "notices", label: "Noticeboard" },
   { key: "members", label: "Members" },
   { key: "office", label: "Office Bearers" },
   { key: "coaches", label: "Club Coaches" },
