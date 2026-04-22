@@ -142,9 +142,7 @@ function normaliseOfficeBearer(row) {
     phone: getFirstValue(row, ["phone", "mobile", "telephone", "tel"]),
     whatsapp: getFirstValue(row, ["whatsapp", "whats_app", "whatsapp_number"]),
     email: getFirstValue(row, ["email", "email_address"]),
-    display_order: Number(
-      getFirstValue(row, ["display_order", "sort_order", "position_order"], 0)
-    ),
+    display_order: Number(getFirstValue(row, ["display_order", "sort_order", "position_order"], 0)),
   };
 }
 
@@ -208,12 +206,7 @@ function ContactButtons({ item }) {
         </a>
       ) : null}
       {whatsappLink ? (
-        <a
-          href={whatsappLink}
-          target="_blank"
-          rel="noreferrer"
-          style={styles.actionBtnAlt}
-        >
+        <a href={whatsappLink} target="_blank" rel="noreferrer" style={styles.actionBtnAlt}>
           WhatsApp
         </a>
       ) : null}
@@ -367,9 +360,7 @@ export default function App() {
     if (result.ok) {
       setOfficeTableName(result.tableName);
       setOfficeBearers(
-        [...result.rows].sort(
-          (a, b) => Number(a.display_order || 0) - Number(b.display_order || 0)
-        )
+        [...result.rows].sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0))
       );
     } else {
       setOfficeBearers([]);
@@ -406,25 +397,41 @@ export default function App() {
     }
   }
 
-  const upcomingEvents = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  const todayStart = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
 
+  const futureEvents = useMemo(() => {
     return [...events]
       .filter((event) => {
         if (!event.event_date) return false;
         const d = new Date(event.event_date);
-        return !Number.isNaN(d.getTime()) && d >= today;
+        return !Number.isNaN(d.getTime()) && d >= todayStart;
       })
       .sort((a, b) => {
         const aDate = new Date(`${a.event_date}T${a.event_time || "00:00"}`);
         const bDate = new Date(`${b.event_date}T${b.event_time || "00:00"}`);
         return aDate - bDate;
       });
-  }, [events]);
+  }, [events, todayStart]);
 
-  const nextUpcomingEvent =
-    upcomingEvents.length > 0 ? upcomingEvents[0] : null;
+  const pastEvents = useMemo(() => {
+    return [...events]
+      .filter((event) => {
+        if (!event.event_date) return false;
+        const d = new Date(event.event_date);
+        return !Number.isNaN(d.getTime()) && d < todayStart;
+      })
+      .sort((a, b) => {
+        const aDate = new Date(`${a.event_date}T${a.event_time || "00:00"}`);
+        const bDate = new Date(`${b.event_date}T${b.event_time || "00:00"}`);
+        return aDate - bDate;
+      });
+  }, [events, todayStart]);
+
+  const nextUpcomingEvent = futureEvents.length > 0 ? futureEvents[0] : null;
   const latestNotices = notices.slice(0, 5);
 
   const filteredMembers = useMemo(() => {
@@ -516,9 +523,7 @@ export default function App() {
     });
 
     await loadEvents();
-    alert(
-      rows.length === 1 ? "Event added." : `${rows.length} repeated events added.`
-    );
+    alert(rows.length === 1 ? "Event added." : `${rows.length} repeated events added.`);
   }
 
   async function deleteEvent(id) {
@@ -527,6 +532,25 @@ export default function App() {
     const { error } = await supabase.from(eventsTableName).delete().eq("id", id);
     if (error) {
       alert(error.message || "Could not delete event.");
+      return;
+    }
+
+    loadEvents();
+  }
+
+  async function deletePastEvents() {
+    if (pastEvents.length === 0) {
+      alert("There are no past events to delete.");
+      return;
+    }
+
+    if (!window.confirm(`Delete ${pastEvents.length} past event(s)?`)) return;
+
+    const pastIds = pastEvents.map((e) => e.id).filter(Boolean);
+
+    const { error } = await supabase.from(eventsTableName).delete().in("id", pastIds);
+    if (error) {
+      alert(error.message || "Could not delete past events.");
       return;
     }
 
@@ -775,16 +799,10 @@ export default function App() {
           <h2 style={styles.cardTitle}>Upcoming Diary</h2>
           {nextUpcomingEvent ? (
             <div style={styles.eventCard}>
-              <div style={styles.eventTitle}>
-                {safeString(nextUpcomingEvent.title)}
-              </div>
-              <div style={styles.eventDate}>
-                {formatDate(nextUpcomingEvent.event_date)}
-              </div>
+              <div style={styles.eventTitle}>{safeString(nextUpcomingEvent.title)}</div>
+              <div style={styles.eventDate}>{formatDate(nextUpcomingEvent.event_date)}</div>
               {shouldShowTime(nextUpcomingEvent.event_time) ? (
-                <div style={styles.eventMeta}>
-                  Time: {nextUpcomingEvent.event_time}
-                </div>
+                <div style={styles.eventMeta}>Time: {nextUpcomingEvent.event_time}</div>
               ) : null}
               {nextUpcomingEvent.details ? (
                 <div style={styles.eventDetails}>{nextUpcomingEvent.details}</div>
@@ -826,32 +844,24 @@ export default function App() {
                 style={styles.input}
                 placeholder="Title"
                 value={newEvent.title}
-                onChange={(e) =>
-                  setNewEvent({ ...newEvent, title: e.target.value })
-                }
+                onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
               />
               <input
                 style={styles.input}
                 type="date"
                 value={newEvent.event_date}
-                onChange={(e) =>
-                  setNewEvent({ ...newEvent, event_date: e.target.value })
-                }
+                onChange={(e) => setNewEvent({ ...newEvent, event_date: e.target.value })}
               />
               <input
                 style={styles.input}
                 placeholder="Time"
                 value={newEvent.event_time}
-                onChange={(e) =>
-                  setNewEvent({ ...newEvent, event_time: e.target.value })
-                }
+                onChange={(e) => setNewEvent({ ...newEvent, event_time: e.target.value })}
               />
               <select
                 style={styles.input}
                 value={newEvent.repeat_type}
-                onChange={(e) =>
-                  setNewEvent({ ...newEvent, repeat_type: e.target.value })
-                }
+                onChange={(e) => setNewEvent({ ...newEvent, repeat_type: e.target.value })}
               >
                 <option value="none">Do not repeat</option>
                 <option value="weekly">Repeat weekly</option>
@@ -861,23 +871,18 @@ export default function App() {
                   style={styles.input}
                   type="date"
                   value={newEvent.repeat_until}
-                  onChange={(e) =>
-                    setNewEvent({ ...newEvent, repeat_until: e.target.value })
-                  }
+                  onChange={(e) => setNewEvent({ ...newEvent, repeat_until: e.target.value })}
                 />
               ) : null}
             </div>
 
             {newEvent.event_date ? (
               <div style={styles.repeatHelp}>
-                First event day:{" "}
-                <strong>{getDayNameFromDate(newEvent.event_date)}</strong>
+                First event day: <strong>{getDayNameFromDate(newEvent.event_date)}</strong>
                 {newEvent.repeat_type === "weekly" && newEvent.repeat_until ? (
                   <>
-                    {" "}
-                    — repeats every{" "}
-                    <strong>{getDayNameFromDate(newEvent.event_date)}</strong>{" "}
-                    until <strong>{formatDate(newEvent.repeat_until)}</strong>
+                    {" "}— repeats every <strong>{getDayNameFromDate(newEvent.event_date)}</strong> until{" "}
+                    <strong>{formatDate(newEvent.repeat_until)}</strong>
                   </>
                 ) : null}
               </div>
@@ -887,22 +892,26 @@ export default function App() {
               style={styles.textarea}
               placeholder="Details"
               value={newEvent.details}
-              onChange={(e) =>
-                setNewEvent({ ...newEvent, details: e.target.value })
-              }
+              onChange={(e) => setNewEvent({ ...newEvent, details: e.target.value })}
             />
 
-            <button style={styles.primaryBtn} onClick={addEvent}>
-              Add Event
-            </button>
+            <div style={styles.adminActionRow}>
+              <button style={styles.primaryBtn} onClick={addEvent}>
+                Add Event
+              </button>
+
+              <button style={styles.secondaryBtn} onClick={deletePastEvents}>
+                Delete Past Events
+              </button>
+            </div>
           </div>
         ) : null}
 
-        {events.length === 0 ? (
+        {futureEvents.length === 0 ? (
           <p style={styles.emptyText}>No diary events yet.</p>
         ) : (
           <div style={styles.listWrap}>
-            {events.map((event) => (
+            {futureEvents.map((event) => (
               <div key={event.id} style={styles.listCard}>
                 <div style={styles.eventTitle}>{safeString(event.title)}</div>
                 <div style={styles.eventDate}>{formatDate(event.event_date)}</div>
@@ -913,10 +922,7 @@ export default function App() {
                   <div style={styles.eventDetails}>{event.details}</div>
                 ) : null}
                 {adminMode ? (
-                  <button
-                    style={styles.deleteBtn}
-                    onClick={() => deleteEvent(event.id)}
-                  >
+                  <button style={styles.deleteBtn} onClick={() => deleteEvent(event.id)}>
                     Delete
                   </button>
                 ) : null}
@@ -940,17 +946,13 @@ export default function App() {
               style={styles.input}
               placeholder="Notice title"
               value={newNotice.title}
-              onChange={(e) =>
-                setNewNotice({ ...newNotice, title: e.target.value })
-              }
+              onChange={(e) => setNewNotice({ ...newNotice, title: e.target.value })}
             />
             <textarea
               style={styles.textarea}
               placeholder="Notice content"
               value={newNotice.content}
-              onChange={(e) =>
-                setNewNotice({ ...newNotice, content: e.target.value })
-              }
+              onChange={(e) => setNewNotice({ ...newNotice, content: e.target.value })}
             />
             <button style={styles.primaryBtn} onClick={addNotice}>
               Add Notice
@@ -967,10 +969,7 @@ export default function App() {
                 <div style={styles.noticeTitle}>{safeString(notice.title)}</div>
                 <div style={styles.noticeBody}>{safeString(notice.content)}</div>
                 {adminMode ? (
-                  <button
-                    style={styles.deleteBtn}
-                    onClick={() => deleteNotice(notice.id)}
-                  >
+                  <button style={styles.deleteBtn} onClick={() => deleteNotice(notice.id)}>
                     Delete
                   </button>
                 ) : null}
@@ -992,21 +991,12 @@ export default function App() {
           items.map((member) => (
             <div key={member.id} style={styles.listCard}>
               <div style={styles.noticeTitle}>{safeString(member.full_name)}</div>
-              {member.phone ? (
-                <div style={styles.infoLine}>Phone: {member.phone}</div>
-              ) : null}
-              {member.whatsapp ? (
-                <div style={styles.infoLine}>WhatsApp: {member.whatsapp}</div>
-              ) : null}
-              {member.email ? (
-                <div style={styles.infoLine}>Email: {member.email}</div>
-              ) : null}
+              {member.phone ? <div style={styles.infoLine}>Phone: {member.phone}</div> : null}
+              {member.whatsapp ? <div style={styles.infoLine}>WhatsApp: {member.whatsapp}</div> : null}
+              {member.email ? <div style={styles.infoLine}>Email: {member.email}</div> : null}
               <ContactButtons item={member} />
               {adminMode ? (
-                <button
-                  style={styles.deleteBtn}
-                  onClick={() => deleteMember(member.id)}
-                >
+                <button style={styles.deleteBtn} onClick={() => deleteMember(member.id)}>
                   Delete
                 </button>
               ) : null}
@@ -1039,40 +1029,30 @@ export default function App() {
                 style={styles.input}
                 placeholder="Full name"
                 value={newMember.full_name}
-                onChange={(e) =>
-                  setNewMember({ ...newMember, full_name: e.target.value })
-                }
+                onChange={(e) => setNewMember({ ...newMember, full_name: e.target.value })}
               />
               <input
                 style={styles.input}
                 placeholder="Phone"
                 value={newMember.phone}
-                onChange={(e) =>
-                  setNewMember({ ...newMember, phone: e.target.value })
-                }
+                onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
               />
               <input
                 style={styles.input}
                 placeholder="WhatsApp"
                 value={newMember.whatsapp}
-                onChange={(e) =>
-                  setNewMember({ ...newMember, whatsapp: e.target.value })
-                }
+                onChange={(e) => setNewMember({ ...newMember, whatsapp: e.target.value })}
               />
               <input
                 style={styles.input}
                 placeholder="Email"
                 value={newMember.email}
-                onChange={(e) =>
-                  setNewMember({ ...newMember, email: e.target.value })
-                }
+                onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
               />
               <select
                 style={styles.input}
                 value={newMember.category}
-                onChange={(e) =>
-                  setNewMember({ ...newMember, category: e.target.value })
-                }
+                onChange={(e) => setNewMember({ ...newMember, category: e.target.value })}
               >
                 <option>Gents</option>
                 <option>Ladies</option>
@@ -1107,44 +1087,31 @@ export default function App() {
                 style={styles.input}
                 placeholder="Role"
                 value={newOfficeBearer.role}
-                onChange={(e) =>
-                  setNewOfficeBearer({ ...newOfficeBearer, role: e.target.value })
-                }
+                onChange={(e) => setNewOfficeBearer({ ...newOfficeBearer, role: e.target.value })}
               />
               <input
                 style={styles.input}
                 placeholder="Name"
                 value={newOfficeBearer.name}
-                onChange={(e) =>
-                  setNewOfficeBearer({ ...newOfficeBearer, name: e.target.value })
-                }
+                onChange={(e) => setNewOfficeBearer({ ...newOfficeBearer, name: e.target.value })}
               />
               <input
                 style={styles.input}
                 placeholder="Phone"
                 value={newOfficeBearer.phone}
-                onChange={(e) =>
-                  setNewOfficeBearer({ ...newOfficeBearer, phone: e.target.value })
-                }
+                onChange={(e) => setNewOfficeBearer({ ...newOfficeBearer, phone: e.target.value })}
               />
               <input
                 style={styles.input}
                 placeholder="WhatsApp"
                 value={newOfficeBearer.whatsapp}
-                onChange={(e) =>
-                  setNewOfficeBearer({
-                    ...newOfficeBearer,
-                    whatsapp: e.target.value,
-                  })
-                }
+                onChange={(e) => setNewOfficeBearer({ ...newOfficeBearer, whatsapp: e.target.value })}
               />
               <input
                 style={styles.input}
                 placeholder="Email"
                 value={newOfficeBearer.email}
-                onChange={(e) =>
-                  setNewOfficeBearer({ ...newOfficeBearer, email: e.target.value })
-                }
+                onChange={(e) => setNewOfficeBearer({ ...newOfficeBearer, email: e.target.value })}
               />
             </div>
             <button style={styles.primaryBtn} onClick={addOfficeBearer}>
@@ -1161,21 +1128,12 @@ export default function App() {
               <div key={item.id} style={styles.listCard}>
                 <div style={styles.noticeTitle}>{safeString(item.role)}</div>
                 <div style={styles.infoLineStrong}>{safeString(item.name)}</div>
-                {item.phone ? (
-                  <div style={styles.infoLine}>Phone: {item.phone}</div>
-                ) : null}
-                {item.whatsapp ? (
-                  <div style={styles.infoLine}>WhatsApp: {item.whatsapp}</div>
-                ) : null}
-                {item.email ? (
-                  <div style={styles.infoLine}>Email: {item.email}</div>
-                ) : null}
+                {item.phone ? <div style={styles.infoLine}>Phone: {item.phone}</div> : null}
+                {item.whatsapp ? <div style={styles.infoLine}>WhatsApp: {item.whatsapp}</div> : null}
+                {item.email ? <div style={styles.infoLine}>Email: {item.email}</div> : null}
                 <ContactButtons item={item} />
                 {adminMode ? (
-                  <button
-                    style={styles.deleteBtn}
-                    onClick={() => deleteOfficeBearer(item.id)}
-                  >
+                  <button style={styles.deleteBtn} onClick={() => deleteOfficeBearer(item.id)}>
                     Delete
                   </button>
                 ) : null}
@@ -1212,9 +1170,7 @@ export default function App() {
                 style={styles.input}
                 placeholder="WhatsApp"
                 value={newCoach.whatsapp}
-                onChange={(e) =>
-                  setNewCoach({ ...newCoach, whatsapp: e.target.value })
-                }
+                onChange={(e) => setNewCoach({ ...newCoach, whatsapp: e.target.value })}
               />
               <input
                 style={styles.input}
@@ -1242,24 +1198,13 @@ export default function App() {
             {coaches.map((coach) => (
               <div key={coach.id} style={styles.listCard}>
                 <div style={styles.noticeTitle}>{safeString(coach.name)}</div>
-                {coach.phone ? (
-                  <div style={styles.infoLine}>Phone: {coach.phone}</div>
-                ) : null}
-                {coach.whatsapp ? (
-                  <div style={styles.infoLine}>WhatsApp: {coach.whatsapp}</div>
-                ) : null}
-                {coach.email ? (
-                  <div style={styles.infoLine}>Email: {coach.email}</div>
-                ) : null}
-                {coach.notes ? (
-                  <div style={styles.infoLine}>{coach.notes}</div>
-                ) : null}
+                {coach.phone ? <div style={styles.infoLine}>Phone: {coach.phone}</div> : null}
+                {coach.whatsapp ? <div style={styles.infoLine}>WhatsApp: {coach.whatsapp}</div> : null}
+                {coach.email ? <div style={styles.infoLine}>Email: {coach.email}</div> : null}
+                {coach.notes ? <div style={styles.infoLine}>{coach.notes}</div> : null}
                 <ContactButtons item={coach} />
                 {adminMode ? (
-                  <button
-                    style={styles.deleteBtn}
-                    onClick={() => deleteCoach(coach.id)}
-                  >
+                  <button style={styles.deleteBtn} onClick={() => deleteCoach(coach.id)}>
                     Delete
                   </button>
                 ) : null}
@@ -1293,19 +1238,11 @@ export default function App() {
           <div style={styles.listWrap}>
             {documents.map((doc) => (
               <div key={doc.id} style={styles.listCard}>
-                <a
-                  href={doc.file_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={styles.link}
-                >
+                <a href={doc.file_url} target="_blank" rel="noreferrer" style={styles.link}>
                   {safeString(doc.title, "Open document")}
                 </a>
                 {adminMode ? (
-                  <button
-                    style={styles.deleteBtn}
-                    onClick={() => deleteDocument(doc.id)}
-                  >
+                  <button style={styles.deleteBtn} onClick={() => deleteDocument(doc.id)}>
                     Delete
                   </button>
                 ) : null}
@@ -1363,10 +1300,7 @@ export default function App() {
           {!adminMode ? (
             <div style={styles.adminStripWrap}>
               {!showAdminLogin ? (
-                <button
-                  style={styles.smallAdminToggle}
-                  onClick={() => setShowAdminLogin(true)}
-                >
+                <button style={styles.smallAdminToggle} onClick={() => setShowAdminLogin(true)}>
                   Admin
                 </button>
               ) : (
@@ -1689,6 +1623,11 @@ const styles = {
     fontSize: 21,
     color: "#84233a",
   },
+  adminActionRow: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+  },
   formGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
@@ -1723,6 +1662,16 @@ const styles = {
   },
   primaryBtn: {
     background: "#8b2940",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "11px 16px",
+    fontSize: 15,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  secondaryBtn: {
+    background: "#666",
     color: "#fff",
     border: "none",
     borderRadius: 10,
