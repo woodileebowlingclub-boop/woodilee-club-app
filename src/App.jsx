@@ -173,7 +173,7 @@ function normaliseNoticeRow(row) {
       row.body || row.content || row.details || row.description || row.note
     ),
     date: safeString(row.date || row.created_at || row.posted_at),
-    url: getPublicFileUrl(row),
+    url: safeString(row.url || row.file_url || row.public_url || row.link),
   };
 }
 
@@ -626,12 +626,17 @@ export default function App() {
     setSaving(true);
     setStatusMessage("");
 
+    if (!safeString(noticeForm.title).trim()) {
+      setSaving(false);
+      setStatusMessage("Please enter a notice title.");
+      return;
+    }
+
     let finalUrl = safeString(noticeForm.url).trim();
-    let filePath = "";
 
     if (noticeForm.file) {
-      const filename = `${Date.now()}-${noticeForm.file.name}`;
-      filePath = `notices/${filename}`;
+      const filename = `${Date.now()}-${noticeForm.file.name.replace(/\s+/g, "-")}`;
+      const filePath = `notices/${filename}`;
 
       const uploadRes = await supabase.storage
         .from(BUCKET)
@@ -639,7 +644,7 @@ export default function App() {
 
       if (uploadRes.error) {
         setSaving(false);
-        setStatusMessage("Could not upload notice file.");
+        setStatusMessage(`Could not upload notice file: ${uploadRes.error.message}`);
         return;
       }
 
@@ -647,60 +652,28 @@ export default function App() {
       finalUrl = data?.publicUrl || "";
     }
 
-    const payloads = [
-      {
-        title: noticeForm.title,
-        body: noticeForm.body,
-        date: noticeForm.date || null,
-        file_url: finalUrl || null,
-        file_path: filePath || null,
-      },
-      {
-        heading: noticeForm.title,
-        content: noticeForm.body,
-        date: noticeForm.date || null,
-        file_url: finalUrl || null,
-        file_path: filePath || null,
-      },
-      {
-        title: noticeForm.title,
-        description: noticeForm.body,
-        posted_at: noticeForm.date || null,
-        public_url: finalUrl || null,
-        filename: filePath || null,
-      },
-      {
-        title: noticeForm.title,
-        body: noticeForm.body,
-        date: noticeForm.date || null,
-        url: finalUrl || null,
-        path: filePath || null,
-      },
-    ];
+    const payload = {
+      title: noticeForm.title,
+      body: noticeForm.body || null,
+      date: noticeForm.date || null,
+      url: finalUrl || null,
+      file_url: finalUrl || null,
+    };
 
-    const res = noticeForm.id
-      ? await tryUpdate(
-          ["information_posts", "notices", "noticeboard", "news"],
-          ["id"],
-          noticeForm.id,
-          payloads
-        )
-      : await tryInsert(
-          ["information_posts", "notices", "noticeboard", "news"],
-          payloads
-        );
+    const { error } = noticeForm.id
+      ? await supabase.from("notices").update(payload).eq("id", noticeForm.id)
+      : await supabase.from("notices").insert(payload);
 
     setSaving(false);
-    setStatusMessage(
-      res.ok
-        ? `Notice ${noticeForm.id ? "updated" : "saved"}.`
-        : `Could not ${noticeForm.id ? "update" : "save"} notice.`
-    );
 
-    if (res.ok) {
-      setNoticeForm(emptyNoticeForm());
-      loadAllData();
+    if (error) {
+      setStatusMessage(`Could not ${noticeForm.id ? "update" : "save"} notice: ${error.message}`);
+      return;
     }
+
+    setStatusMessage(`Notice ${noticeForm.id ? "updated" : "saved"}.`);
+    setNoticeForm(emptyNoticeForm());
+    loadAllData();
   }
 
   async function saveMember() {
@@ -875,11 +848,7 @@ export default function App() {
     if (section === "diary") {
       res = await tryDelete(["events", "diary", "fixtures"], ["id", "event_id"], id);
     } else if (section === "notices") {
-      res = await tryDelete(
-        ["information_posts", "notices", "noticeboard", "news"],
-        ["id"],
-        id
-      );
+      res = await tryDelete(["notices"], ["id"], id);
     } else if (section === "members") {
       res = await tryDelete(["members", "club_members"], ["id"], id);
     } else if (section === "office") {
