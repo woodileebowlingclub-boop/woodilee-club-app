@@ -68,8 +68,8 @@ function formatDateTime(dateStr, timeStr) {
 
 function getPublicFileUrl(row) {
   const directUrl =
-    row.file_url ||
     row.url ||
+    row.file_url ||
     row.link ||
     row.public_url ||
     row.download_url ||
@@ -170,11 +170,7 @@ function normaliseNoticeRow(row) {
     id: row.id ?? Math.random().toString(36),
     title: safeString(row.title || row.heading || row.subject),
     body: safeString(
-      row.body ||
-        row.content ||
-        row.details ||
-        row.description ||
-        row.note
+      row.body || row.content || row.details || row.description || row.note
     ),
     date: safeString(row.date || row.created_at || row.posted_at),
     url: getPublicFileUrl(row),
@@ -215,11 +211,35 @@ function normaliseCoachRow(row) {
 }
 
 function normaliseDocumentRow(row) {
+  const finalUrl = safeString(row.url || row.file_url);
+  const title = safeString(row.title || "Untitled document");
+  const description = safeString(row.description);
+  const category = safeString(row.category || "General");
+  const buttonText = safeString(row.button_text || "Open");
+  const lower = `${title} ${finalUrl}`.toLowerCase();
+
+  let fileType = "file";
+  if (lower.includes(".pdf")) fileType = "pdf";
+  else if (
+    lower.includes(".jpg") ||
+    lower.includes(".jpeg") ||
+    lower.includes(".png") ||
+    lower.includes(".webp") ||
+    lower.includes(".gif")
+  ) {
+    fileType = "image";
+  } else if (lower.includes(".doc") || lower.includes(".docx")) {
+    fileType = "word";
+  }
+
   return {
     id: row.id ?? Math.random().toString(36),
-    title: safeString(row.title || row.name || row.filename),
-    url: getPublicFileUrl(row),
-    description: safeString(row.description || row.note || row.notes),
+    title,
+    url: finalUrl,
+    description,
+    category,
+    button_text: buttonText,
+    fileType,
   };
 }
 
@@ -260,7 +280,15 @@ function emptyCoachForm() {
 }
 
 function emptyDocumentForm() {
-  return { id: "", title: "", url: "", description: "", file: null };
+  return {
+    id: "",
+    title: "",
+    url: "",
+    description: "",
+    category: "General",
+    button_text: "Open",
+    file: null,
+  };
 }
 
 function addDays(dateString, days) {
@@ -326,6 +354,7 @@ export default function App() {
   const [officeForm, setOfficeForm] = useState(emptyOfficeForm());
   const [coachForm, setCoachForm] = useState(emptyCoachForm());
   const [documentForm, setDocumentForm] = useState(emptyDocumentForm());
+  const [documentSearch, setDocumentSearch] = useState("");
 
   async function loadAllData() {
     setLoading(true);
@@ -406,6 +435,19 @@ export default function App() {
     });
     return groups;
   }, [memberRows]);
+
+  const filteredDocuments = useMemo(() => {
+    const q = documentSearch.trim().toLowerCase();
+    if (!q) return documentRows;
+
+    return documentRows.filter((row) => {
+      return (
+        row.title.toLowerCase().includes(q) ||
+        row.description.toLowerCase().includes(q) ||
+        row.category.toLowerCase().includes(q)
+      );
+    });
+  }, [documentRows, documentSearch]);
 
   function handleAdminLogin() {
     if (adminPin === ADMIN_PIN) {
@@ -490,6 +532,8 @@ export default function App() {
       title: row.title,
       url: row.url,
       description: row.description,
+      category: row.category || "General",
+      button_text: row.button_text || "Open",
       file: null,
     });
     setActiveTab("documents");
@@ -771,61 +815,54 @@ export default function App() {
 
   async function saveDocument() {
     setSaving(true);
+    setStatusMessage("");
+
     let finalUrl = safeString(documentForm.url).trim();
-    let filePath = "";
+
+    if (!safeString(documentForm.title).trim()) {
+      setSaving(false);
+      setStatusMessage("Please enter a document title.");
+      return;
+    }
 
     if (documentForm.file) {
-      const filename = `${Date.now()}-${documentForm.file.name}`;
-      filePath = `documents/${filename}`;
+      const filename = `${Date.now()}-${documentForm.file.name.replace(/\s+/g, "-")}`;
+      const filePath = `documents/${filename}`;
+
       const uploadRes = await supabase.storage
         .from(BUCKET)
         .upload(filePath, documentForm.file, { upsert: true });
 
-      if (!uploadRes.error) {
-        const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-        finalUrl = data?.publicUrl || finalUrl;
+      if (uploadRes.error) {
+        setSaving(false);
+        setStatusMessage("Upload failed.");
+        return;
       }
+
+      const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
+      finalUrl = data?.publicUrl || "";
     }
 
-    const payloads = [
-      {
-        title: documentForm.title,
-        url: finalUrl,
-        description: documentForm.description,
-        file_path: filePath || null,
-      },
-      {
-        title: documentForm.title,
-        public_url: finalUrl,
-        description: documentForm.description,
-        filename: filePath || null,
-      },
-      {
-        title: documentForm.title,
-        link: finalUrl,
-        notes: documentForm.description,
-        path: filePath || null,
-      },
-    ];
+    const payload = {
+      title: documentForm.title,
+      description: documentForm.description || null,
+      category: documentForm.category || "General",
+      button_text: documentForm.button_text || "Open",
+      url: finalUrl || null,
+    };
 
-    const res = documentForm.id
-      ? await tryUpdate(
-          ["documents", "club_documents"],
-          ["id"],
-          documentForm.id,
-          payloads
-        )
-      : await tryInsert(["documents", "club_documents"], payloads);
+    const { error } = documentForm.id
+      ? await supabase.from("documents").update(payload).eq("id", documentForm.id)
+      : await supabase.from("documents").insert(payload);
 
     setSaving(false);
-    setStatusMessage(
-      res.ok
-        ? `Document ${documentForm.id ? "updated" : "saved"}.`
-        : `Could not ${documentForm.id ? "update" : "save"} document.`
-    );
-    if (res.ok) {
+
+    if (!error) {
+      setStatusMessage(`Document ${documentForm.id ? "updated" : "saved"}.`);
       setDocumentForm(emptyDocumentForm());
       loadAllData();
+    } else {
+      setStatusMessage(`Could not ${documentForm.id ? "update" : "save"} document.`);
     }
   }
 
@@ -1566,7 +1603,16 @@ export default function App() {
       <div style={styles.cardLarge}>
         <div style={styles.sectionHeaderRow}>
           <h2 style={styles.cardTitle}>Documents</h2>
-          <div style={styles.pill}>{documentRows.length} files</div>
+          <div style={styles.pill}>{filteredDocuments.length} files</div>
+        </div>
+
+        <div style={{ marginTop: 18, marginBottom: 8 }}>
+          <input
+            style={styles.input}
+            placeholder="Search documents"
+            value={documentSearch}
+            onChange={(e) => setDocumentSearch(e.target.value)}
+          />
         </div>
 
         {isAdmin ? (
@@ -1583,6 +1629,26 @@ export default function App() {
                 setDocumentForm({ ...documentForm, title: e.target.value })
               }
             />
+
+            <div style={styles.formGrid2}>
+              <input
+                style={styles.input}
+                placeholder="Category"
+                value={documentForm.category}
+                onChange={(e) =>
+                  setDocumentForm({ ...documentForm, category: e.target.value })
+                }
+              />
+
+              <input
+                style={styles.input}
+                placeholder="Button text"
+                value={documentForm.button_text}
+                onChange={(e) =>
+                  setDocumentForm({ ...documentForm, button_text: e.target.value })
+                }
+              />
+            </div>
 
             <input
               style={styles.input}
@@ -1608,7 +1674,7 @@ export default function App() {
             <input
               style={styles.input}
               type="file"
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
               onChange={(e) =>
                 setDocumentForm({
                   ...documentForm,
@@ -1622,16 +1688,34 @@ export default function App() {
             )}
 
             <div style={styles.helpText}>
-              You can paste a public URL or upload a file directly.
+              Upload a file or paste a public link. Category helps members find
+              files quicker.
             </div>
           </div>
         ) : null}
 
-        {documentRows.length ? (
-          documentRows.map((row) => (
+        {filteredDocuments.length ? (
+          filteredDocuments.map((row) => (
             <div key={row.id} style={styles.listItem}>
-              <div>
+              <div style={{ flex: 1 }}>
                 <div style={styles.itemTitle}>{row.title}</div>
+
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+                  {row.category ? (
+                    <span style={styles.docCategory}>{row.category}</span>
+                  ) : null}
+
+                  {row.fileType === "pdf" ? (
+                    <span style={styles.docBadgePdf}>PDF</span>
+                  ) : row.fileType === "image" ? (
+                    <span style={styles.docBadgeImage}>Image</span>
+                  ) : row.fileType === "word" ? (
+                    <span style={styles.docBadgeWord}>Word</span>
+                  ) : (
+                    <span style={styles.docBadgeFile}>File</span>
+                  )}
+                </div>
+
                 {row.description ? (
                   <div style={styles.itemText}>{row.description}</div>
                 ) : null}
@@ -1639,15 +1723,22 @@ export default function App() {
 
               <div style={styles.itemButtons}>
                 {row.url ? (
-                  <a
-                    style={styles.primaryButton}
-                    href={row.url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Open
-                  </a>
+                  <>
+                    <a
+                      style={styles.primaryButton}
+                      href={row.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {row.button_text || "Open"}
+                    </a>
+
+                    <a style={styles.smallButton} href={row.url} download>
+                      Download
+                    </a>
+                  </>
                 ) : null}
+
                 {isAdmin ? (
                   <button
                     style={styles.smallButton}
@@ -1656,6 +1747,7 @@ export default function App() {
                     Edit
                   </button>
                 ) : null}
+
                 {isAdmin ? (
                   <button
                     style={styles.smallDeleteButton}
@@ -1973,6 +2065,10 @@ const styles = {
     fontWeight: 700,
     padding: "10px 14px",
     cursor: "pointer",
+    textDecoration: "none",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
   smallDeleteButton: {
     border: "none",
@@ -2076,5 +2172,60 @@ const styles = {
   },
   memberGroup: {
     marginTop: 16,
+  },
+  docCategory: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "#f0c841",
+    color: "#17233d",
+    borderRadius: 999,
+    padding: "6px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  docBadgePdf: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "#c62828",
+    color: "#fff",
+    borderRadius: 999,
+    padding: "6px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  docBadgeImage: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "#1565c0",
+    color: "#fff",
+    borderRadius: 999,
+    padding: "6px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  docBadgeWord: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "#2e7d32",
+    color: "#fff",
+    borderRadius: 999,
+    padding: "6px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  docBadgeFile: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "#596579",
+    color: "#fff",
+    borderRadius: 999,
+    padding: "6px 12px",
+    fontSize: 14,
+    fontWeight: 700,
   },
 };
