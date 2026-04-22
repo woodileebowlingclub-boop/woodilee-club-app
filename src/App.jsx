@@ -22,926 +22,790 @@ function safeString(value, fallback = "") {
   return String(value);
 }
 
-function cleanPhone(phone) {
-  return safeString(phone).replace(/\s+/g, "");
-}
-
-function formatPhoneForDisplay(phone) {
-  return safeString(phone).trim();
-}
-
 function formatDate(dateStr) {
   if (!dateStr) return "";
   const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return safeString(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString("en-GB", {
     day: "numeric",
-    month: "long",
+    month: "short",
     year: "numeric",
   });
 }
 
-function formatTime(timeStr) {
-  if (!timeStr) return "";
-  const raw = safeString(timeStr).trim();
-  if (!raw) return "";
-
-  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(raw)) {
-    const [h, m] = raw.split(":");
-    const dt = new Date();
-    dt.setHours(Number(h), Number(m), 0, 0);
-    return dt.toLocaleTimeString("en-GB", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  }
-
-  return raw;
+function toDateOnlyString(date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
-function formatDateTime(dateStr, timeStr) {
-  const d = formatDate(dateStr);
-  const t = formatTime(timeStr);
-  if (d && t) return `${d} at ${t}`;
-  return d || t || "";
-}
-
-function getPublicFileUrl(row) {
-  const directUrl =
-    row.url ||
-    row.file_url ||
-    row.link ||
-    row.public_url ||
-    row.download_url ||
-    "";
-
-  if (directUrl) return directUrl;
-
-  const filePath =
-    row.file_path || row.path || row.storage_path || row.filename || "";
-
-  if (!filePath) return "";
-
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-  return data?.publicUrl || "";
-}
-
-async function tryReadTable(tableNames, queryBuilder) {
-  for (const table of tableNames) {
-    try {
-      const query = queryBuilder(supabase.from(table));
-      const { data, error } = await query;
-      if (!error && Array.isArray(data)) {
-        return { table, data };
-      }
-    } catch (err) {
-      // try next table
-    }
-  }
-  return { table: null, data: [] };
-}
-
-async function tryInsert(tableNames, payloads) {
-  const payloadList = Array.isArray(payloads) ? payloads : [payloads];
-  for (const table of tableNames) {
-    for (const payload of payloadList) {
-      try {
-        const { error } = await supabase.from(table).insert(payload);
-        if (!error) return { ok: true, table };
-      } catch (err) {
-        // try next payload/table
-      }
-    }
-  }
-  return { ok: false };
-}
-
-async function tryUpdate(tableNames, idFieldNames, idValue, payloads) {
-  const payloadList = Array.isArray(payloads) ? payloads : [payloads];
-  for (const table of tableNames) {
-    for (const idField of idFieldNames) {
-      for (const payload of payloadList) {
-        try {
-          const { error } = await supabase
-            .from(table)
-            .update(payload)
-            .eq(idField, idValue);
-          if (!error) return { ok: true, table, idField };
-        } catch (err) {
-          // try next combination
-        }
-      }
-    }
-  }
-  return { ok: false };
-}
-
-async function tryDelete(tableNames, idFieldNames, idValue) {
-  for (const table of tableNames) {
-    for (const idField of idFieldNames) {
-      try {
-        const { error } = await supabase
-          .from(table)
-          .delete()
-          .eq(idField, idValue);
-        if (!error) return { ok: true, table, idField };
-      } catch (err) {
-        // try next combination
-      }
-    }
-  }
-  return { ok: false };
-}
-
-function normaliseDiaryRow(row) {
-  return {
-    id: row.id ?? row.event_id ?? Math.random().toString(36),
-    title: safeString(row.title || row.name || row.heading),
-    details: safeString(
-      row.details || row.description || row.note || row.notes
-    ),
-    date: safeString(row.date || row.event_date || row.date_text),
-    time: safeString(row.time || row.time_text || row.event_time),
-  };
-}
-
-function normaliseNoticeRow(row) {
-  return {
-    id: row.id ?? Math.random().toString(36),
-    title: safeString(row.title || row.heading || row.subject),
-    body: safeString(
-      row.body || row.content || row.details || row.description || row.note
-    ),
-    date: safeString(row.date || row.created_at || row.posted_at),
-    url: safeString(row.url || row.file_url || row.public_url || row.link),
-  };
-}
-
-function normaliseMemberRow(row) {
-  return {
-    id: row.id ?? Math.random().toString(36),
-    name: safeString(row.name),
-    phone: safeString(row.phone || row.mobile || row.telephone),
-    email: safeString(row.email),
-    section: safeString(row.section || row.category || "Members"),
-    notes: safeString(row.notes || row.note),
-  };
-}
-
-function normaliseOfficeRow(row) {
-  return {
-    id: row.id ?? Math.random().toString(36),
-    role: safeString(row.role || row.title),
-    name: safeString(row.name),
-    phone: safeString(row.phone || row.mobile),
-    email: safeString(row.email),
-    sort_order: Number(row.sort_order ?? row.display_order ?? 9999),
-  };
-}
-
-function normaliseCoachRow(row) {
-  return {
-    id: row.id ?? Math.random().toString(36),
-    name: safeString(row.name),
-    phone: safeString(row.phone || row.mobile),
-    email: safeString(row.email),
-    notes: safeString(row.notes || row.note),
-    sort_order: Number(row.sort_order ?? row.display_order ?? 9999),
-  };
-}
-
-function normaliseDocumentRow(row) {
-  const finalUrl = safeString(row.url || row.file_url);
-  const title = safeString(row.title || "Untitled document");
-  const description = safeString(row.description);
-  const category = safeString(row.category || "General");
-  const buttonText = safeString(row.button_text || "Open");
-  const lower = `${title} ${finalUrl}`.toLowerCase();
-
-  let fileType = "file";
-  if (lower.includes(".pdf")) fileType = "pdf";
-  else if (
-    lower.includes(".jpg") ||
-    lower.includes(".jpeg") ||
-    lower.includes(".png") ||
-    lower.includes(".webp") ||
-    lower.includes(".gif")
-  ) {
-    fileType = "image";
-  } else if (lower.includes(".doc") || lower.includes(".docx")) {
-    fileType = "word";
-  }
-
-  return {
-    id: row.id ?? Math.random().toString(36),
-    title,
-    url: finalUrl,
-    description,
-    category,
-    button_text: buttonText,
-    fileType,
-  };
-}
-
-function emptyDiaryForm() {
-  return {
-    id: "",
-    title: "",
-    details: "",
-    date: "",
-    time: "",
-    repeatType: "none",
-    repeatUntil: "",
-    repeatCount: "8",
-  };
-}
-
-function emptyNoticeForm() {
-  return { id: "", title: "", body: "", date: "", file: null, url: "" };
-}
-
-function emptyMemberForm() {
-  return {
-    id: "",
-    name: "",
-    phone: "",
-    email: "",
-    section: "Members",
-    notes: "",
-  };
-}
-
-function emptyOfficeForm() {
-  return { id: "", role: "", name: "", phone: "", email: "", sort_order: "" };
-}
-
-function emptyCoachForm() {
-  return { id: "", name: "", phone: "", email: "", notes: "", sort_order: "" };
-}
-
-function emptyDocumentForm() {
-  return {
-    id: "",
-    title: "",
-    url: "",
-    description: "",
-    category: "General",
-    button_text: "Open",
-    file: null,
-  };
-}
-
-function addDays(dateString, days) {
-  const d = new Date(dateString);
+function addDays(date, days) {
+  const d = new Date(date);
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return d;
 }
 
-function addMonths(dateString, months) {
-  const d = new Date(dateString);
-  d.setMonth(d.getMonth() + months);
-  return d.toISOString().slice(0, 10);
+function getDayNameFromDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-GB", { weekday: "long" });
 }
 
-function buildRecurringEvents(form) {
-  const title = safeString(form.title).trim();
-  const details = safeString(form.details).trim();
-  const date = safeString(form.date).trim();
-  const time = safeString(form.time).trim();
+function getWeeklyDates(startDateStr, repeatUntilStr) {
+  const dates = [];
+  if (!startDateStr) return dates;
 
-  if (!title || !date) return [];
+  const start = new Date(startDateStr);
+  if (Number.isNaN(start.getTime())) return dates;
 
-  const base = { title, details, date, time };
-  if (form.repeatType === "none") return [base];
+  dates.push(toDateOnlyString(start));
 
-  const results = [base];
-  const repeatCount = Math.max(1, Number(form.repeatCount || 1));
-  const repeatUntil = safeString(form.repeatUntil).trim();
+  if (!repeatUntilStr) return dates;
 
-  let currentDate = date;
-  for (let i = 1; i < repeatCount; i += 1) {
-    currentDate =
-      form.repeatType === "monthly"
-        ? addMonths(currentDate, 1)
-        : addDays(currentDate, 7);
+  const until = new Date(repeatUntilStr);
+  if (Number.isNaN(until.getTime())) return dates;
 
-    if (repeatUntil && currentDate > repeatUntil) break;
-
-    results.push({ ...base, date: currentDate });
+  let next = addDays(start, 7);
+  while (next <= until) {
+    dates.push(toDateOnlyString(next));
+    next = addDays(next, 7);
   }
 
-  return results;
+  return dates;
+}
+
+function getFirstValue(obj, keys, fallback = "") {
+  for (const key of keys) {
+    if (obj && obj[key] !== null && obj[key] !== undefined && obj[key] !== "") {
+      return obj[key];
+    }
+  }
+  return fallback;
+}
+
+function cleanPhone(value) {
+  const raw = safeString(value).trim();
+  if (!raw) return "";
+  return raw.replace(/[^\d+]/g, "");
+}
+
+function toWhatsAppLink(value) {
+  const raw = safeString(value).trim();
+  if (!raw) return "";
+  let cleaned = raw.replace(/\D/g, "");
+  if (cleaned.startsWith("0")) cleaned = `44${cleaned.slice(1)}`;
+  return cleaned ? `https://wa.me/${cleaned}` : "";
+}
+
+function shouldShowTime(timeValue) {
+  const t = safeString(timeValue).trim().toLowerCase();
+  return t && t !== "00:00" && t !== "00:00:00" && t !== "midnight";
+}
+
+function normaliseEvent(row) {
+  return {
+    id: getFirstValue(row, ["id"]),
+    title: getFirstValue(row, ["title", "name", "event_name"], "Untitled event"),
+    event_date: getFirstValue(row, ["event_date", "date", "eventDate"]),
+    event_time: getFirstValue(row, ["event_time", "time", "eventTime"]),
+    details: getFirstValue(row, ["details", "content", "description", "notes"]),
+  };
+}
+
+function normaliseNotice(row) {
+  return {
+    id: getFirstValue(row, ["id"]),
+    title: getFirstValue(row, ["title", "heading", "name"], "Notice"),
+    content: getFirstValue(row, ["content", "details", "description", "text"]),
+    created_at: getFirstValue(row, ["created_at"]),
+  };
+}
+
+function normaliseMember(row) {
+  return {
+    id: getFirstValue(row, ["id"]),
+    full_name: getFirstValue(row, ["full_name", "name", "member_name"]),
+    phone: getFirstValue(row, ["phone", "mobile", "telephone", "tel"]),
+    whatsapp: getFirstValue(row, ["whatsapp", "whats_app", "whatsapp_number"]),
+    email: getFirstValue(row, ["email", "email_address"]),
+    category: getFirstValue(row, ["category", "section", "member_type"], "Gents"),
+  };
+}
+
+function normaliseOfficeBearer(row) {
+  return {
+    id: getFirstValue(row, ["id"]),
+    role: getFirstValue(row, ["role", "position", "title"]),
+    name: getFirstValue(row, ["name", "full_name", "person"]),
+    phone: getFirstValue(row, ["phone", "mobile", "telephone", "tel"]),
+    whatsapp: getFirstValue(row, ["whatsapp", "whats_app", "whatsapp_number"]),
+    email: getFirstValue(row, ["email", "email_address"]),
+    display_order: Number(
+      getFirstValue(row, ["display_order", "sort_order", "position_order"], 0)
+    ),
+  };
+}
+
+function normaliseCoach(row) {
+  return {
+    id: getFirstValue(row, ["id"]),
+    name: getFirstValue(row, ["name", "full_name"]),
+    phone: getFirstValue(row, ["phone", "mobile", "telephone", "tel"]),
+    whatsapp: getFirstValue(row, ["whatsapp", "whats_app", "whatsapp_number"]),
+    email: getFirstValue(row, ["email", "email_address"]),
+    notes: getFirstValue(row, ["notes", "details", "description"]),
+  };
+}
+
+function normaliseDocument(row) {
+  return {
+    id: getFirstValue(row, ["id"]),
+    title: getFirstValue(row, ["title", "name", "file_name"], "Open document"),
+    file_url: getFirstValue(row, ["file_url", "url", "link"]),
+  };
+}
+
+async function tryLoadTable(tableNames, normaliser, orderConfigs = []) {
+  for (const tableName of tableNames) {
+    let query = supabase.from(tableName).select("*");
+
+    for (const item of orderConfigs) {
+      query = query.order(item.column, { ascending: item.ascending });
+    }
+
+    const { data, error } = await query;
+
+    if (!error) {
+      return {
+        ok: true,
+        tableName,
+        rows: (data || []).map(normaliser),
+      };
+    }
+  }
+
+  return {
+    ok: false,
+    tableName: null,
+    rows: [],
+  };
+}
+
+function ContactButtons({ item }) {
+  const phone = cleanPhone(item.phone);
+  const whatsappLink = toWhatsAppLink(item.whatsapp || item.phone);
+  const email = safeString(item.email);
+
+  if (!phone && !whatsappLink && !email) return null;
+
+  return (
+    <div style={styles.contactButtons}>
+      {phone ? (
+        <a href={`tel:${phone}`} style={styles.actionBtn}>
+          Call
+        </a>
+      ) : null}
+      {whatsappLink ? (
+        <a
+          href={whatsappLink}
+          target="_blank"
+          rel="noreferrer"
+          style={styles.actionBtnAlt}
+        >
+          WhatsApp
+        </a>
+      ) : null}
+      {email ? (
+        <a href={`mailto:${email}`} style={styles.actionBtnAlt}>
+          Email
+        </a>
+      ) : null}
+    </div>
+  );
 }
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("home");
-  const [adminPin, setAdminPin] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminMode, setAdminMode] = useState(false);
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [adminPinInput, setAdminPinInput] = useState("");
   const [loading, setLoading] = useState(true);
-  const [statusMessage, setStatusMessage] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [memberSearch, setMemberSearch] = useState("");
 
-  const [diaryRows, setDiaryRows] = useState([]);
-  const [noticeRows, setNoticeRows] = useState([]);
-  const [memberRows, setMemberRows] = useState([]);
-  const [officeRows, setOfficeRows] = useState([]);
-  const [coachRows, setCoachRows] = useState([]);
-  const [documentRows, setDocumentRows] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [notices, setNotices] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [officeBearers, setOfficeBearers] = useState([]);
+  const [coaches, setCoaches] = useState([]);
+  const [documents, setDocuments] = useState([]);
 
-  const [diaryForm, setDiaryForm] = useState(emptyDiaryForm());
-  const [noticeForm, setNoticeForm] = useState(emptyNoticeForm());
-  const [memberForm, setMemberForm] = useState(emptyMemberForm());
-  const [officeForm, setOfficeForm] = useState(emptyOfficeForm());
-  const [coachForm, setCoachForm] = useState(emptyCoachForm());
-  const [documentForm, setDocumentForm] = useState(emptyDocumentForm());
-  const [documentSearch, setDocumentSearch] = useState("");
+  const [eventsTableName, setEventsTableName] = useState("events");
+  const [noticesTableName, setNoticesTableName] = useState("notices");
+  const [membersTableName, setMembersTableName] = useState("members");
+  const [officeTableName, setOfficeTableName] = useState("office_bearers");
+  const [coachesTableName, setCoachesTableName] = useState("coaches");
+  const [documentsTableName, setDocumentsTableName] = useState("documents");
 
-  async function loadAllData() {
-    setLoading(true);
-    setStatusMessage("");
+  const [newEvent, setNewEvent] = useState({
+    title: "",
+    event_date: "",
+    event_time: "",
+    details: "",
+    repeat_type: "none",
+    repeat_until: "",
+  });
 
-    const diaryPromise = tryReadTable(
-      ["diary", "events", "fixtures"],
-      (t) => t.select("*").order("date", { ascending: true }).limit(500)
-    );
+  const [newNotice, setNewNotice] = useState({
+    title: "",
+    content: "",
+  });
 
-    const noticesPromise = tryReadTable(
-      ["notices", "noticeboard", "information_posts", "news"],
-      (t) => t.select("*").order("date", { ascending: false }).limit(300)
-    );
+  const [newMember, setNewMember] = useState({
+    full_name: "",
+    phone: "",
+    whatsapp: "",
+    email: "",
+    category: "Gents",
+  });
 
-    const membersPromise = tryReadTable(
-      ["members", "club_members"],
-      (t) => t.select("*").order("name", { ascending: true }).limit(1000)
-    );
+  const [newOfficeBearer, setNewOfficeBearer] = useState({
+    role: "",
+    name: "",
+    phone: "",
+    whatsapp: "",
+    email: "",
+  });
 
-    const officePromise = tryReadTable(
-      ["office_bearers", "officebearers", "office"],
-      (t) => t.select("*").order("sort_order", { ascending: true }).limit(100)
-    );
-
-    const coachesPromise = tryReadTable(
-      ["club_coaches", "coaches"],
-      (t) => t.select("*").order("sort_order", { ascending: true }).limit(100)
-    );
-
-    const documentsPromise = tryReadTable(
-      ["documents", "club_documents"],
-      (t) => t.select("*").order("created_at", { ascending: false }).limit(200)
-    );
-
-    const [diaryRes, noticesRes, membersRes, officeRes, coachesRes, documentsRes] =
-      await Promise.all([
-        diaryPromise,
-        noticesPromise,
-        membersPromise,
-        officePromise,
-        coachesPromise,
-        documentsPromise,
-      ]);
-
-    setDiaryRows((diaryRes.data || []).map(normaliseDiaryRow));
-    setNoticeRows((noticesRes.data || []).map(normaliseNoticeRow));
-    setMemberRows((membersRes.data || []).map(normaliseMemberRow));
-    setOfficeRows((officeRes.data || []).map(normaliseOfficeRow));
-    setCoachRows((coachesRes.data || []).map(normaliseCoachRow));
-    setDocumentRows((documentsRes.data || []).map(normaliseDocumentRow));
-
-    setLoading(false);
-  }
+  const [newCoach, setNewCoach] = useState({
+    name: "",
+    phone: "",
+    whatsapp: "",
+    email: "",
+    notes: "",
+  });
 
   useEffect(() => {
     loadAllData();
   }, []);
 
-  const upcomingDiary = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const sorted = [...diaryRows].sort((a, b) =>
-      (a.date || "").localeCompare(b.date || "")
+  async function loadAllData() {
+    setLoading(true);
+    setErrorMessage("");
+
+    await Promise.all([
+      loadEvents(),
+      loadNotices(),
+      loadMembers(),
+      loadOfficeBearers(),
+      loadCoaches(),
+      loadDocuments(),
+    ]);
+
+    setLoading(false);
+  }
+
+  async function loadEvents() {
+    const result = await tryLoadTable(
+      ["events", "diary_events"],
+      normaliseEvent,
+      [
+        { column: "event_date", ascending: true },
+        { column: "event_time", ascending: true },
+      ]
     );
-    return sorted.find((row) => row.date >= today) || sorted[0] || null;
-  }, [diaryRows]);
 
-  const latestNotices = useMemo(() => noticeRows.slice(0, 3), [noticeRows]);
-
-  const groupedMembers = useMemo(() => {
-    const groups = { Gents: [], Ladies: [], Associate: [], Members: [] };
-    memberRows.forEach((row) => {
-      const label = safeString(row.section, "Members");
-      if (/gent/i.test(label)) groups.Gents.push(row);
-      else if (/lad/i.test(label)) groups.Ladies.push(row);
-      else if (/assoc/i.test(label)) groups.Associate.push(row);
-      else groups.Members.push(row);
-    });
-    return groups;
-  }, [memberRows]);
-
-  const filteredDocuments = useMemo(() => {
-    const q = documentSearch.trim().toLowerCase();
-    if (!q) return documentRows;
-
-    return documentRows.filter((row) => {
-      return (
-        row.title.toLowerCase().includes(q) ||
-        row.description.toLowerCase().includes(q) ||
-        row.category.toLowerCase().includes(q)
-      );
-    });
-  }, [documentRows, documentSearch]);
-
-  function handleAdminLogin() {
-    if (adminPin === ADMIN_PIN) {
-      setIsAdmin(true);
-      setStatusMessage("Admin logged in.");
-      setAdminPin("");
-      return;
-    }
-    setStatusMessage("Incorrect admin PIN.");
-  }
-
-  function handleLogout() {
-    setIsAdmin(false);
-    setStatusMessage("Logged out.");
-  }
-
-  function startEditDiary(row) {
-    setDiaryForm({
-      id: row.id,
-      title: row.title,
-      details: row.details,
-      date: row.date,
-      time: row.time,
-      repeatType: "none",
-      repeatUntil: "",
-      repeatCount: "8",
-    });
-    setActiveTab("diary");
-  }
-
-  function startEditNotice(row) {
-    setNoticeForm({
-      id: row.id,
-      title: row.title,
-      body: row.body,
-      date: row.date?.slice?.(0, 10) || "",
-      file: null,
-      url: row.url || "",
-    });
-    setActiveTab("notices");
-  }
-
-  function startEditMember(row) {
-    setMemberForm({
-      id: row.id,
-      name: row.name,
-      phone: row.phone,
-      email: row.email,
-      section: row.section,
-      notes: row.notes,
-    });
-    setActiveTab("members");
-  }
-
-  function startEditOffice(row) {
-    setOfficeForm({
-      id: row.id,
-      role: row.role,
-      name: row.name,
-      phone: row.phone,
-      email: row.email,
-      sort_order: safeString(row.sort_order),
-    });
-    setActiveTab("office");
-  }
-
-  function startEditCoach(row) {
-    setCoachForm({
-      id: row.id,
-      name: row.name,
-      phone: row.phone,
-      email: row.email,
-      notes: row.notes,
-      sort_order: safeString(row.sort_order),
-    });
-    setActiveTab("coaches");
-  }
-
-  function startEditDocument(row) {
-    setDocumentForm({
-      id: row.id,
-      title: row.title,
-      url: row.url,
-      description: row.description,
-      category: row.category || "General",
-      button_text: row.button_text || "Open",
-      file: null,
-    });
-    setActiveTab("documents");
-  }
-
-  async function saveDiary() {
-    setSaving(true);
-    setStatusMessage("");
-    const eventsToSave = buildRecurringEvents(diaryForm);
-
-    if (diaryForm.id) {
-      const payloads = [
-        {
-          title: diaryForm.title,
-          details: diaryForm.details,
-          date: diaryForm.date,
-          date_text: diaryForm.date,
-          time_text: diaryForm.time,
-        },
-        {
-          title: diaryForm.title,
-          note: diaryForm.details,
-          event_date: diaryForm.date,
-          date_text: diaryForm.date,
-          time_text: diaryForm.time,
-        },
-        {
-          title: diaryForm.title,
-          details: diaryForm.details,
-          event_date: diaryForm.date,
-          event_time: diaryForm.time,
-        },
-      ];
-      const res = await tryUpdate(
-        ["events", "diary", "fixtures"],
-        ["id", "event_id"],
-        diaryForm.id,
-        payloads
-      );
-      setSaving(false);
-      setStatusMessage(
-        res.ok ? "Diary entry updated." : "Could not update diary entry."
-      );
-      if (res.ok) {
-        setDiaryForm(emptyDiaryForm());
-        loadAllData();
-      }
+    if (!result.ok) {
+      setEvents([]);
+      setErrorMessage("Could not load events.");
       return;
     }
 
-    let ok = true;
-    for (const item of eventsToSave) {
-      const payloads = [
-        {
-          title: item.title,
-          details: item.details,
-          date: item.date,
-          date_text: item.date,
-          time_text: item.time,
-        },
-        {
-          title: item.title,
-          note: item.details,
-          event_date: item.date,
-          date_text: item.date,
-          time_text: item.time,
-        },
-        {
-          title: item.title,
-          details: item.details,
-          event_date: item.date,
-          event_time: item.time,
-        },
-      ];
-      const res = await tryInsert(["events", "diary", "fixtures"], payloads);
-      if (!res.ok) ok = false;
-    }
+    setEventsTableName(result.tableName);
+    setEvents(result.rows);
+  }
 
-    setSaving(false);
-    setStatusMessage(
-      ok ? "Diary entry saved." : "Could not save one or more diary entries."
+  async function loadNotices() {
+    const result = await tryLoadTable(
+      ["notices", "information_posts"],
+      normaliseNotice,
+      [{ column: "created_at", ascending: false }]
     );
-    if (ok) {
-      setDiaryForm(emptyDiaryForm());
-      loadAllData();
+
+    if (result.ok) {
+      setNoticesTableName(result.tableName);
+      setNotices(result.rows);
+    } else {
+      setNotices([]);
     }
   }
 
-  async function saveNotice() {
-    setSaving(true);
-    setStatusMessage("");
+  async function loadMembers() {
+    const result = await tryLoadTable(
+      ["members"],
+      normaliseMember,
+      [{ column: "full_name", ascending: true }]
+    );
 
-    if (!safeString(noticeForm.title).trim()) {
-      setSaving(false);
-      setStatusMessage("Please enter a notice title.");
+    if (result.ok) {
+      setMembersTableName(result.tableName);
+      setMembers(result.rows);
+    } else {
+      setMembers([]);
+    }
+  }
+
+  async function loadOfficeBearers() {
+    const result = await tryLoadTable(
+      ["office_bearers"],
+      normaliseOfficeBearer,
+      [{ column: "display_order", ascending: true }]
+    );
+
+    if (result.ok) {
+      setOfficeTableName(result.tableName);
+      setOfficeBearers(
+        [...result.rows].sort(
+          (a, b) => Number(a.display_order || 0) - Number(b.display_order || 0)
+        )
+      );
+    } else {
+      setOfficeBearers([]);
+    }
+  }
+
+  async function loadCoaches() {
+    const result = await tryLoadTable(
+      ["coaches", "club_coaches"],
+      normaliseCoach,
+      [{ column: "name", ascending: true }]
+    );
+
+    if (result.ok) {
+      setCoachesTableName(result.tableName);
+      setCoaches(result.rows);
+    } else {
+      setCoaches([]);
+    }
+  }
+
+  async function loadDocuments() {
+    const result = await tryLoadTable(
+      ["documents"],
+      normaliseDocument,
+      [{ column: "created_at", ascending: false }]
+    );
+
+    if (result.ok) {
+      setDocumentsTableName(result.tableName);
+      setDocuments(result.rows);
+    } else {
+      setDocuments([]);
+    }
+  }
+
+  const upcomingEvents = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return [...events]
+      .filter((event) => {
+        if (!event.event_date) return false;
+        const d = new Date(event.event_date);
+        return !Number.isNaN(d.getTime()) && d >= today;
+      })
+      .sort((a, b) => {
+        const aDate = new Date(`${a.event_date}T${a.event_time || "00:00"}`);
+        const bDate = new Date(`${b.event_date}T${b.event_time || "00:00"}`);
+        return aDate - bDate;
+      });
+  }, [events]);
+
+  const nextUpcomingEvent =
+    upcomingEvents.length > 0 ? upcomingEvents[0] : null;
+  const latestNotices = notices.slice(0, 5);
+
+  const filteredMembers = useMemo(() => {
+    const q = memberSearch.trim().toLowerCase();
+    if (!q) return members;
+
+    return members.filter((m) => {
+      const haystack = [
+        safeString(m.full_name),
+        safeString(m.phone),
+        safeString(m.whatsapp),
+        safeString(m.email),
+        safeString(m.category),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(q);
+    });
+  }, [members, memberSearch]);
+
+  const gentsMembers = filteredMembers.filter(
+    (m) => safeString(m.category).toLowerCase() === "gents"
+  );
+  const ladiesMembers = filteredMembers.filter(
+    (m) => safeString(m.category).toLowerCase() === "ladies"
+  );
+  const associateMembers = filteredMembers.filter(
+    (m) => safeString(m.category).toLowerCase() === "associate"
+  );
+
+  async function handleAdminLogin() {
+    if (adminPinInput === ADMIN_PIN) {
+      setAdminMode(true);
+      setShowAdminLogin(false);
+      setAdminPinInput("");
+    } else {
+      alert("Incorrect admin PIN.");
+    }
+  }
+
+  function handleAdminLogout() {
+    setAdminMode(false);
+  }
+
+  async function addEvent() {
+    if (!newEvent.title || !newEvent.event_date) {
+      alert("Please add at least a title and date.");
       return;
     }
 
-    let finalUrl = safeString(noticeForm.url).trim();
+    let eventDates = [newEvent.event_date];
 
-    if (noticeForm.file) {
-      const filename = `${Date.now()}-${noticeForm.file.name.replace(/\s+/g, "-")}`;
-      const filePath = `notices/${filename}`;
-
-      const uploadRes = await supabase.storage
-        .from(BUCKET)
-        .upload(filePath, noticeForm.file, { upsert: true });
-
-      if (uploadRes.error) {
-        setSaving(false);
-        setStatusMessage(`Could not upload notice file: ${uploadRes.error.message}`);
+    if (newEvent.repeat_type === "weekly") {
+      if (!newEvent.repeat_until) {
+        alert("Please choose a repeat until date.");
         return;
       }
 
-      const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-      finalUrl = data?.publicUrl || "";
+      if (new Date(newEvent.repeat_until) < new Date(newEvent.event_date)) {
+        alert("Repeat until date must be after the first event date.");
+        return;
+      }
+
+      eventDates = getWeeklyDates(newEvent.event_date, newEvent.repeat_until);
     }
 
-    const payload = {
-      title: noticeForm.title,
-      body: noticeForm.body || null,
-      date: noticeForm.date || null,
-      url: finalUrl || null,
-      file_url: finalUrl || null,
-    };
+    const rows = eventDates.map((dateStr) => ({
+      title: newEvent.title,
+      event_date: dateStr,
+      event_time: newEvent.event_time || null,
+      details: newEvent.details || null,
+    }));
 
-    const { error } = noticeForm.id
-      ? await supabase.from("notices").update(payload).eq("id", noticeForm.id)
-      : await supabase.from("notices").insert(payload);
-
-    setSaving(false);
+    const { error } = await supabase.from(eventsTableName).insert(rows);
 
     if (error) {
-      setStatusMessage(`Could not ${noticeForm.id ? "update" : "save"} notice: ${error.message}`);
+      alert(error.message || "Could not add event.");
       return;
     }
 
-    setStatusMessage(`Notice ${noticeForm.id ? "updated" : "saved"}.`);
-    setNoticeForm(emptyNoticeForm());
-    loadAllData();
-  }
+    setNewEvent({
+      title: "",
+      event_date: "",
+      event_time: "",
+      details: "",
+      repeat_type: "none",
+      repeat_until: "",
+    });
 
-  async function saveMember() {
-    setSaving(true);
-    const payloads = [
-      {
-        name: memberForm.name,
-        phone: memberForm.phone,
-        email: memberForm.email,
-        section: memberForm.section,
-        notes: memberForm.notes,
-      },
-      {
-        name: memberForm.name,
-        mobile: memberForm.phone,
-        email: memberForm.email,
-        category: memberForm.section,
-        note: memberForm.notes,
-      },
-    ];
-
-    const res = memberForm.id
-      ? await tryUpdate(["members", "club_members"], ["id"], memberForm.id, payloads)
-      : await tryInsert(["members", "club_members"], payloads);
-
-    setSaving(false);
-    setStatusMessage(
-      res.ok
-        ? `Member ${memberForm.id ? "updated" : "saved"}.`
-        : `Could not ${memberForm.id ? "update" : "save"} member.`
+    await loadEvents();
+    alert(
+      rows.length === 1 ? "Event added." : `${rows.length} repeated events added.`
     );
-    if (res.ok) {
-      setMemberForm(emptyMemberForm());
-      loadAllData();
-    }
   }
 
-  async function saveOffice() {
-    setSaving(true);
-    const payloads = [
-      {
-        role: officeForm.role,
-        name: officeForm.name,
-        phone: officeForm.phone,
-        email: officeForm.email,
-        sort_order: Number(officeForm.sort_order || 999),
-      },
-      {
-        role: officeForm.role,
-        name: officeForm.name,
-        phone: officeForm.phone,
-        email: officeForm.email,
-        display_order: Number(officeForm.sort_order || 999),
-      },
-    ];
+  async function deleteEvent(id) {
+    if (!window.confirm("Delete this event?")) return;
 
-    const res = officeForm.id
-      ? await tryUpdate(
-          ["office_bearers", "officebearers", "office"],
-          ["id"],
-          officeForm.id,
-          payloads
-        )
-      : await tryInsert(["office_bearers", "officebearers", "office"], payloads);
-
-    setSaving(false);
-    setStatusMessage(
-      res.ok
-        ? `Office bearer ${officeForm.id ? "updated" : "saved"}.`
-        : `Could not ${officeForm.id ? "update" : "save"} office bearer.`
-    );
-    if (res.ok) {
-      setOfficeForm(emptyOfficeForm());
-      loadAllData();
-    }
-  }
-
-  async function saveCoach() {
-    setSaving(true);
-    const payloads = [
-      {
-        name: coachForm.name,
-        phone: coachForm.phone,
-        email: coachForm.email,
-        notes: coachForm.notes,
-        sort_order: Number(coachForm.sort_order || 999),
-      },
-      {
-        name: coachForm.name,
-        phone: coachForm.phone,
-        email: coachForm.email,
-        note: coachForm.notes,
-        display_order: Number(coachForm.sort_order || 999),
-      },
-    ];
-
-    const res = coachForm.id
-      ? await tryUpdate(["club_coaches", "coaches"], ["id"], coachForm.id, payloads)
-      : await tryInsert(["club_coaches", "coaches"], payloads);
-
-    setSaving(false);
-    setStatusMessage(
-      res.ok
-        ? `Coach ${coachForm.id ? "updated" : "saved"}.`
-        : `Could not ${coachForm.id ? "update" : "save"} coach.`
-    );
-    if (res.ok) {
-      setCoachForm(emptyCoachForm());
-      loadAllData();
-    }
-  }
-
-  async function saveDocument() {
-    setSaving(true);
-    setStatusMessage("");
-
-    let finalUrl = safeString(documentForm.url).trim();
-
-    if (!safeString(documentForm.title).trim()) {
-      setSaving(false);
-      setStatusMessage("Please enter a document title.");
+    const { error } = await supabase.from(eventsTableName).delete().eq("id", id);
+    if (error) {
+      alert(error.message || "Could not delete event.");
       return;
     }
 
-    if (documentForm.file) {
-      const filename = `${Date.now()}-${documentForm.file.name.replace(/\s+/g, "-")}`;
-      const filePath = `documents/${filename}`;
-
-      const uploadRes = await supabase.storage
-        .from(BUCKET)
-        .upload(filePath, documentForm.file, { upsert: true });
-
-      if (uploadRes.error) {
-        setSaving(false);
-        setStatusMessage("Upload failed.");
-        return;
-      }
-
-      const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-      finalUrl = data?.publicUrl || "";
-    }
-
-    const payload = {
-      title: documentForm.title,
-      description: documentForm.description || null,
-      category: documentForm.category || "General",
-      button_text: documentForm.button_text || "Open",
-      url: finalUrl || null,
-    };
-
-    const { error } = documentForm.id
-      ? await supabase.from("documents").update(payload).eq("id", documentForm.id)
-      : await supabase.from("documents").insert(payload);
-
-    setSaving(false);
-
-    if (!error) {
-      setStatusMessage(`Document ${documentForm.id ? "updated" : "saved"}.`);
-      setDocumentForm(emptyDocumentForm());
-      loadAllData();
-    } else {
-      setStatusMessage(`Could not ${documentForm.id ? "update" : "save"} document.`);
-    }
+    loadEvents();
   }
 
-  async function handleDelete(section, id) {
-    if (!window.confirm("Delete this item?")) return;
-
-    setSaving(true);
-    let res = { ok: false };
-
-    if (section === "diary") {
-      res = await tryDelete(["events", "diary", "fixtures"], ["id", "event_id"], id);
-    } else if (section === "notices") {
-      res = await tryDelete(["notices"], ["id"], id);
-    } else if (section === "members") {
-      res = await tryDelete(["members", "club_members"], ["id"], id);
-    } else if (section === "office") {
-      res = await tryDelete(
-        ["office_bearers", "officebearers", "office"],
-        ["id"],
-        id
-      );
-    } else if (section === "coaches") {
-      res = await tryDelete(["club_coaches", "coaches"], ["id"], id);
-    } else if (section === "documents") {
-      res = await tryDelete(["documents", "club_documents"], ["id"], id);
+  async function addNotice() {
+    if (!newNotice.title || !newNotice.content) {
+      alert("Please enter a notice title and content.");
+      return;
     }
 
-    setSaving(false);
-    setStatusMessage(res.ok ? "Deleted." : "Could not delete item.");
-    if (res.ok) loadAllData();
+    const { error } = await supabase.from(noticesTableName).insert([
+      {
+        title: newNotice.title,
+        content: newNotice.content,
+      },
+    ]);
+
+    if (error) {
+      alert(error.message || "Could not add notice.");
+      return;
+    }
+
+    setNewNotice({ title: "", content: "" });
+    loadNotices();
   }
 
-  function renderAdminBar(onSave, onClear) {
-    if (!isAdmin) return null;
-    return (
-      <div style={styles.adminActionRow}>
-        <button style={styles.saveButton} onClick={onSave} disabled={saving}>
-          {saving ? "Saving..." : "Save"}
-        </button>
-        <button style={styles.secondaryButton} onClick={onClear}>
-          Clear
-        </button>
-      </div>
-    );
+  async function deleteNotice(id) {
+    if (!window.confirm("Delete this notice?")) return;
+
+    const { error } = await supabase.from(noticesTableName).delete().eq("id", id);
+    if (error) {
+      alert(error.message || "Could not delete notice.");
+      return;
+    }
+
+    loadNotices();
+  }
+
+  async function addMember() {
+    if (!newMember.full_name) {
+      alert("Please enter a member name.");
+      return;
+    }
+
+    const { error } = await supabase.from(membersTableName).insert([
+      {
+        full_name: newMember.full_name,
+        phone: newMember.phone || null,
+        whatsapp: newMember.whatsapp || null,
+        email: newMember.email || null,
+        category: newMember.category || "Gents",
+      },
+    ]);
+
+    if (error) {
+      alert(error.message || "Could not add member.");
+      return;
+    }
+
+    setNewMember({
+      full_name: "",
+      phone: "",
+      whatsapp: "",
+      email: "",
+      category: "Gents",
+    });
+
+    loadMembers();
+  }
+
+  async function deleteMember(id) {
+    if (!window.confirm("Delete this member?")) return;
+
+    const { error } = await supabase.from(membersTableName).delete().eq("id", id);
+    if (error) {
+      alert(error.message || "Could not delete member.");
+      return;
+    }
+
+    loadMembers();
+  }
+
+  async function addOfficeBearer() {
+    if (!newOfficeBearer.role || !newOfficeBearer.name) {
+      alert("Please enter role and name.");
+      return;
+    }
+
+    const nextOrder =
+      officeBearers.length > 0
+        ? Math.max(...officeBearers.map((x) => Number(x.display_order || 0))) + 1
+        : 1;
+
+    const { error } = await supabase.from(officeTableName).insert([
+      {
+        role: newOfficeBearer.role,
+        name: newOfficeBearer.name,
+        phone: newOfficeBearer.phone || null,
+        whatsapp: newOfficeBearer.whatsapp || null,
+        email: newOfficeBearer.email || null,
+        display_order: nextOrder,
+      },
+    ]);
+
+    if (error) {
+      alert(error.message || "Could not add office bearer.");
+      return;
+    }
+
+    setNewOfficeBearer({
+      role: "",
+      name: "",
+      phone: "",
+      whatsapp: "",
+      email: "",
+    });
+
+    loadOfficeBearers();
+  }
+
+  async function deleteOfficeBearer(id) {
+    if (!window.confirm("Delete this office bearer?")) return;
+
+    const { error } = await supabase.from(officeTableName).delete().eq("id", id);
+    if (error) {
+      alert(error.message || "Could not delete office bearer.");
+      return;
+    }
+
+    loadOfficeBearers();
+  }
+
+  async function addCoach() {
+    if (!newCoach.name) {
+      alert("Please enter coach name.");
+      return;
+    }
+
+    const { error } = await supabase.from(coachesTableName).insert([
+      {
+        name: newCoach.name,
+        phone: newCoach.phone || null,
+        whatsapp: newCoach.whatsapp || null,
+        email: newCoach.email || null,
+        notes: newCoach.notes || null,
+      },
+    ]);
+
+    if (error) {
+      alert(error.message || "Could not add coach.");
+      return;
+    }
+
+    setNewCoach({
+      name: "",
+      phone: "",
+      whatsapp: "",
+      email: "",
+      notes: "",
+    });
+
+    loadCoaches();
+  }
+
+  async function deleteCoach(id) {
+    if (!window.confirm("Delete this coach?")) return;
+
+    const { error } = await supabase.from(coachesTableName).delete().eq("id", id);
+    if (error) {
+      alert(error.message || "Could not delete coach.");
+      return;
+    }
+
+    loadCoaches();
+  }
+
+  async function uploadDocument(file) {
+    if (!file) return;
+
+    const fileName = `${Date.now()}-${file.name}`;
+    const filePath = fileName;
+
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(filePath, file);
+
+    if (uploadError) {
+      alert(uploadError.message || "Document upload failed.");
+      return;
+    }
+
+    const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
+
+    const { error: insertError } = await supabase.from(documentsTableName).insert([
+      {
+        title: file.name,
+        file_url: publicData?.publicUrl || "",
+      },
+    ]);
+
+    if (insertError) {
+      alert(insertError.message || "Upload saved but database record failed.");
+      return;
+    }
+
+    loadDocuments();
+  }
+
+  async function deleteDocument(id) {
+    if (!window.confirm("Delete this document?")) return;
+
+    const { error } = await supabase.from(documentsTableName).delete().eq("id", id);
+    if (error) {
+      alert(error.message || "Could not delete document.");
+      return;
+    }
+
+    loadDocuments();
   }
 
   function renderHome() {
     return (
-      <div style={styles.sectionGrid}>
+      <div style={styles.grid3}>
         <div style={styles.card}>
-          <h2 style={styles.cardTitle}>Next Event</h2>
-          {upcomingDiary ? (
-            <>
-              <div style={styles.bigTitle}>{upcomingDiary.title}</div>
-              <div style={styles.cardText}>
-                {formatDateTime(upcomingDiary.date, upcomingDiary.time)}
+          <h2 style={styles.cardTitle}>Welcome</h2>
+          <p style={styles.largeText}>
+            Welcome to the club app. Use the tabs above to view diary dates,
+            notices, members, office bearers, coaches and documents.
+          </p>
+
+          <div style={styles.websiteRow}>
+            <a
+              href="https://woodileebowlingclub.co.uk/home"
+              target="_blank"
+              rel="noreferrer"
+              style={styles.websiteLink}
+            >
+              Visit our website
+            </a>
+          </div>
+        </div>
+
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>Upcoming Diary</h2>
+          {nextUpcomingEvent ? (
+            <div style={styles.eventCard}>
+              <div style={styles.eventTitle}>
+                {safeString(nextUpcomingEvent.title)}
               </div>
-              <div style={styles.cardText}>
-                {upcomingDiary.details || "No details provided"}
+              <div style={styles.eventDate}>
+                {formatDate(nextUpcomingEvent.event_date)}
               </div>
-            </>
+              {shouldShowTime(nextUpcomingEvent.event_time) ? (
+                <div style={styles.eventMeta}>
+                  Time: {nextUpcomingEvent.event_time}
+                </div>
+              ) : null}
+              {nextUpcomingEvent.details ? (
+                <div style={styles.eventDetails}>{nextUpcomingEvent.details}</div>
+              ) : null}
+            </div>
           ) : (
-            <div style={styles.cardText}>No diary entries available</div>
+            <p style={styles.emptyText}>No upcoming events.</p>
           )}
         </div>
 
         <div style={styles.card}>
-          <h2 style={styles.cardTitle}>Admin</h2>
-          <div style={styles.adminBadge}>
-            {isAdmin ? "Admin logged in" : "Admin not logged in"}
-          </div>
-          <div style={styles.buttonRow}>
-            <button style={styles.primaryButton} onClick={loadAllData}>
-              Refresh Data
-            </button>
-            {isAdmin ? (
-              <button style={styles.secondaryButton} onClick={handleLogout}>
-                Logout
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        <div style={{ ...styles.card, gridColumn: "1 / -1" }}>
           <h2 style={styles.cardTitle}>Latest Notices</h2>
-          {latestNotices.length ? (
-            latestNotices.map((row) => (
-              <div key={row.id} style={styles.listItemCompact}>
-                <div style={styles.itemTitle}>{row.title}</div>
-                <div style={styles.cardText}>{row.body}</div>
-                {row.url ? (
-                  <div style={{ marginTop: 10 }}>
-                    <a
-                      style={styles.primaryButton}
-                      href={row.url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Open attachment
-                    </a>
-                  </div>
-                ) : null}
+          {latestNotices.length === 0 ? (
+            <p style={styles.emptyText}>No notices yet.</p>
+          ) : (
+            latestNotices.map((notice) => (
+              <div key={notice.id} style={styles.noticeCard}>
+                <div style={styles.noticeTitle}>{safeString(notice.title)}</div>
+                <div style={styles.noticeBody}>{safeString(notice.content)}</div>
               </div>
             ))
-          ) : (
-            <div style={styles.cardText}>No notices available</div>
           )}
         </div>
       </div>
@@ -950,132 +814,115 @@ export default function App() {
 
   function renderDiary() {
     return (
-      <div style={styles.cardLarge}>
-        <div style={styles.sectionHeaderRow}>
-          <h2 style={styles.cardTitle}>Diary</h2>
-          <div style={styles.pill}>{diaryRows.length} entries</div>
-        </div>
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Diary</h2>
 
-        {isAdmin ? (
-          <div style={styles.formBox}>
-            <h3 style={styles.formTitle}>
-              {diaryForm.id ? "Edit diary entry" : "Add diary entry"}
-            </h3>
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Add Event</h3>
 
-            <div style={styles.formGrid2}>
+            <div style={styles.formGrid}>
               <input
                 style={styles.input}
                 placeholder="Title"
-                value={diaryForm.title}
+                value={newEvent.title}
                 onChange={(e) =>
-                  setDiaryForm({ ...diaryForm, title: e.target.value })
+                  setNewEvent({ ...newEvent, title: e.target.value })
                 }
               />
-
               <input
                 style={styles.input}
                 type="date"
-                value={diaryForm.date}
+                value={newEvent.event_date}
                 onChange={(e) =>
-                  setDiaryForm({ ...diaryForm, date: e.target.value })
+                  setNewEvent({ ...newEvent, event_date: e.target.value })
                 }
               />
-
               <input
                 style={styles.input}
-                type="time"
-                value={diaryForm.time}
+                placeholder="Time"
+                value={newEvent.event_time}
                 onChange={(e) =>
-                  setDiaryForm({ ...diaryForm, time: e.target.value })
+                  setNewEvent({ ...newEvent, event_time: e.target.value })
                 }
               />
-
               <select
                 style={styles.input}
-                value={diaryForm.repeatType}
+                value={newEvent.repeat_type}
                 onChange={(e) =>
-                  setDiaryForm({ ...diaryForm, repeatType: e.target.value })
+                  setNewEvent({ ...newEvent, repeat_type: e.target.value })
                 }
               >
-                <option value="none">No repeat</option>
-                <option value="weekly">Repeat weekly (same day)</option>
-                <option value="monthly">Repeat monthly (same date)</option>
+                <option value="none">Do not repeat</option>
+                <option value="weekly">Repeat weekly</option>
               </select>
-
-              <input
-                style={styles.input}
-                type="date"
-                value={diaryForm.repeatUntil}
-                onChange={(e) =>
-                  setDiaryForm({ ...diaryForm, repeatUntil: e.target.value })
-                }
-                placeholder="Repeat until"
-              />
-
-              <input
-                style={styles.input}
-                type="number"
-                min="1"
-                max="52"
-                value={diaryForm.repeatCount}
-                onChange={(e) =>
-                  setDiaryForm({ ...diaryForm, repeatCount: e.target.value })
-                }
-                placeholder="How many times"
-              />
+              {newEvent.repeat_type === "weekly" ? (
+                <input
+                  style={styles.input}
+                  type="date"
+                  value={newEvent.repeat_until}
+                  onChange={(e) =>
+                    setNewEvent({ ...newEvent, repeat_until: e.target.value })
+                  }
+                />
+              ) : null}
             </div>
+
+            {newEvent.event_date ? (
+              <div style={styles.repeatHelp}>
+                First event day:{" "}
+                <strong>{getDayNameFromDate(newEvent.event_date)}</strong>
+                {newEvent.repeat_type === "weekly" && newEvent.repeat_until ? (
+                  <>
+                    {" "}
+                    — repeats every{" "}
+                    <strong>{getDayNameFromDate(newEvent.event_date)}</strong>{" "}
+                    until <strong>{formatDate(newEvent.repeat_until)}</strong>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
 
             <textarea
               style={styles.textarea}
               placeholder="Details"
-              value={diaryForm.details}
+              value={newEvent.details}
               onChange={(e) =>
-                setDiaryForm({ ...diaryForm, details: e.target.value })
+                setNewEvent({ ...newEvent, details: e.target.value })
               }
             />
 
-            {renderAdminBar(saveDiary, () => setDiaryForm(emptyDiaryForm()))}
-
-            <div style={styles.helpText}>
-              For every Monday, pick a Monday start date and choose “Repeat
-              weekly”.
-            </div>
+            <button style={styles.primaryBtn} onClick={addEvent}>
+              Add Event
+            </button>
           </div>
         ) : null}
 
-        {diaryRows.length ? (
-          diaryRows.map((row) => (
-            <div key={row.id} style={styles.listItem}>
-              <div>
-                <div style={styles.itemTitle}>{row.title}</div>
-                <div style={styles.itemText}>
-                  {formatDateTime(row.date, row.time)}
-                </div>
-                {row.details ? (
-                  <div style={styles.itemText}>{row.details}</div>
+        {events.length === 0 ? (
+          <p style={styles.emptyText}>No diary events yet.</p>
+        ) : (
+          <div style={styles.listWrap}>
+            {events.map((event) => (
+              <div key={event.id} style={styles.listCard}>
+                <div style={styles.eventTitle}>{safeString(event.title)}</div>
+                <div style={styles.eventDate}>{formatDate(event.event_date)}</div>
+                {shouldShowTime(event.event_time) ? (
+                  <div style={styles.eventMeta}>Time: {event.event_time}</div>
                 ) : null}
-              </div>
-
-              {isAdmin ? (
-                <div style={styles.itemButtons}>
+                {event.details ? (
+                  <div style={styles.eventDetails}>{event.details}</div>
+                ) : null}
+                {adminMode ? (
                   <button
-                    style={styles.smallButton}
-                    onClick={() => startEditDiary(row)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    style={styles.smallDeleteButton}
-                    onClick={() => handleDelete("diary", row.id)}
+                    style={styles.deleteBtn}
+                    onClick={() => deleteEvent(event.id)}
                   >
                     Delete
                   </button>
-                </div>
-              ) : null}
-            </div>
-          ))
-        ) : (
-          <div style={styles.emptyText}>No diary entries found</div>
+                ) : null}
+              </div>
+            ))}
+          </div>
         )}
       </div>
     );
@@ -1083,485 +930,342 @@ export default function App() {
 
   function renderNotices() {
     return (
-      <div style={styles.cardLarge}>
-        <div style={styles.sectionHeaderRow}>
-          <h2 style={styles.cardTitle}>Noticeboard</h2>
-          <div style={styles.pill}>{noticeRows.length} notices</div>
-        </div>
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Noticeboard</h2>
 
-        {isAdmin ? (
-          <div style={styles.formBox}>
-            <h3 style={styles.formTitle}>
-              {noticeForm.id ? "Edit notice" : "Add notice"}
-            </h3>
-
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Add Notice</h3>
             <input
               style={styles.input}
-              placeholder="Title"
-              value={noticeForm.title}
+              placeholder="Notice title"
+              value={newNotice.title}
               onChange={(e) =>
-                setNoticeForm({ ...noticeForm, title: e.target.value })
+                setNewNotice({ ...newNotice, title: e.target.value })
               }
             />
-
-            <input
-              style={styles.input}
-              type="date"
-              value={noticeForm.date}
-              onChange={(e) =>
-                setNoticeForm({ ...noticeForm, date: e.target.value })
-              }
-            />
-
             <textarea
               style={styles.textarea}
-              placeholder="Notice text"
-              value={noticeForm.body}
+              placeholder="Notice content"
+              value={newNotice.content}
               onChange={(e) =>
-                setNoticeForm({ ...noticeForm, body: e.target.value })
+                setNewNotice({ ...newNotice, content: e.target.value })
               }
             />
-
-            <input
-              style={styles.input}
-              type="file"
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
-              onChange={(e) =>
-                setNoticeForm({
-                  ...noticeForm,
-                  file: e.target.files?.[0] || null,
-                })
-              }
-            />
-
-            <input
-              style={styles.input}
-              placeholder="Or paste public file URL (optional)"
-              value={noticeForm.url || ""}
-              onChange={(e) =>
-                setNoticeForm({ ...noticeForm, url: e.target.value })
-              }
-            />
-
-            {renderAdminBar(saveNotice, () => setNoticeForm(emptyNoticeForm()))}
-
-            <div style={styles.helpText}>
-              You can upload a file or paste a public file link.
-            </div>
+            <button style={styles.primaryBtn} onClick={addNotice}>
+              Add Notice
+            </button>
           </div>
         ) : null}
 
-        {noticeRows.length ? (
-          noticeRows.map((row) => (
-            <div key={row.id} style={styles.listItem}>
-              <div>
-                <div style={styles.itemTitle}>{row.title}</div>
-                {row.date ? (
-                  <div style={styles.itemText}>{formatDate(row.date)}</div>
-                ) : null}
-                <div style={styles.itemText}>{row.body}</div>
-
-                {row.url ? (
-                  <div style={{ marginTop: 12 }}>
-                    <a
-                      style={styles.primaryButton}
-                      href={row.url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Open attachment
-                    </a>
-                  </div>
-                ) : null}
-              </div>
-
-              {isAdmin ? (
-                <div style={styles.itemButtons}>
+        {notices.length === 0 ? (
+          <p style={styles.emptyText}>No notices yet.</p>
+        ) : (
+          <div style={styles.listWrap}>
+            {notices.map((notice) => (
+              <div key={notice.id} style={styles.listCard}>
+                <div style={styles.noticeTitle}>{safeString(notice.title)}</div>
+                <div style={styles.noticeBody}>{safeString(notice.content)}</div>
+                {adminMode ? (
                   <button
-                    style={styles.smallButton}
-                    onClick={() => startEditNotice(row)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    style={styles.smallDeleteButton}
-                    onClick={() => handleDelete("notices", row.id)}
+                    style={styles.deleteBtn}
+                    onClick={() => deleteNotice(notice.id)}
                   >
                     Delete
                   </button>
-                </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderMembersSection(title, items) {
+    return (
+      <div style={styles.memberSection}>
+        <h3 style={styles.sectionTitle}>{title}</h3>
+        {items.length === 0 ? (
+          <p style={styles.emptyText}>None added yet.</p>
+        ) : (
+          items.map((member) => (
+            <div key={member.id} style={styles.listCard}>
+              <div style={styles.noticeTitle}>{safeString(member.full_name)}</div>
+              {member.phone ? (
+                <div style={styles.infoLine}>Phone: {member.phone}</div>
+              ) : null}
+              {member.whatsapp ? (
+                <div style={styles.infoLine}>WhatsApp: {member.whatsapp}</div>
+              ) : null}
+              {member.email ? (
+                <div style={styles.infoLine}>Email: {member.email}</div>
+              ) : null}
+              <ContactButtons item={member} />
+              {adminMode ? (
+                <button
+                  style={styles.deleteBtn}
+                  onClick={() => deleteMember(member.id)}
+                >
+                  Delete
+                </button>
               ) : null}
             </div>
           ))
-        ) : (
-          <div style={styles.emptyText}>No notices found</div>
         )}
       </div>
     );
   }
 
   function renderMembers() {
-    const order = ["Gents", "Ladies", "Associate", "Members"];
     return (
-      <div style={styles.cardLarge}>
-        <div style={styles.sectionHeaderRow}>
-          <h2 style={styles.cardTitle}>Members</h2>
-          <div style={styles.pill}>{memberRows.length} members</div>
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Members</h2>
+
+        <div style={styles.searchRow}>
+          <input
+            style={styles.input}
+            placeholder="Search members"
+            value={memberSearch}
+            onChange={(e) => setMemberSearch(e.target.value)}
+          />
         </div>
 
-        {isAdmin ? (
-          <div style={styles.formBox}>
-            <h3 style={styles.formTitle}>
-              {memberForm.id ? "Edit member" : "Add member"}
-            </h3>
-
-            <div style={styles.formGrid2}>
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Add Member</h3>
+            <div style={styles.formGrid}>
               <input
                 style={styles.input}
-                placeholder="Name"
-                value={memberForm.name}
+                placeholder="Full name"
+                value={newMember.full_name}
                 onChange={(e) =>
-                  setMemberForm({ ...memberForm, name: e.target.value })
+                  setNewMember({ ...newMember, full_name: e.target.value })
                 }
               />
-
+              <input
+                style={styles.input}
+                placeholder="Phone"
+                value={newMember.phone}
+                onChange={(e) =>
+                  setNewMember({ ...newMember, phone: e.target.value })
+                }
+              />
+              <input
+                style={styles.input}
+                placeholder="WhatsApp"
+                value={newMember.whatsapp}
+                onChange={(e) =>
+                  setNewMember({ ...newMember, whatsapp: e.target.value })
+                }
+              />
+              <input
+                style={styles.input}
+                placeholder="Email"
+                value={newMember.email}
+                onChange={(e) =>
+                  setNewMember({ ...newMember, email: e.target.value })
+                }
+              />
               <select
                 style={styles.input}
-                value={memberForm.section}
+                value={newMember.category}
                 onChange={(e) =>
-                  setMemberForm({ ...memberForm, section: e.target.value })
+                  setNewMember({ ...newMember, category: e.target.value })
                 }
               >
-                <option>Members</option>
                 <option>Gents</option>
                 <option>Ladies</option>
                 <option>Associate</option>
               </select>
-
-              <input
-                style={styles.input}
-                placeholder="Phone"
-                value={memberForm.phone}
-                onChange={(e) =>
-                  setMemberForm({ ...memberForm, phone: e.target.value })
-                }
-              />
-
-              <input
-                style={styles.input}
-                placeholder="Email"
-                value={memberForm.email}
-                onChange={(e) =>
-                  setMemberForm({ ...memberForm, email: e.target.value })
-                }
-              />
             </div>
-
-            <textarea
-              style={styles.textarea}
-              placeholder="Notes"
-              value={memberForm.notes}
-              onChange={(e) =>
-                setMemberForm({ ...memberForm, notes: e.target.value })
-              }
-            />
-
-            {renderAdminBar(saveMember, () => setMemberForm(emptyMemberForm()))}
+            <button style={styles.primaryBtn} onClick={addMember}>
+              Add Member
+            </button>
           </div>
         ) : null}
 
-        {order.map((section) =>
-          groupedMembers[section]?.length ? (
-            <div key={section} style={styles.memberGroup}>
-              <h3 style={styles.subHeading}>{section}</h3>
-              {groupedMembers[section].map((row) => (
-                <div key={row.id} style={styles.listItem}>
-                  <div>
-                    <div style={styles.itemTitle}>{row.name}</div>
-                    {row.phone ? (
-                      <div style={styles.itemText}>
-                        Phone: {formatPhoneForDisplay(row.phone)}
-                      </div>
-                    ) : null}
-                    {row.email ? (
-                      <div style={styles.itemText}>Email: {row.email}</div>
-                    ) : null}
-                    {row.notes ? (
-                      <div style={styles.itemText}>{row.notes}</div>
-                    ) : null}
-                  </div>
-
-                  <div style={styles.itemButtons}>
-                    {row.phone ? (
-                      <a
-                        style={styles.whatsAppButton}
-                        href={`https://wa.me/${cleanPhone(row.phone)}`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        WhatsApp
-                      </a>
-                    ) : null}
-                    {isAdmin ? (
-                      <button
-                        style={styles.smallButton}
-                        onClick={() => startEditMember(row)}
-                      >
-                        Edit
-                      </button>
-                    ) : null}
-                    {isAdmin ? (
-                      <button
-                        style={styles.smallDeleteButton}
-                        onClick={() => handleDelete("members", row.id)}
-                      >
-                        Delete
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : null
-        )}
-
-        {!memberRows.length ? (
-          <div style={styles.emptyText}>No members found</div>
-        ) : null}
+        <div style={styles.membersGrid}>
+          {renderMembersSection("Gents", gentsMembers)}
+          {renderMembersSection("Ladies", ladiesMembers)}
+          {renderMembersSection("Associate", associateMembers)}
+        </div>
       </div>
     );
   }
 
-  function renderOffice() {
-    const sortedRows = [...officeRows].sort((a, b) => a.sort_order - b.sort_order);
+  function renderOfficeBearers() {
     return (
-      <div style={styles.cardLarge}>
-        <div style={styles.sectionHeaderRow}>
-          <h2 style={styles.cardTitle}>Office Bearers</h2>
-          <div style={styles.pill}>{officeRows.length}</div>
-        </div>
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Office Bearers</h2>
 
-        {isAdmin ? (
-          <div style={styles.formBox}>
-            <h3 style={styles.formTitle}>
-              {officeForm.id ? "Edit office bearer" : "Add office bearer"}
-            </h3>
-
-            <div style={styles.formGrid2}>
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Add Office Bearer</h3>
+            <div style={styles.formGrid}>
               <input
                 style={styles.input}
                 placeholder="Role"
-                value={officeForm.role}
+                value={newOfficeBearer.role}
                 onChange={(e) =>
-                  setOfficeForm({ ...officeForm, role: e.target.value })
+                  setNewOfficeBearer({ ...newOfficeBearer, role: e.target.value })
                 }
               />
               <input
                 style={styles.input}
                 placeholder="Name"
-                value={officeForm.name}
+                value={newOfficeBearer.name}
                 onChange={(e) =>
-                  setOfficeForm({ ...officeForm, name: e.target.value })
+                  setNewOfficeBearer({ ...newOfficeBearer, name: e.target.value })
                 }
               />
               <input
                 style={styles.input}
                 placeholder="Phone"
-                value={officeForm.phone}
+                value={newOfficeBearer.phone}
                 onChange={(e) =>
-                  setOfficeForm({ ...officeForm, phone: e.target.value })
+                  setNewOfficeBearer({ ...newOfficeBearer, phone: e.target.value })
+                }
+              />
+              <input
+                style={styles.input}
+                placeholder="WhatsApp"
+                value={newOfficeBearer.whatsapp}
+                onChange={(e) =>
+                  setNewOfficeBearer({
+                    ...newOfficeBearer,
+                    whatsapp: e.target.value,
+                  })
                 }
               />
               <input
                 style={styles.input}
                 placeholder="Email"
-                value={officeForm.email}
+                value={newOfficeBearer.email}
                 onChange={(e) =>
-                  setOfficeForm({ ...officeForm, email: e.target.value })
-                }
-              />
-              <input
-                style={styles.input}
-                placeholder="Display order"
-                type="number"
-                value={officeForm.sort_order}
-                onChange={(e) =>
-                  setOfficeForm({ ...officeForm, sort_order: e.target.value })
+                  setNewOfficeBearer({ ...newOfficeBearer, email: e.target.value })
                 }
               />
             </div>
-
-            {renderAdminBar(saveOffice, () => setOfficeForm(emptyOfficeForm()))}
+            <button style={styles.primaryBtn} onClick={addOfficeBearer}>
+              Add Office Bearer
+            </button>
           </div>
         ) : null}
 
-        {sortedRows.length ? (
-          sortedRows.map((row) => (
-            <div key={row.id} style={styles.listItem}>
-              <div>
-                <div style={styles.itemTitle}>{row.role}</div>
-                <div style={styles.itemText}>{row.name}</div>
-                {row.phone ? (
-                  <div style={styles.itemText}>
-                    Phone: {formatPhoneForDisplay(row.phone)}
-                  </div>
+        {officeBearers.length === 0 ? (
+          <p style={styles.emptyText}>No office bearers added yet.</p>
+        ) : (
+          <div style={styles.listWrap}>
+            {officeBearers.map((item) => (
+              <div key={item.id} style={styles.listCard}>
+                <div style={styles.noticeTitle}>{safeString(item.role)}</div>
+                <div style={styles.infoLineStrong}>{safeString(item.name)}</div>
+                {item.phone ? (
+                  <div style={styles.infoLine}>Phone: {item.phone}</div>
                 ) : null}
-                {row.email ? (
-                  <div style={styles.itemText}>Email: {row.email}</div>
+                {item.whatsapp ? (
+                  <div style={styles.infoLine}>WhatsApp: {item.whatsapp}</div>
                 ) : null}
-              </div>
-
-              <div style={styles.itemButtons}>
-                {row.phone ? (
-                  <a
-                    style={styles.whatsAppButton}
-                    href={`https://wa.me/${cleanPhone(row.phone)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    WhatsApp
-                  </a>
+                {item.email ? (
+                  <div style={styles.infoLine}>Email: {item.email}</div>
                 ) : null}
-                {isAdmin ? (
+                <ContactButtons item={item} />
+                {adminMode ? (
                   <button
-                    style={styles.smallButton}
-                    onClick={() => startEditOffice(row)}
-                  >
-                    Edit
-                  </button>
-                ) : null}
-                {isAdmin ? (
-                  <button
-                    style={styles.smallDeleteButton}
-                    onClick={() => handleDelete("office", row.id)}
+                    style={styles.deleteBtn}
+                    onClick={() => deleteOfficeBearer(item.id)}
                   >
                     Delete
                   </button>
                 ) : null}
               </div>
-            </div>
-          ))
-        ) : (
-          <div style={styles.emptyText}>No office bearers found</div>
+            ))}
+          </div>
         )}
       </div>
     );
   }
 
   function renderCoaches() {
-    const sortedRows = [...coachRows].sort((a, b) => a.sort_order - b.sort_order);
     return (
-      <div style={styles.cardLarge}>
-        <div style={styles.sectionHeaderRow}>
-          <h2 style={styles.cardTitle}>Club Coaches</h2>
-          <div style={styles.pill}>{coachRows.length}</div>
-        </div>
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Club Coaches</h2>
 
-        {isAdmin ? (
-          <div style={styles.formBox}>
-            <h3 style={styles.formTitle}>
-              {coachForm.id ? "Edit coach" : "Add coach"}
-            </h3>
-
-            <div style={styles.formGrid2}>
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Add Coach</h3>
+            <div style={styles.formGrid}>
               <input
                 style={styles.input}
                 placeholder="Name"
-                value={coachForm.name}
-                onChange={(e) =>
-                  setCoachForm({ ...coachForm, name: e.target.value })
-                }
+                value={newCoach.name}
+                onChange={(e) => setNewCoach({ ...newCoach, name: e.target.value })}
               />
               <input
                 style={styles.input}
                 placeholder="Phone"
-                value={coachForm.phone}
+                value={newCoach.phone}
+                onChange={(e) => setNewCoach({ ...newCoach, phone: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="WhatsApp"
+                value={newCoach.whatsapp}
                 onChange={(e) =>
-                  setCoachForm({ ...coachForm, phone: e.target.value })
+                  setNewCoach({ ...newCoach, whatsapp: e.target.value })
                 }
               />
               <input
                 style={styles.input}
                 placeholder="Email"
-                value={coachForm.email}
-                onChange={(e) =>
-                  setCoachForm({ ...coachForm, email: e.target.value })
-                }
+                value={newCoach.email}
+                onChange={(e) => setNewCoach({ ...newCoach, email: e.target.value })}
               />
               <input
                 style={styles.input}
-                placeholder="Display order"
-                type="number"
-                value={coachForm.sort_order}
-                onChange={(e) =>
-                  setCoachForm({ ...coachForm, sort_order: e.target.value })
-                }
+                placeholder="Notes"
+                value={newCoach.notes}
+                onChange={(e) => setNewCoach({ ...newCoach, notes: e.target.value })}
               />
             </div>
-
-            <textarea
-              style={styles.textarea}
-              placeholder="Notes"
-              value={coachForm.notes}
-              onChange={(e) =>
-                setCoachForm({ ...coachForm, notes: e.target.value })
-              }
-            />
-
-            {renderAdminBar(saveCoach, () => setCoachForm(emptyCoachForm()))}
+            <button style={styles.primaryBtn} onClick={addCoach}>
+              Add Coach
+            </button>
           </div>
         ) : null}
 
-        {sortedRows.length ? (
-          sortedRows.map((row) => (
-            <div key={row.id} style={styles.listItem}>
-              <div>
-                <div style={styles.itemTitle}>{row.name}</div>
-                {row.phone ? (
-                  <div style={styles.itemText}>
-                    Phone: {formatPhoneForDisplay(row.phone)}
-                  </div>
+        {coaches.length === 0 ? (
+          <p style={styles.emptyText}>No coaches added yet.</p>
+        ) : (
+          <div style={styles.listWrap}>
+            {coaches.map((coach) => (
+              <div key={coach.id} style={styles.listCard}>
+                <div style={styles.noticeTitle}>{safeString(coach.name)}</div>
+                {coach.phone ? (
+                  <div style={styles.infoLine}>Phone: {coach.phone}</div>
                 ) : null}
-                {row.email ? (
-                  <div style={styles.itemText}>Email: {row.email}</div>
+                {coach.whatsapp ? (
+                  <div style={styles.infoLine}>WhatsApp: {coach.whatsapp}</div>
                 ) : null}
-                {row.notes ? (
-                  <div style={styles.itemText}>{row.notes}</div>
+                {coach.email ? (
+                  <div style={styles.infoLine}>Email: {coach.email}</div>
                 ) : null}
-              </div>
-
-              <div style={styles.itemButtons}>
-                {row.phone ? (
-                  <a
-                    style={styles.whatsAppButton}
-                    href={`https://wa.me/${cleanPhone(row.phone)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    WhatsApp
-                  </a>
+                {coach.notes ? (
+                  <div style={styles.infoLine}>{coach.notes}</div>
                 ) : null}
-                {isAdmin ? (
+                <ContactButtons item={coach} />
+                {adminMode ? (
                   <button
-                    style={styles.smallButton}
-                    onClick={() => startEditCoach(row)}
-                  >
-                    Edit
-                  </button>
-                ) : null}
-                {isAdmin ? (
-                  <button
-                    style={styles.smallDeleteButton}
-                    onClick={() => handleDelete("coaches", row.id)}
+                    style={styles.deleteBtn}
+                    onClick={() => deleteCoach(coach.id)}
                   >
                     Delete
                   </button>
                 ) : null}
               </div>
-            </div>
-          ))
-        ) : (
-          <div style={styles.emptyText}>No coaches found</div>
+            ))}
+          </div>
         )}
       </div>
     );
@@ -1569,174 +1273,58 @@ export default function App() {
 
   function renderDocuments() {
     return (
-      <div style={styles.cardLarge}>
-        <div style={styles.sectionHeaderRow}>
-          <h2 style={styles.cardTitle}>Documents</h2>
-          <div style={styles.pill}>{filteredDocuments.length} files</div>
-        </div>
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Documents</h2>
 
-        <div style={{ marginTop: 18, marginBottom: 8 }}>
-          <input
-            style={styles.input}
-            placeholder="Search documents"
-            value={documentSearch}
-            onChange={(e) => setDocumentSearch(e.target.value)}
-          />
-        </div>
-
-        {isAdmin ? (
-          <div style={styles.formBox}>
-            <h3 style={styles.formTitle}>
-              {documentForm.id ? "Edit document" : "Add document"}
-            </h3>
-
-            <input
-              style={styles.input}
-              placeholder="Title"
-              value={documentForm.title}
-              onChange={(e) =>
-                setDocumentForm({ ...documentForm, title: e.target.value })
-              }
-            />
-
-            <div style={styles.formGrid2}>
-              <input
-                style={styles.input}
-                placeholder="Category"
-                value={documentForm.category}
-                onChange={(e) =>
-                  setDocumentForm({ ...documentForm, category: e.target.value })
-                }
-              />
-
-              <input
-                style={styles.input}
-                placeholder="Button text"
-                value={documentForm.button_text}
-                onChange={(e) =>
-                  setDocumentForm({ ...documentForm, button_text: e.target.value })
-                }
-              />
-            </div>
-
-            <input
-              style={styles.input}
-              placeholder="Paste document URL here"
-              value={documentForm.url}
-              onChange={(e) =>
-                setDocumentForm({ ...documentForm, url: e.target.value })
-              }
-            />
-
-            <textarea
-              style={styles.textarea}
-              placeholder="Description (optional)"
-              value={documentForm.description}
-              onChange={(e) =>
-                setDocumentForm({
-                  ...documentForm,
-                  description: e.target.value,
-                })
-              }
-            />
-
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Upload Document</h3>
             <input
               style={styles.input}
               type="file"
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
-              onChange={(e) =>
-                setDocumentForm({
-                  ...documentForm,
-                  file: e.target.files?.[0] || null,
-                })
-              }
+              onChange={(e) => uploadDocument(e.target.files?.[0])}
             />
-
-            {renderAdminBar(saveDocument, () =>
-              setDocumentForm(emptyDocumentForm())
-            )}
-
-            <div style={styles.helpText}>
-              Upload a file or paste a public link. Category helps members find
-              files quicker.
-            </div>
           </div>
         ) : null}
 
-        {filteredDocuments.length ? (
-          filteredDocuments.map((row) => (
-            <div key={row.id} style={styles.listItem}>
-              <div style={{ flex: 1 }}>
-                <div style={styles.itemTitle}>{row.title}</div>
-
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
-                  {row.category ? (
-                    <span style={styles.docCategory}>{row.category}</span>
-                  ) : null}
-
-                  {row.fileType === "pdf" ? (
-                    <span style={styles.docBadgePdf}>PDF</span>
-                  ) : row.fileType === "image" ? (
-                    <span style={styles.docBadgeImage}>Image</span>
-                  ) : row.fileType === "word" ? (
-                    <span style={styles.docBadgeWord}>Word</span>
-                  ) : (
-                    <span style={styles.docBadgeFile}>File</span>
-                  )}
-                </div>
-
-                {row.description ? (
-                  <div style={styles.itemText}>{row.description}</div>
-                ) : null}
-              </div>
-
-              <div style={styles.itemButtons}>
-                {row.url ? (
-                  <>
-                    <a
-                      style={styles.primaryButton}
-                      href={row.url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {row.button_text || "Open"}
-                    </a>
-
-                    <a style={styles.smallButton} href={row.url} download>
-                      Download
-                    </a>
-                  </>
-                ) : null}
-
-                {isAdmin ? (
+        {documents.length === 0 ? (
+          <p style={styles.emptyText}>No documents yet.</p>
+        ) : (
+          <div style={styles.listWrap}>
+            {documents.map((doc) => (
+              <div key={doc.id} style={styles.listCard}>
+                <a
+                  href={doc.file_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={styles.link}
+                >
+                  {safeString(doc.title, "Open document")}
+                </a>
+                {adminMode ? (
                   <button
-                    style={styles.smallButton}
-                    onClick={() => startEditDocument(row)}
-                  >
-                    Edit
-                  </button>
-                ) : null}
-
-                {isAdmin ? (
-                  <button
-                    style={styles.smallDeleteButton}
-                    onClick={() => handleDelete("documents", row.id)}
+                    style={styles.deleteBtn}
+                    onClick={() => deleteDocument(doc.id)}
                   >
                     Delete
                   </button>
                 ) : null}
               </div>
-            </div>
-          ))
-        ) : (
-          <div style={styles.emptyText}>No documents found</div>
+            ))}
+          </div>
         )}
       </div>
     );
   }
 
-  function renderTab() {
-    if (loading) return <div style={styles.cardLarge}>Loading...</div>;
+  function renderContent() {
+    if (loading) {
+      return (
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>Loading...</h2>
+        </div>
+      );
+    }
 
     switch (activeTab) {
       case "home":
@@ -1748,7 +1336,7 @@ export default function App() {
       case "members":
         return renderMembers();
       case "office":
-        return renderOffice();
+        return renderOfficeBearers();
       case "coaches":
         return renderCoaches();
       case "documents":
@@ -1762,52 +1350,67 @@ export default function App() {
     <div style={styles.page}>
       <div style={styles.wrap}>
         <div style={styles.header}>
-          <div style={styles.headerLeft}>
-            <img src={logo} alt="Club logo" style={styles.logo} />
-            <div>
-              <h1 style={styles.title}>{CLUB_NAME}</h1>
-              <div style={styles.subtitle}>{CLUB_SUBTITLE}</div>
+          <div style={styles.headerTop}>
+            <div style={styles.brandWrap}>
+              {logo ? <img src={logo} alt="Club Logo" style={styles.logo} /> : null}
+              <div style={styles.titleBlock}>
+                <h1 style={styles.title}>{CLUB_NAME}</h1>
+                <div style={styles.subtitle}>{CLUB_SUBTITLE}</div>
+              </div>
             </div>
           </div>
 
-          <div style={styles.headerRight}>
-            {isAdmin ? (
-              <div style={styles.adminBadge}>Admin logged in</div>
-            ) : (
-              <>
-                <input
-                  style={styles.inputPin}
-                  type="password"
-                  placeholder="Admin PIN"
-                  value={adminPin}
-                  onChange={(e) => setAdminPin(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleAdminLogin();
-                  }}
-                />
-                <button style={styles.primaryButton} onClick={handleAdminLogin}>
-                  Login
+          {!adminMode ? (
+            <div style={styles.adminStripWrap}>
+              {!showAdminLogin ? (
+                <button
+                  style={styles.smallAdminToggle}
+                  onClick={() => setShowAdminLogin(true)}
+                >
+                  Admin
                 </button>
-              </>
-            )}
-
-            <button style={styles.primaryButton} onClick={loadAllData}>
-              Refresh
-            </button>
-
-            {isAdmin ? (
-              <button style={styles.secondaryButton} onClick={handleLogout}>
+              ) : (
+                <div style={styles.compactAdminPanel}>
+                  <input
+                    style={styles.compactPinInput}
+                    type="password"
+                    placeholder="Admin PIN"
+                    value={adminPinInput}
+                    onChange={(e) => setAdminPinInput(e.target.value)}
+                  />
+                  <button style={styles.compactAdminBtn} onClick={handleAdminLogin}>
+                    Go
+                  </button>
+                  <button
+                    style={styles.compactCancelBtn}
+                    onClick={() => {
+                      setShowAdminLogin(false);
+                      setAdminPinInput("");
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={styles.loggedInRow}>
+              <div style={styles.loggedInText}>Logged in as Admin</div>
+              <button style={styles.smallLogoutBtn} onClick={handleAdminLogout}>
                 Logout
               </button>
-            ) : null}
-          </div>
+            </div>
+          )}
         </div>
 
-        <div style={styles.tabsWrap}>
+        <div style={styles.tabBar}>
           {TABS.map((tab) => (
             <button
               key={tab.key}
-              style={activeTab === tab.key ? styles.tabActive : styles.tab}
+              style={{
+                ...styles.tab,
+                ...(activeTab === tab.key ? styles.activeTab : {}),
+              }}
               onClick={() => setActiveTab(tab.key)}
             >
               {tab.label}
@@ -1815,11 +1418,9 @@ export default function App() {
           ))}
         </div>
 
-        {statusMessage ? (
-          <div style={styles.statusMessage}>{statusMessage}</div>
-        ) : null}
+        {errorMessage ? <div style={styles.errorBanner}>{errorMessage}</div> : null}
 
-        {renderTab()}
+        {renderContent()}
       </div>
     </div>
   );
@@ -1828,373 +1429,388 @@ export default function App() {
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "linear-gradient(180deg, #8b102b 0%, #b11233 100%)",
-    padding: 16,
+    background: "linear-gradient(180deg, #5b1224 0%, #7a1d32 55%, #611426 100%)",
+    padding: 14,
     fontFamily: "Arial, sans-serif",
+    color: "#23364f",
   },
   wrap: {
-    maxWidth: 1260,
+    maxWidth: 1480,
     margin: "0 auto",
   },
   header: {
-    background: "#efefef",
-    borderRadius: 36,
-    padding: 26,
+    background: "#ececec",
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 18,
+    border: "1px solid rgba(255,255,255,0.25)",
+  },
+  headerTop: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
-    gap: 20,
-    flexWrap: "wrap",
-    marginBottom: 20,
-  },
-  headerLeft: {
-    display: "flex",
-    alignItems: "center",
-    gap: 24,
+    alignItems: "flex-start",
+    gap: 16,
     flexWrap: "wrap",
   },
-  headerRight: {
+  brandWrap: {
     display: "flex",
     alignItems: "center",
-    gap: 14,
+    gap: 16,
     flexWrap: "wrap",
   },
   logo: {
-    width: 150,
-    height: 150,
+    width: 90,
+    height: 90,
     objectFit: "contain",
   },
+  titleBlock: {
+    minWidth: 0,
+  },
   title: {
-    fontSize: 64,
-    lineHeight: 1,
     margin: 0,
-    color: "#17233d",
+    fontSize: 30,
+    lineHeight: 1.08,
+    color: "#84233a",
     fontWeight: 800,
   },
   subtitle: {
-    fontSize: 28,
-    color: "#17233d",
-    marginTop: 14,
-    maxWidth: 420,
-  },
-  inputPin: {
-    height: 56,
-    borderRadius: 18,
-    border: "1px solid #ccc",
-    padding: "0 18px",
-    fontSize: 22,
-    minWidth: 220,
-  },
-  tabsWrap: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 14,
-    marginBottom: 20,
-  },
-  tab: {
-    border: "none",
-    borderRadius: 20,
-    background: "#f2f2f2",
-    color: "#17233d",
-    fontSize: 22,
-    fontWeight: 700,
-    padding: "18px 28px",
-    cursor: "pointer",
-  },
-  tabActive: {
-    border: "none",
-    borderRadius: 20,
-    background: "#f0c841",
-    color: "#17233d",
-    fontSize: 22,
-    fontWeight: 800,
-    padding: "18px 28px",
-    cursor: "pointer",
-  },
-  card: {
-    background: "#efefef",
-    borderRadius: 28,
-    padding: 28,
-    minHeight: 180,
-  },
-  cardLarge: {
-    background: "#efefef",
-    borderRadius: 28,
-    padding: 32,
-  },
-  sectionGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-    gap: 20,
-  },
-  sectionHeaderRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 14,
-    flexWrap: "wrap",
-  },
-  cardTitle: {
-    margin: 0,
-    fontSize: 46,
-    color: "#17233d",
-    fontWeight: 800,
-  },
-  subHeading: {
-    margin: "12px 0",
-    fontSize: 30,
-    color: "#17233d",
-  },
-  bigTitle: {
-    fontSize: 34,
-    fontWeight: 800,
-    color: "#17233d",
-    marginBottom: 12,
-  },
-  cardText: {
-    fontSize: 22,
-    color: "#334",
     marginTop: 8,
-  },
-  itemTitle: {
-    fontSize: 28,
-    fontWeight: 800,
-    color: "#17233d",
-  },
-  itemText: {
     fontSize: 20,
-    color: "#334",
-    marginTop: 6,
-    whiteSpace: "pre-wrap",
+    fontWeight: 700,
+    color: "#2d3f59",
   },
-  listItem: {
+  adminStripWrap: {
+    marginTop: 16,
     display: "flex",
-    justifyContent: "space-between",
-    gap: 18,
-    padding: "18px 0",
-    borderBottom: "1px solid #d5d5d5",
-    alignItems: "flex-start",
+    justifyContent: "flex-start",
+  },
+  smallAdminToggle: {
+    background: "transparent",
+    color: "#666",
+    border: "1px solid #c8c8c8",
+    borderRadius: 10,
+    padding: "6px 12px",
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  compactAdminPanel: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
     flexWrap: "wrap",
   },
-  listItemCompact: {
-    padding: "12px 0",
-    borderBottom: "1px solid #d5d5d5",
+  compactPinInput: {
+    padding: 10,
+    borderRadius: 10,
+    border: "1px solid #c7b7be",
+    fontSize: 14,
+    minWidth: 140,
+    background: "#fff",
   },
-  itemButtons: {
+  compactAdminBtn: {
+    background: "#8b2940",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "10px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  compactCancelBtn: {
+    background: "#ddd",
+    color: "#444",
+    border: "none",
+    borderRadius: 10,
+    padding: "10px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  loggedInRow: {
+    marginTop: 16,
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  loggedInText: {
+    fontSize: 15,
+    fontWeight: 700,
+    color: "#23364f",
+  },
+  smallLogoutBtn: {
+    background: "#666",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "9px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  tabBar: {
     display: "flex",
     gap: 10,
     flexWrap: "wrap",
+    marginBottom: 18,
   },
-  buttonRow: {
-    display: "flex",
-    gap: 12,
-    flexWrap: "wrap",
-    marginTop: 18,
-  },
-  primaryButton: {
+  tab: {
+    background: "#f4e9ee",
+    color: "#6f2134",
     border: "none",
-    borderRadius: 18,
-    background: "#9f1435",
-    color: "white",
-    fontSize: 18,
-    fontWeight: 700,
-    padding: "14px 22px",
-    cursor: "pointer",
-    textDecoration: "none",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  secondaryButton: {
-    border: "none",
-    borderRadius: 18,
-    background: "#596579",
-    color: "white",
-    fontSize: 18,
-    fontWeight: 700,
-    padding: "14px 22px",
-    cursor: "pointer",
-  },
-  saveButton: {
-    border: "none",
-    borderRadius: 18,
-    background: "#14814d",
-    color: "white",
-    fontSize: 18,
-    fontWeight: 700,
-    padding: "14px 22px",
-    cursor: "pointer",
-  },
-  smallButton: {
-    border: "none",
-    borderRadius: 14,
-    background: "#e7edf8",
-    color: "#17233d",
-    fontSize: 16,
-    fontWeight: 700,
-    padding: "10px 14px",
-    cursor: "pointer",
-    textDecoration: "none",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  smallDeleteButton: {
-    border: "none",
-    borderRadius: 14,
-    background: "#cc3b4b",
-    color: "white",
-    fontSize: 16,
-    fontWeight: 700,
-    padding: "10px 14px",
-    cursor: "pointer",
-  },
-  whatsAppButton: {
-    border: "none",
-    borderRadius: 14,
-    background: "#25D366",
-    color: "white",
-    fontSize: 16,
-    fontWeight: 700,
-    padding: "10px 14px",
-    cursor: "pointer",
-    textDecoration: "none",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  adminBadge: {
-    background: "#dfeadf",
-    color: "#0d6b3e",
-    borderRadius: 999,
-    padding: "14px 20px",
-    fontSize: 18,
-    fontWeight: 700,
-  },
-  pill: {
-    background: "#9f1435",
-    color: "white",
-    borderRadius: 999,
+    borderRadius: 16,
     padding: "12px 18px",
-    fontSize: 18,
+    fontSize: 17,
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 2px 0 rgba(0,0,0,0.08)",
+  },
+  activeTab: {
+    background: "#8b2940",
+    color: "#fff",
+  },
+  errorBanner: {
+    background: "#f7e8ec",
+    color: "#b00020",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 18,
+    fontSize: 16,
+    fontWeight: 800,
+  },
+  grid3: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))",
+    gap: 18,
+  },
+  card: {
+    background: "#ececec",
+    borderRadius: 20,
+    padding: 18,
+    minHeight: 220,
+  },
+  cardTitle: {
+    margin: "0 0 16px 0",
+    fontSize: 28,
+    lineHeight: 1.1,
+    color: "#84233a",
+    fontWeight: 800,
+  },
+  sectionTitle: {
+    margin: "0 0 12px 0",
+    fontSize: 21,
+    color: "#84233a",
+    fontWeight: 800,
+  },
+  largeText: {
+    fontSize: 17,
+    lineHeight: 1.5,
     fontWeight: 700,
+    color: "#2d3f59",
+  },
+  websiteRow: {
+    marginTop: 14,
+  },
+  websiteLink: {
+    display: "inline-block",
+    background: "#8b2940",
+    color: "#fff",
+    textDecoration: "none",
+    borderRadius: 10,
+    padding: "10px 14px",
+    fontSize: 15,
+    fontWeight: 700,
+  },
+  eventCard: {
+    background: "#f7f3f5",
+    borderRadius: 15,
+    padding: 15,
+    border: "1px solid #e0d2d8",
+  },
+  eventTitle: {
+    fontSize: 21,
+    fontWeight: 800,
+    color: "#84233a",
+    marginBottom: 8,
+  },
+  eventDate: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: "#2d3f59",
+    marginBottom: 6,
+  },
+  eventMeta: {
+    fontSize: 15,
+    fontWeight: 600,
+    color: "#2d3f59",
+    marginBottom: 4,
+  },
+  eventDetails: {
+    fontSize: 15,
+    lineHeight: 1.45,
+    color: "#2d3f59",
+    marginTop: 8,
+    whiteSpace: "pre-wrap",
+  },
+  noticeCard: {
+    background: "#f7f3f5",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    border: "1px solid #e0d2d8",
+  },
+  noticeTitle: {
+    fontSize: 19,
+    fontWeight: 800,
+    color: "#84233a",
+    marginBottom: 8,
+  },
+  noticeBody: {
+    fontSize: 15,
+    lineHeight: 1.45,
+    color: "#2d3f59",
+    whiteSpace: "pre-wrap",
   },
   emptyText: {
-    fontSize: 22,
-    color: "#4b5563",
+    fontSize: 16,
+    color: "#2d3f59",
+    fontWeight: 600,
   },
-  formBox: {
-    background: "#ffffff",
-    borderRadius: 22,
-    padding: 20,
-    margin: "22px 0 10px",
-    border: "1px solid #e2e2e2",
+  adminBox: {
+    background: "#f4e9ee",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 18,
   },
-  formTitle: {
+  adminTitle: {
     marginTop: 0,
-    fontSize: 28,
-    color: "#17233d",
+    fontSize: 21,
+    color: "#84233a",
   },
-  formGrid2: {
+  formGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: 12,
+    gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+    gap: 10,
     marginBottom: 12,
   },
   input: {
     width: "100%",
-    borderRadius: 14,
-    border: "1px solid #cfd3d9",
-    padding: "14px 16px",
-    fontSize: 18,
+    padding: 12,
+    borderRadius: 10,
+    border: "1px solid #c7b7be",
+    fontSize: 15,
     boxSizing: "border-box",
-    marginBottom: 12,
+    background: "#fff",
   },
   textarea: {
     width: "100%",
     minHeight: 100,
-    borderRadius: 14,
-    border: "1px solid #cfd3d9",
-    padding: "14px 16px",
-    fontSize: 18,
+    padding: 12,
+    borderRadius: 10,
+    border: "1px solid #c7b7be",
+    fontSize: 15,
     boxSizing: "border-box",
     marginBottom: 12,
-    resize: "vertical",
+    background: "#fff",
   },
-  adminActionRow: {
-    display: "flex",
+  repeatHelp: {
+    fontSize: 14,
+    color: "#2d3f59",
+    fontWeight: 600,
+    marginBottom: 12,
+  },
+  primaryBtn: {
+    background: "#8b2940",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "11px 16px",
+    fontSize: 15,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  deleteBtn: {
+    marginTop: 12,
+    background: "#c70039",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "10px 14px",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  listWrap: {
+    display: "grid",
     gap: 12,
-    flexWrap: "wrap",
   },
-  helpText: {
-    color: "#556",
+  listCard: {
+    background: "#f7f3f5",
+    borderRadius: 14,
+    padding: 14,
+    border: "1px solid #e0d2d8",
+  },
+  membersGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+    gap: 16,
+  },
+  memberSection: {
+    background: "#f7f3f5",
+    borderRadius: 16,
+    padding: 14,
+    border: "1px solid #e0d2d8",
+  },
+  infoLine: {
+    fontSize: 15,
+    color: "#2d3f59",
+    marginBottom: 5,
+    fontWeight: 600,
+    wordBreak: "break-word",
+  },
+  infoLineStrong: {
     fontSize: 16,
-    marginTop: 8,
+    color: "#2d3f59",
+    marginBottom: 6,
+    fontWeight: 800,
+    wordBreak: "break-word",
   },
-  statusMessage: {
-    background: "#f4f4f4",
-    borderRadius: 18,
-    padding: "14px 18px",
+  searchRow: {
+    marginBottom: 14,
+  },
+  contactButtons: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    marginTop: 10,
+  },
+  actionBtn: {
+    display: "inline-block",
+    background: "#8b2940",
+    color: "#fff",
+    textDecoration: "none",
+    borderRadius: 10,
+    padding: "8px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  actionBtnAlt: {
+    display: "inline-block",
+    background: "#e9dde2",
+    color: "#6f2134",
+    textDecoration: "none",
+    borderRadius: 10,
+    padding: "8px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  link: {
     fontSize: 18,
-    color: "#17233d",
-    marginBottom: 18,
-  },
-  memberGroup: {
-    marginTop: 16,
-  },
-  docCategory: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#f0c841",
-    color: "#17233d",
-    borderRadius: 999,
-    padding: "6px 12px",
-    fontSize: 14,
     fontWeight: 700,
-  },
-  docBadgePdf: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#c62828",
-    color: "#fff",
-    borderRadius: 999,
-    padding: "6px 12px",
-    fontSize: 14,
-    fontWeight: 700,
-  },
-  docBadgeImage: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#1565c0",
-    color: "#fff",
-    borderRadius: 999,
-    padding: "6px 12px",
-    fontSize: 14,
-    fontWeight: 700,
-  },
-  docBadgeWord: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#2e7d32",
-    color: "#fff",
-    borderRadius: 999,
-    padding: "6px 12px",
-    fontSize: 14,
-    fontWeight: 700,
-  },
-  docBadgeFile: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#596579",
-    color: "#fff",
-    borderRadius: 999,
-    padding: "6px 12px",
-    fontSize: 14,
-    fontWeight: 700,
+    color: "#84233a",
+    textDecoration: "none",
+    wordBreak: "break-word",
   },
 };
