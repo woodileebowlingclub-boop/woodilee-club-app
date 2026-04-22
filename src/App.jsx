@@ -155,6 +155,16 @@ export default function App() {
 
   const [loading, setLoading] = useState(true);
 
+  const [eventForm, setEventForm] = useState({
+    id: null,
+    title: "",
+    event_date: "",
+    event_time: "",
+    location: "",
+    description: "",
+  });
+  const [isSavingEvent, setIsSavingEvent] = useState(false);
+
   const groupedMembers = useMemo(() => {
     const groups = {
       Gents: [],
@@ -180,15 +190,32 @@ export default function App() {
     const { data, error } = await supabase
       .from("events")
       .select("*")
-      .order("event_date", { ascending: true })
-      .order("event_time", { ascending: true });
+      .order("event_date", { ascending: true, nullsFirst: false })
+      .order("date", { ascending: true, nullsFirst: false })
+      .order("event_time", { ascending: true, nullsFirst: false })
+      .order("time", { ascending: true, nullsFirst: false });
 
     if (error) {
       console.error("Error loading events:", error.message);
       return;
     }
 
-    setEvents(data || []);
+    const cleaned = (data || []).map((event) => ({
+      ...event,
+      title: event.title || event.name || "",
+      event_date: event.event_date || event.date || "",
+      event_time: event.event_time || event.time || "",
+      location: event.location || "",
+      description: event.description || event.details || "",
+    }));
+
+    cleaned.sort((a, b) => {
+      const dateA = new Date(`${a.event_date || "9999-12-31"}T${a.event_time || "23:59"}`);
+      const dateB = new Date(`${b.event_date || "9999-12-31"}T${b.event_time || "23:59"}`);
+      return dateA.getTime() - dateB.getTime();
+    });
+
+    setEvents(cleaned);
   }
 
   async function fetchNotices() {
@@ -303,6 +330,90 @@ export default function App() {
   function handleAdminLogout() {
     setIsAdmin(false);
     window.alert("Admin mode turned off.");
+  }
+
+  function resetEventForm() {
+    setEventForm({
+      id: null,
+      title: "",
+      event_date: "",
+      event_time: "",
+      location: "",
+      description: "",
+    });
+  }
+
+  function handleEditEvent(event) {
+    setEventForm({
+      id: event.id || null,
+      title: safeString(event.title || event.name),
+      event_date: safeString(event.event_date || event.date),
+      event_time: safeString(event.event_time || event.time),
+      location: safeString(event.location),
+      description: safeString(event.description || event.details),
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function handleSaveEvent() {
+    if (!eventForm.title.trim()) {
+      window.alert("Please enter an event title.");
+      return;
+    }
+
+    if (!eventForm.event_date) {
+      window.alert("Please enter an event date.");
+      return;
+    }
+
+    setIsSavingEvent(true);
+
+    try {
+      const payload = {
+        title: eventForm.title.trim(),
+        event_date: eventForm.event_date,
+        event_time: eventForm.event_time || null,
+        location: eventForm.location.trim() || null,
+        description: eventForm.description.trim() || null,
+      };
+
+      let response;
+      if (eventForm.id) {
+        response = await supabase.from("events").update(payload).eq("id", eventForm.id);
+      } else {
+        response = await supabase.from("events").insert([payload]);
+      }
+
+      if (response.error) {
+        console.error(response.error);
+        window.alert(`Could not save diary item: ${response.error.message}`);
+        return;
+      }
+
+      await fetchEvents();
+      resetEventForm();
+      window.alert(eventForm.id ? "Diary item updated." : "Diary item added.");
+    } finally {
+      setIsSavingEvent(false);
+    }
+  }
+
+  async function handleDeleteEvent(eventId) {
+    const ok = window.confirm("Delete this diary item?");
+    if (!ok) return;
+
+    const { error } = await supabase.from("events").delete().eq("id", eventId);
+    if (error) {
+      console.error(error);
+      window.alert(`Could not delete diary item: ${error.message}`);
+      return;
+    }
+
+    if (eventForm.id === eventId) {
+      resetEventForm();
+    }
+
+    await fetchEvents();
   }
 
   async function handleDocumentUpload() {
@@ -540,6 +651,65 @@ export default function App() {
         {!loading && activeTab === "diary" && (
           <div style={styles.sectionCard}>
             <h2 style={styles.sectionTitle}>Diary</h2>
+
+            {isAdmin && (
+              <div style={styles.adminCard}>
+                <h3 style={styles.subTitle}>{eventForm.id ? "Edit Diary Item" : "Add Diary Item"}</h3>
+
+                <input
+                  type="text"
+                  placeholder="Event title"
+                  value={eventForm.title}
+                  onChange={(e) => setEventForm((prev) => ({ ...prev, title: e.target.value }))}
+                  style={styles.input}
+                />
+
+                <input
+                  type="date"
+                  value={eventForm.event_date}
+                  onChange={(e) => setEventForm((prev) => ({ ...prev, event_date: e.target.value }))}
+                  style={styles.input}
+                />
+
+                <input
+                  type="time"
+                  value={eventForm.event_time}
+                  onChange={(e) => setEventForm((prev) => ({ ...prev, event_time: e.target.value }))}
+                  style={styles.input}
+                />
+
+                <input
+                  type="text"
+                  placeholder="Location"
+                  value={eventForm.location}
+                  onChange={(e) => setEventForm((prev) => ({ ...prev, location: e.target.value }))}
+                  style={styles.input}
+                />
+
+                <textarea
+                  placeholder="Description"
+                  value={eventForm.description}
+                  onChange={(e) => setEventForm((prev) => ({ ...prev, description: e.target.value }))}
+                  style={styles.textarea}
+                  rows={4}
+                />
+
+                <div style={styles.formButtonRow}>
+                  <button
+                    style={isSavingEvent ? styles.primaryButtonDisabled : styles.primaryButton}
+                    onClick={handleSaveEvent}
+                    disabled={isSavingEvent}
+                  >
+                    {isSavingEvent ? "Saving..." : eventForm.id ? "Update Diary Item" : "Add Diary Item"}
+                  </button>
+
+                  <button type="button" style={styles.linkLikeButton} onClick={resetEventForm}>
+                    Clear
+                  </button>
+                </div>
+              </div>
+            )}
+
             {events.length === 0 ? (
               <div style={styles.emptyMessage}>No diary items yet.</div>
             ) : (
@@ -553,6 +723,17 @@ export default function App() {
                     </div>
                     {event.location ? <div style={styles.listBody}><strong>Location:</strong> {event.location}</div> : null}
                     {event.description ? <div style={styles.listBody}>{event.description}</div> : null}
+
+                    {isAdmin ? (
+                      <div style={styles.inlineActionRow}>
+                        <button style={styles.secondaryButton} onClick={() => handleEditEvent(event)}>
+                          Edit
+                        </button>
+                        <button style={styles.deleteButton} onClick={() => handleDeleteEvent(event.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -1252,5 +1433,27 @@ const styles = {
     background: "#f7f3f5",
     color: "#6f2237",
     fontWeight: 700,
+  },
+  formButtonRow: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+  linkLikeButton: {
+    background: "#ffffff",
+    color: "#8b1e3f",
+    border: "2px solid #8b1e3f",
+    borderRadius: 12,
+    padding: "10px 16px",
+    fontWeight: 800,
+    fontSize: "0.95rem",
+    cursor: "pointer",
+  },
+  inlineActionRow: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    marginTop: 14,
   },
 };
