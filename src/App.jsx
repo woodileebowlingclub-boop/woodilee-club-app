@@ -17,123 +17,205 @@ const TABS = [
   { key: "documents", label: "Documents" },
 ];
 
-const DOCUMENT_CATEGORIES = [
-  "General",
-  "Competitions",
-  "Rules",
-  "Forms",
-  "Minutes",
-  "Finance",
-  "Notices",
-];
-
 function safeString(value, fallback = "") {
   if (value === null || value === undefined) return fallback;
   return String(value);
 }
 
-function cleanPhone(phone) {
-  return safeString(phone).replace(/\s+/g, "");
-}
-
-function formatPhoneForDisplay(phone) {
-  const cleaned = safeString(phone).replace(/\s+/g, "");
-  if (!cleaned) return "";
-  if (cleaned.startsWith("07") && cleaned.length === 11) {
-    return `${cleaned.slice(0, 5)} ${cleaned.slice(5, 8)} ${cleaned.slice(8)}`;
+function getFirstValue(obj, keys, fallback = "") {
+  for (const key of keys) {
+    if (obj && obj[key] !== null && obj[key] !== undefined && obj[key] !== "") {
+      return obj[key];
+    }
   }
-  return safeString(phone);
+  return fallback;
 }
 
-function formatDate(dateValue) {
-  if (!dateValue) return "";
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return safeString(dateValue);
-  return date.toLocaleDateString("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function formatShortDate(dateValue) {
-  if (!dateValue) return "";
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return safeString(dateValue);
-  return date.toLocaleDateString("en-GB", {
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return safeString(dateStr);
+  return d.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
 }
 
-function formatTime(timeValue) {
-  if (!timeValue) return "";
-  const raw = safeString(timeValue).trim();
+function toDateOnlyString(date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(date, days) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function getDayNameFromDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-GB", { weekday: "long" });
+}
+
+function getWeeklyDates(startDateStr, repeatUntilStr) {
+  const dates = [];
+  if (!startDateStr) return dates;
+
+  const start = new Date(startDateStr);
+  if (Number.isNaN(start.getTime())) return dates;
+
+  dates.push(toDateOnlyString(start));
+
+  if (!repeatUntilStr) return dates;
+
+  const until = new Date(repeatUntilStr);
+  if (Number.isNaN(until.getTime())) return dates;
+
+  let next = addDays(start, 7);
+  while (next <= until) {
+    dates.push(toDateOnlyString(next));
+    next = addDays(next, 7);
+  }
+
+  return dates;
+}
+
+function cleanPhone(value) {
+  const raw = safeString(value).trim();
   if (!raw) return "";
-  if (/^\d{2}:\d{2}(:\d{2})?$/.test(raw)) {
-    const [hours, minutes] = raw.split(":");
-    const date = new Date();
-    date.setHours(Number(hours), Number(minutes), 0, 0);
-    return date.toLocaleTimeString("en-GB", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  }
-  return raw;
+  return raw.replace(/[^\d+]/g, "");
 }
 
-function getFileExtension(fileName = "") {
-  const parts = String(fileName).split(".");
-  return parts.length > 1 ? parts.pop().toLowerCase() : "";
+function toWhatsAppLink(value) {
+  const raw = safeString(value).trim();
+  if (!raw) return "";
+  let cleaned = raw.replace(/\D/g, "");
+  if (cleaned.startsWith("0")) cleaned = `44${cleaned.slice(1)}`;
+  return cleaned ? `https://wa.me/${cleaned}` : "";
 }
 
-function isViewableFile(url = "", fileName = "") {
-  const ext = getFileExtension(fileName || url);
-  return ["pdf", "jpg", "jpeg", "png", "gif", "webp"].includes(ext);
+function shouldShowTime(timeValue) {
+  const t = safeString(timeValue).trim().toLowerCase();
+  return !!t && t !== "00:00" && t !== "00:00:00" && t !== "midnight";
 }
 
-function getViewerUrl(url = "", fileName = "") {
-  const ext = getFileExtension(fileName || url);
-  if (ext === "pdf") {
-    return `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(url)}`;
-  }
-  return url;
+function normaliseMemberCategory(value) {
+  const v = safeString(value).trim().toLowerCase();
+
+  if (["gent", "gents", "men", "male"].includes(v)) return "gents";
+  if (["lady", "ladies", "women", "female"].includes(v)) return "ladies";
+  if (["associate", "associates", "assoc"].includes(v)) return "associate";
+
+  return "gents";
 }
 
-function sortDocuments(list = [], sortMode = "title-asc") {
-  const arr = [...list];
-  if (sortMode === "title-asc") {
-    return arr.sort((a, b) => safeString(a.title).localeCompare(safeString(b.title), undefined, { sensitivity: "base" }));
-  }
-  if (sortMode === "title-desc") {
-    return arr.sort((a, b) => safeString(b.title).localeCompare(safeString(a.title), undefined, { sensitivity: "base" }));
-  }
-  if (sortMode === "category-asc") {
-    return arr.sort((a, b) => {
-      const categoryCompare = safeString(a.category).localeCompare(safeString(b.category), undefined, { sensitivity: "base" });
-      if (categoryCompare !== 0) return categoryCompare;
-      return safeString(a.title).localeCompare(safeString(b.title), undefined, { sensitivity: "base" });
-    });
-  }
-  if (sortMode === "newest") {
-    return arr.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-  }
-  if (sortMode === "oldest") {
-    return arr.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
-  }
-  return arr;
+function normaliseEvent(row) {
+  return {
+    id: getFirstValue(row, ["id"]),
+    title: getFirstValue(row, ["title", "name", "event_name"], "Untitled event"),
+    event_date: getFirstValue(row, ["event_date", "date", "eventDate"]),
+    event_time: getFirstValue(row, ["event_time", "time", "time_text", "date_text_time"]),
+    details: getFirstValue(row, ["details", "note", "notes", "content", "description"]),
+    date_text: getFirstValue(row, ["date_text"]),
+  };
 }
 
-function sortByName(list, key = "name") {
-  return [...list].sort((a, b) => safeString(a[key] || a.full_name).localeCompare(safeString(b[key] || b.full_name), undefined, { sensitivity: "base" }));
+function normaliseNotice(row) {
+  return {
+    id: getFirstValue(row, ["id"]),
+    title: getFirstValue(row, ["title", "heading", "name"], "Notice"),
+    content: getFirstValue(row, ["content", "details", "description", "text"]),
+    created_at: getFirstValue(row, ["created_at"]),
+  };
+}
+
+function normaliseMember(row) {
+  return {
+    id: getFirstValue(row, ["id"]),
+    full_name: getFirstValue(row, ["full_name", "name", "member_name"]),
+    phone: getFirstValue(row, ["phone", "mobile", "telephone", "tel"]),
+    whatsapp: getFirstValue(row, ["whatsapp", "whats_app", "whatsapp_number"]),
+    email: getFirstValue(row, ["email", "email_address"]),
+    category: normaliseMemberCategory(
+      getFirstValue(row, ["category", "section", "member_type"], "gents")
+    ),
+  };
+}
+
+function normaliseOfficeBearer(row) {
+  return {
+    id: getFirstValue(row, ["id"]),
+    role: getFirstValue(row, ["role", "position", "title"]),
+    name: getFirstValue(row, ["name", "full_name", "person"]),
+    phone: getFirstValue(row, ["phone", "mobile", "telephone", "tel"]),
+    whatsapp: getFirstValue(row, ["whatsapp", "whats_app", "whatsapp_number"]),
+    email: getFirstValue(row, ["email", "email_address"]),
+    display_order: Number(
+      getFirstValue(row, ["display_order", "sort_order", "position_order"], 0)
+    ),
+  };
+}
+
+function normaliseCoach(row) {
+  return {
+    id: getFirstValue(row, ["id"]),
+    name: getFirstValue(row, ["name", "full_name"]),
+    phone: getFirstValue(row, ["phone", "mobile", "telephone", "tel"]),
+    whatsapp: getFirstValue(row, ["whatsapp", "whats_app", "whatsapp_number"]),
+    email: getFirstValue(row, ["email", "email_address"]),
+    notes: getFirstValue(row, ["notes", "details", "description"]),
+  };
+}
+
+function normaliseDocument(row) {
+  return {
+    id: getFirstValue(row, ["id"]),
+    title: getFirstValue(row, ["title", "name", "file_name"], "Open document"),
+    file_url: getFirstValue(row, ["file_url", "url", "link"]),
+  };
+}
+
+function ContactButtons({ item }) {
+  const phone = cleanPhone(item.phone);
+  const whatsappLink = toWhatsAppLink(item.whatsapp || item.phone);
+  const email = safeString(item.email);
+
+  if (!phone && !whatsappLink && !email) return null;
+
+  return (
+    <div style={styles.contactButtons}>
+      {phone ? (
+        <a href={`tel:${phone}`} style={styles.actionBtn}>
+          Call
+        </a>
+      ) : null}
+      {whatsappLink ? (
+        <a href={whatsappLink} target="_blank" rel="noreferrer" style={styles.actionBtnAlt}>
+          WhatsApp
+        </a>
+      ) : null}
+      {email ? (
+        <a href={`mailto:${email}`} style={styles.actionBtnAlt}>
+          Email
+        </a>
+      ) : null}
+    </div>
+  );
 }
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("home");
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminMode, setAdminMode] = useState(false);
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [adminPinInput, setAdminPinInput] = useState("");
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [memberSearch, setMemberSearch] = useState("");
 
   const [events, setEvents] = useState([]);
   const [notices, setNotices] = useState([]);
@@ -142,580 +224,1511 @@ export default function App() {
   const [coaches, setCoaches] = useState([]);
   const [documents, setDocuments] = useState([]);
 
-  const [eventForm, setEventForm] = useState({ id: null, title: "", event_date: "", event_time: "", location: "", description: "" });
-  const [noticeForm, setNoticeForm] = useState({ id: null, title: "", description: "", url: "" });
-  const [memberForm, setMemberForm] = useState({ id: null, full_name: "", category: "Gents", phone: "", email: "" });
-  const [officeForm, setOfficeForm] = useState({ id: null, name: "", role: "", phone: "", email: "", sort_order: "" });
-  const [coachForm, setCoachForm] = useState({ id: null, name: "", role: "Coach", phone: "", email: "", sort_order: "" });
+  const [newEvent, setNewEvent] = useState({
+    title: "",
+    event_date: "",
+    event_time: "",
+    details: "",
+    repeat_type: "none",
+    repeat_until: "",
+  });
 
-  const [docTitle, setDocTitle] = useState("");
-  const [docCategory, setDocCategory] = useState("General");
-  const [docDescription, setDocDescription] = useState("");
-  const [docFile, setDocFile] = useState(null);
-  const [docSort, setDocSort] = useState("title-asc");
-  const [docViewerUrl, setDocViewerUrl] = useState("");
-  const [docViewerTitle, setDocViewerTitle] = useState("");
+  const [newNotice, setNewNotice] = useState({
+    title: "",
+    content: "",
+  });
 
-  const [isSavingEvent, setIsSavingEvent] = useState(false);
-  const [isSavingNotice, setIsSavingNotice] = useState(false);
-  const [isSavingMember, setIsSavingMember] = useState(false);
-  const [isSavingOffice, setIsSavingOffice] = useState(false);
-  const [isSavingCoach, setIsSavingCoach] = useState(false);
-  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [newMember, setNewMember] = useState({
+    full_name: "",
+    phone: "",
+    whatsapp: "",
+    email: "",
+    category: "gents",
+  });
 
-  const groupedMembers = useMemo(() => {
-    const groups = { Gents: [], Ladies: [], Associates: [] };
-    members.forEach((member) => {
-      const category = safeString(member.category).toLowerCase();
-      if (category.includes("lad")) groups.Ladies.push(member);
-      else if (category.includes("assoc")) groups.Associates.push(member);
-      else groups.Gents.push(member);
-    });
-    return groups;
-  }, [members]);
+  const [newOfficeBearer, setNewOfficeBearer] = useState({
+    role: "",
+    name: "",
+    phone: "",
+    whatsapp: "",
+    email: "",
+  });
 
-  async function fetchEvents() {
-    const { data, error } = await supabase.from("events").select("*");
-    if (error) {
-      console.error("Error loading events:", error.message);
-      return;
-    }
-    const cleaned = (data || []).map((event) => ({
-      ...event,
-      title: event.title || event.name || "",
-      event_date: event.event_date || event.date || "",
-      event_time: event.event_time || event.time || "",
-      location: event.location || "",
-      description: event.description || event.details || "",
-    }));
-    cleaned.sort((a, b) => {
-      const keyA = `${a.event_date || "9999-12-31"}T${a.event_time || "23:59"}`;
-      const keyB = `${b.event_date || "9999-12-31"}T${b.event_time || "23:59"}`;
-      return new Date(keyA).getTime() - new Date(keyB).getTime();
-    });
-    setEvents(cleaned);
-  }
-
-  async function fetchNotices() {
-    const { data, error } = await supabase.from("information_posts").select("*");
-    if (error) {
-      console.error("Error loading notices:", error.message);
-      return;
-    }
-    const cleaned = (data || []).map((notice) => ({
-      ...notice,
-      title: notice.title || "Notice",
-      description: notice.description || notice.content || "",
-      url: notice.url || "",
-    }));
-    cleaned.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-    setNotices(cleaned);
-  }
-
-  async function fetchMembers() {
-    const { data, error } = await supabase.from("members").select("*");
-    if (error) {
-      console.error("Error loading members:", error.message);
-      return;
-    }
-    const cleaned = (data || []).map((member) => ({
-      ...member,
-      full_name: member.full_name || member.name || "",
-      category: member.category || "Gents",
-      phone: member.phone || member.mobile || member.contact_number || "",
-      email: member.email || "",
-    }));
-    setMembers(sortByName(cleaned, "full_name"));
-  }
-
-  async function fetchOfficeBearers() {
-    const { data, error } = await supabase.from("office_bearers").select("*");
-    if (error) {
-      console.error("Error loading office bearers:", error.message);
-      return;
-    }
-    const cleaned = [...(data || [])].sort((a, b) => {
-      const sortA = Number(a.sort_order ?? 9999);
-      const sortB = Number(b.sort_order ?? 9999);
-      if (sortA !== sortB) return sortA - sortB;
-      return safeString(a.name).localeCompare(safeString(b.name), undefined, { sensitivity: "base" });
-    });
-    setOfficeBearers(cleaned);
-  }
-
-  async function fetchCoaches() {
-    const { data, error } = await supabase.from("club_coaches").select("*");
-    if (error) {
-      console.error("Error loading coaches:", error.message);
-      return;
-    }
-    const cleaned = [...(data || [])].sort((a, b) => {
-      const sortA = Number(a.sort_order ?? 9999);
-      const sortB = Number(b.sort_order ?? 9999);
-      if (sortA !== sortB) return sortA - sortB;
-      return safeString(a.name).localeCompare(safeString(b.name), undefined, { sensitivity: "base" });
-    });
-    setCoaches(cleaned);
-  }
-
-  async function fetchDocuments() {
-    const { data, error } = await supabase.from("documents").select("*");
-    if (error) {
-      console.error("Error loading documents:", error.message);
-      return;
-    }
-    const cleaned = (data || []).map((doc) => ({
-      ...doc,
-      file_url: doc.file_url || doc.url || "",
-      category: doc.category || "General",
-      description: doc.description || "",
-      button_text: doc.button_text || "Open",
-    }));
-    setDocuments(sortDocuments(cleaned, docSort));
-  }
-
-  async function loadAllData() {
-    setLoading(true);
-    await Promise.all([
-      fetchEvents(),
-      fetchNotices(),
-      fetchMembers(),
-      fetchOfficeBearers(),
-      fetchCoaches(),
-      fetchDocuments(),
-    ]);
-    setLoading(false);
-  }
+  const [newCoach, setNewCoach] = useState({
+    name: "",
+    phone: "",
+    whatsapp: "",
+    email: "",
+    notes: "",
+  });
 
   useEffect(() => {
     loadAllData();
   }, []);
 
-  useEffect(() => {
-    setDocuments((prev) => sortDocuments(prev, docSort));
-  }, [docSort]);
+  async function loadAllData() {
+    setLoading(true);
+    setErrorMessage("");
+
+    await Promise.all([
+      loadEvents(),
+      loadNotices(),
+      loadMembers(),
+      loadOfficeBearers(),
+      loadCoaches(),
+      loadDocuments(),
+    ]);
+
+    setLoading(false);
+  }
+
+  async function loadEvents() {
+    const { data, error } = await supabase
+      .from("events")
+      .select("*")
+      .order("date", { ascending: true });
+
+    if (error) {
+      setEvents([]);
+      setErrorMessage(error.message || "Could not load events.");
+      return;
+    }
+
+    setEvents((data || []).map(normaliseEvent));
+  }
+
+  async function loadNotices() {
+    const { data, error } = await supabase
+      .from("information_posts")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error) setNotices((data || []).map(normaliseNotice));
+  }
+
+  async function loadMembers() {
+    const { data, error } = await supabase
+      .from("members")
+      .select("*")
+      .order("full_name", { ascending: true });
+
+    if (!error) setMembers((data || []).map(normaliseMember));
+  }
+
+  async function loadOfficeBearers() {
+    const { data, error } = await supabase
+      .from("office_bearers")
+      .select("*")
+      .order("display_order", { ascending: true });
+
+    if (!error) {
+      setOfficeBearers(
+        (data || [])
+          .map(normaliseOfficeBearer)
+          .sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0))
+      );
+    }
+  }
+
+  async function loadCoaches() {
+    const { data, error } = await supabase
+      .from("club_coaches")
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (!error) setCoaches((data || []).map(normaliseCoach));
+  }
+
+  async function loadDocuments() {
+    const { data, error } = await supabase
+      .from("documents")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error) setDocuments((data || []).map(normaliseDocument));
+  }
+
+  const allSortedEvents = useMemo(() => {
+    return [...events]
+      .filter((event) => {
+        if (!event.event_date) return false;
+        const d = new Date(event.event_date);
+        return !Number.isNaN(d.getTime());
+      })
+      .sort((a, b) => {
+        const aDate = new Date(`${a.event_date}T${a.event_time || "00:00"}`);
+        const bDate = new Date(`${b.event_date}T${b.event_time || "00:00"}`);
+        return aDate - bDate;
+      });
+  }, [events]);
+
+  const diaryEvents = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const upcoming = allSortedEvents.filter((event) => {
+      const d = new Date(event.event_date);
+      d.setHours(0, 0, 0, 0);
+      return d >= today;
+    });
+
+    if (upcoming.length > 0) return upcoming;
+
+    return allSortedEvents.slice(-10).reverse();
+  }, [allSortedEvents]);
+
+  const pastEvents = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return allSortedEvents.filter((event) => {
+      const d = new Date(event.event_date);
+      d.setHours(0, 0, 0, 0);
+      return d < today;
+    });
+  }, [allSortedEvents]);
+
+  const nextUpcomingEvent = diaryEvents.length > 0 ? diaryEvents[0] : null;
+  const latestNotices = notices.slice(0, 5);
+
+  const filteredMembers = useMemo(() => {
+    const q = memberSearch.trim().toLowerCase();
+    if (!q) return members;
+
+    return members.filter((m) => {
+      const haystack = [
+        safeString(m.full_name),
+        safeString(m.phone),
+        safeString(m.whatsapp),
+        safeString(m.email),
+        safeString(m.category),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(q);
+    });
+  }, [members, memberSearch]);
+
+  const gentsMembers = filteredMembers.filter((m) => m.category === "gents");
+  const ladiesMembers = filteredMembers.filter((m) => m.category === "ladies");
+  const associateMembers = filteredMembers.filter((m) => m.category === "associate");
 
   async function handleAdminLogin() {
-    const pin = window.prompt("Enter admin PIN");
-    if (pin === ADMIN_PIN) {
-      setIsAdmin(true);
-      window.alert("Admin mode enabled.");
-    } else if (pin !== null) {
-      window.alert("Incorrect PIN.");
+    if (adminPinInput === ADMIN_PIN) {
+      setAdminMode(true);
+      setShowAdminLogin(false);
+      setAdminPinInput("");
+    } else {
+      alert("Incorrect admin PIN.");
     }
   }
 
   function handleAdminLogout() {
-    setIsAdmin(false);
-    window.alert("Admin mode turned off.");
+    setAdminMode(false);
   }
 
-  function resetEventForm() {
-    setEventForm({ id: null, title: "", event_date: "", event_time: "", location: "", description: "" });
-  }
-  function resetNoticeForm() {
-    setNoticeForm({ id: null, title: "", description: "", url: "" });
-  }
-  function resetMemberForm() {
-    setMemberForm({ id: null, full_name: "", category: "Gents", phone: "", email: "" });
-  }
-  function resetOfficeForm() {
-    setOfficeForm({ id: null, name: "", role: "", phone: "", email: "", sort_order: "" });
-  }
-  function resetCoachForm() {
-    setCoachForm({ id: null, name: "", role: "Coach", phone: "", email: "", sort_order: "" });
-  }
-
-  function handleEditEvent(item) {
-    setEventForm({
-      id: item.id || null,
-      title: safeString(item.title),
-      event_date: safeString(item.event_date),
-      event_time: safeString(item.event_time),
-      location: safeString(item.location),
-      description: safeString(item.description),
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function handleEditNotice(item) {
-    setNoticeForm({
-      id: item.id || null,
-      title: safeString(item.title),
-      description: safeString(item.description),
-      url: safeString(item.url),
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function handleEditMember(item) {
-    setMemberForm({
-      id: item.id || null,
-      full_name: safeString(item.full_name),
-      category: safeString(item.category, "Gents"),
-      phone: safeString(item.phone),
-      email: safeString(item.email),
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function handleEditOffice(item) {
-    setOfficeForm({
-      id: item.id || null,
-      name: safeString(item.name),
-      role: safeString(item.role),
-      phone: safeString(item.phone),
-      email: safeString(item.email),
-      sort_order: safeString(item.sort_order),
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function handleEditCoach(item) {
-    setCoachForm({
-      id: item.id || null,
-      name: safeString(item.name),
-      role: safeString(item.role, "Coach"),
-      phone: safeString(item.phone),
-      email: safeString(item.email),
-      sort_order: safeString(item.sort_order),
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  async function handleSaveEvent() {
-    if (!eventForm.title.trim() || !eventForm.event_date) {
-      window.alert("Please enter a title and date.");
+  async function addEvent() {
+    if (!newEvent.title.trim() || !newEvent.event_date) {
+      alert("Please add at least a title and date.");
       return;
     }
-    setIsSavingEvent(true);
-    try {
-      const payload = {
-        title: eventForm.title.trim(),
-        event_date: eventForm.event_date,
-        event_time: eventForm.event_time || null,
-        location: eventForm.location.trim() || null,
-        description: eventForm.description.trim() || null,
-      };
-      const response = eventForm.id
-        ? await supabase.from("events").update(payload).eq("id", eventForm.id)
-        : await supabase.from("events").insert([payload]);
-      if (response.error) {
-        window.alert(`Could not save diary item: ${response.error.message}`);
+
+    let eventDates = [newEvent.event_date];
+
+    if (newEvent.repeat_type === "weekly") {
+      if (!newEvent.repeat_until) {
+        alert("Please choose a repeat until date.");
         return;
       }
-      await fetchEvents();
-      resetEventForm();
-    } finally {
-      setIsSavingEvent(false);
-    }
-  }
 
-  async function handleSaveNotice() {
-    if (!noticeForm.title.trim()) {
-      window.alert("Please enter a notice title.");
-      return;
-    }
-    setIsSavingNotice(true);
-    try {
-      const payload = {
-        title: noticeForm.title.trim(),
-        description: noticeForm.description.trim() || null,
-        content: noticeForm.description.trim() || null,
-        url: noticeForm.url.trim() || null,
-      };
-      const response = noticeForm.id
-        ? await supabase.from("information_posts").update(payload).eq("id", noticeForm.id)
-        : await supabase.from("information_posts").insert([payload]);
-      if (response.error) {
-        window.alert(`Could not save notice: ${response.error.message}`);
+      if (new Date(newEvent.repeat_until) < new Date(newEvent.event_date)) {
+        alert("Repeat until date must be after the first event date.");
         return;
       }
-      await fetchNotices();
-      resetNoticeForm();
-    } finally {
-      setIsSavingNotice(false);
-    }
-  }
 
-  async function handleSaveMember() {
-    if (!memberForm.full_name.trim()) {
-      window.alert("Please enter the member name.");
-      return;
+      eventDates = getWeeklyDates(newEvent.event_date, newEvent.repeat_until);
     }
-    setIsSavingMember(true);
-    try {
-      const payload = {
-        full_name: memberForm.full_name.trim(),
-        category: memberForm.category,
-        phone: memberForm.phone.trim() || null,
-        email: memberForm.email.trim() || null,
+
+    const rows = eventDates.map((dateStr) => {
+      const prettyDate = formatDate(dateStr);
+      return {
+        title: newEvent.title.trim(),
+        date: dateStr,
+        event_date: dateStr,
+        date_text: prettyDate,
+        event_time: newEvent.event_time.trim() || null,
+        time_text: newEvent.event_time.trim() || null,
+        details: newEvent.details.trim() || null,
+        note: newEvent.details.trim() || null,
       };
-      const response = memberForm.id
-        ? await supabase.from("members").update(payload).eq("id", memberForm.id)
-        : await supabase.from("members").insert([payload]);
-      if (response.error) {
-        window.alert(`Could not save member: ${response.error.message}`);
-        return;
-      }
-      await fetchMembers();
-      resetMemberForm();
-    } finally {
-      setIsSavingMember(false);
-    }
-  }
+    });
 
-  async function handleSaveOffice() {
-    if (!officeForm.name.trim() || !officeForm.role.trim()) {
-      window.alert("Please enter name and role.");
-      return;
-    }
-    setIsSavingOffice(true);
-    try {
-      const payload = {
-        name: officeForm.name.trim(),
-        role: officeForm.role.trim(),
-        phone: officeForm.phone.trim() || null,
-        email: officeForm.email.trim() || null,
-        sort_order: officeForm.sort_order === "" ? null : Number(officeForm.sort_order),
-      };
-      const response = officeForm.id
-        ? await supabase.from("office_bearers").update(payload).eq("id", officeForm.id)
-        : await supabase.from("office_bearers").insert([payload]);
-      if (response.error) {
-        window.alert(`Could not save office bearer: ${response.error.message}`);
-        return;
-      }
-      await fetchOfficeBearers();
-      resetOfficeForm();
-    } finally {
-      setIsSavingOffice(false);
-    }
-  }
+    const { error } = await supabase.from("events").insert(rows);
 
-  async function handleSaveCoach() {
-    if (!coachForm.name.trim()) {
-      window.alert("Please enter coach name.");
-      return;
-    }
-    setIsSavingCoach(true);
-    try {
-      const payload = {
-        name: coachForm.name.trim(),
-        role: coachForm.role.trim() || "Coach",
-        phone: coachForm.phone.trim() || null,
-        email: coachForm.email.trim() || null,
-        sort_order: coachForm.sort_order === "" ? null : Number(coachForm.sort_order),
-      };
-      const response = coachForm.id
-        ? await supabase.from("club_coaches").update(payload).eq("id", coachForm.id)
-        : await supabase.from("club_coaches").insert([payload]);
-      if (response.error) {
-        window.alert(`Could not save coach: ${response.error.message}`);
-        return;
-      }
-      await fetchCoaches();
-      resetCoachForm();
-    } finally {
-      setIsSavingCoach(false);
-    }
-  }
-
-  async function handleDeleteRow(table, id, refreshFn, label, resetFn, currentId) {
-    const ok = window.confirm(`Delete this ${label}?`);
-    if (!ok) return;
-    const { error } = await supabase.from(table).delete().eq("id", id);
     if (error) {
-      window.alert(`Could not delete ${label}: ${error.message}`);
+      alert(error.message || "Could not add event.");
       return;
     }
-    if (currentId === id && resetFn) resetFn();
-    await refreshFn();
+
+    setNewEvent({
+      title: "",
+      event_date: "",
+      event_time: "",
+      details: "",
+      repeat_type: "none",
+      repeat_until: "",
+    });
+
+    await loadEvents();
+    alert(rows.length === 1 ? "Event added." : `${rows.length} repeated events added.`);
   }
 
-  async function handleDocumentUpload() {
-    if (!docTitle.trim()) {
-      window.alert("Please enter a document title.");
-      return;
-    }
-    if (!docFile) {
-      window.alert("Please choose a file.");
-      return;
-    }
-    setIsUploadingDoc(true);
-    try {
-      const safeName = docFile.name.replace(/\s+/g, "-");
-      const fileName = `${Date.now()}-${safeName}`;
-      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(fileName, docFile, { upsert: false });
-      if (uploadError) {
-        window.alert(`File upload failed: ${uploadError.message}`);
-        return;
-      }
-      const { data: publicUrlData } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
-      const publicUrl = publicUrlData?.publicUrl || "";
-      const { error: insertError } = await supabase.from("documents").insert([
-        {
-          title: docTitle.trim(),
-          description: docDescription.trim() || null,
-          category: docCategory,
-          file_name: docFile.name,
-          file_url: publicUrl,
-          button_text: "Open",
-        },
-      ]);
-      if (insertError) {
-        window.alert(`Document record could not be saved: ${insertError.message}`);
-        return;
-      }
-      setDocTitle("");
-      setDocCategory("General");
-      setDocDescription("");
-      setDocFile(null);
-      const input = document.getElementById("document-upload-input");
-      if (input) input.value = "";
-      await fetchDocuments();
-    } finally {
-      setIsUploadingDoc(false);
-    }
-  }
+  async function deleteEvent(id) {
+    if (!window.confirm("Delete this event?")) return;
 
-  async function handleDeleteDocument(doc) {
-    const ok = window.confirm(`Delete \"${safeString(doc.title, "this document")}\"?`);
-    if (!ok) return;
-    const fileUrl = doc.file_url || doc.url || "";
-    if (fileUrl) {
-      const parts = fileUrl.split("/");
-      const storageFileName = parts[parts.length - 1];
-      if (storageFileName) {
-        await supabase.storage.from(BUCKET).remove([storageFileName]);
-      }
-    }
-    const { error } = await supabase.from("documents").delete().eq("id", doc.id);
+    const { error } = await supabase.from("events").delete().eq("id", id);
     if (error) {
-      window.alert(`Could not delete document: ${error.message}`);
+      alert(error.message || "Could not delete event.");
       return;
     }
-    setDocViewerUrl("");
-    setDocViewerTitle("");
-    await fetchDocuments();
+
+    loadEvents();
   }
 
-  function handleOpenDocument(doc) {
-    const fileUrl = doc.file_url || doc.url || "";
-    if (!fileUrl) {
-      window.alert("This document has no file link.");
+  async function deletePastEvents() {
+    if (pastEvents.length === 0) {
+      alert("There are no past events to delete.");
       return;
     }
-    if (isViewableFile(fileUrl, doc.file_name)) {
-      setDocViewerTitle(doc.title || "Document");
-      setDocViewerUrl(getViewerUrl(fileUrl, doc.file_name));
-    } else {
-      window.open(fileUrl, "_blank", "noopener,noreferrer");
+
+    if (!window.confirm(`Delete ${pastEvents.length} past event(s)?`)) return;
+
+    const ids = pastEvents.map((e) => e.id).filter(Boolean);
+    const { error } = await supabase.from("events").delete().in("id", ids);
+
+    if (error) {
+      alert(error.message || "Could not delete past events.");
+      return;
     }
+
+    loadEvents();
   }
 
-  function renderPersonCard(person, type, editHandler, deleteHandler) {
-    const phone = person.phone || person.mobile || person.contact_number || "";
-    const displayPhone = formatPhoneForDisplay(phone);
-    const telPhone = cleanPhone(phone);
-    const whatsappPhone = telPhone.startsWith("0") ? `44${telPhone.slice(1)}` : telPhone;
+  async function addNotice() {
+    if (!newNotice.title.trim() || !newNotice.content.trim()) {
+      alert("Please enter a notice title and content.");
+      return;
+    }
+
+    const { error } = await supabase.from("information_posts").insert([
+      {
+        title: newNotice.title.trim(),
+        content: newNotice.content.trim(),
+      },
+    ]);
+
+    if (error) {
+      alert(error.message || "Could not add notice.");
+      return;
+    }
+
+    setNewNotice({ title: "", content: "" });
+    loadNotices();
+  }
+
+  async function deleteNotice(id) {
+    if (!window.confirm("Delete this notice?")) return;
+
+    const { error } = await supabase.from("information_posts").delete().eq("id", id);
+    if (error) {
+      alert(error.message || "Could not delete notice.");
+      return;
+    }
+
+    loadNotices();
+  }
+
+  async function addMember() {
+    if (!newMember.full_name.trim()) {
+      alert("Please enter a member name.");
+      return;
+    }
+
+    const payload = {
+      full_name: newMember.full_name.trim(),
+      name: newMember.full_name.trim(),
+      phone: newMember.phone.trim() || null,
+      whatsapp: newMember.whatsapp.trim() || null,
+      email: newMember.email.trim() || null,
+      category: normaliseMemberCategory(newMember.category),
+    };
+
+    const { error } = await supabase.from("members").insert([payload]);
+
+    if (error) {
+      alert(error.message || "Could not add member.");
+      return;
+    }
+
+    setNewMember({
+      full_name: "",
+      phone: "",
+      whatsapp: "",
+      email: "",
+      category: "gents",
+    });
+
+    await loadMembers();
+    alert("Member added.");
+  }
+
+  async function deleteMember(id) {
+    if (!window.confirm("Delete this member?")) return;
+
+    const { error } = await supabase.from("members").delete().eq("id", id);
+    if (error) {
+      alert(error.message || "Could not delete member.");
+      return;
+    }
+
+    loadMembers();
+  }
+
+  async function addOfficeBearer() {
+    if (!newOfficeBearer.role.trim() || !newOfficeBearer.name.trim()) {
+      alert("Please enter role and name.");
+      return;
+    }
+
+    const nextOrder =
+      officeBearers.length > 0
+        ? Math.max(...officeBearers.map((x) => Number(x.display_order || 0))) + 1
+        : 1;
+
+    const payload = {
+      role: newOfficeBearer.role.trim(),
+      name: newOfficeBearer.name.trim(),
+      phone: newOfficeBearer.phone.trim() || null,
+      whatsapp: newOfficeBearer.whatsapp.trim() || null,
+      email: newOfficeBearer.email.trim() || null,
+      display_order: nextOrder,
+    };
+
+    const { error } = await supabase.from("office_bearers").insert([payload]);
+
+    if (error) {
+      alert(error.message || "Could not add office bearer.");
+      return;
+    }
+
+    setNewOfficeBearer({
+      role: "",
+      name: "",
+      phone: "",
+      whatsapp: "",
+      email: "",
+    });
+
+    await loadOfficeBearers();
+    alert("Office bearer added.");
+  }
+
+  async function deleteOfficeBearer(id) {
+    if (!window.confirm("Delete this office bearer?")) return;
+
+    const { error } = await supabase.from("office_bearers").delete().eq("id", id);
+    if (error) {
+      alert(error.message || "Could not delete office bearer.");
+      return;
+    }
+
+    loadOfficeBearers();
+  }
+
+  async function addCoach() {
+    if (!newCoach.name.trim()) {
+      alert("Please enter coach name.");
+      return;
+    }
+
+    const { error } = await supabase.from("club_coaches").insert([
+      {
+        name: newCoach.name.trim(),
+        phone: newCoach.phone.trim() || null,
+        whatsapp: newCoach.whatsapp.trim() || null,
+        email: newCoach.email.trim() || null,
+        notes: newCoach.notes.trim() || null,
+      },
+    ]);
+
+    if (error) {
+      alert(error.message || "Could not add coach.");
+      return;
+    }
+
+    setNewCoach({
+      name: "",
+      phone: "",
+      whatsapp: "",
+      email: "",
+      notes: "",
+    });
+
+    loadCoaches();
+  }
+
+  async function deleteCoach(id) {
+    if (!window.confirm("Delete this coach?")) return;
+
+    const { error } = await supabase.from("club_coaches").delete().eq("id", id);
+    if (error) {
+      alert(error.message || "Could not delete coach.");
+      return;
+    }
+
+    loadCoaches();
+  }
+
+  async function uploadDocument(file) {
+    if (!file) return;
+
+    const fileName = `${Date.now()}-${file.name}`;
+    const filePath = fileName;
+
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(filePath, file);
+
+    if (uploadError) {
+      alert(uploadError.message || "Document upload failed.");
+      return;
+    }
+
+    const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
+
+    const { error: insertError } = await supabase.from("documents").insert([
+      {
+        title: file.name,
+        file_url: publicData?.publicUrl || "",
+      },
+    ]);
+
+    if (insertError) {
+      alert(insertError.message || "Upload saved but database record failed.");
+      return;
+    }
+
+    loadDocuments();
+  }
+
+  async function deleteDocument(id) {
+    if (!window.confirm("Delete this document?")) return;
+
+    const { error } = await supabase.from("documents").delete().eq("id", id);
+    if (error) {
+      alert(error.message || "Could not delete document.");
+      return;
+    }
+
+    loadDocuments();
+  }
+
+  function renderHome() {
     return (
-      <div key={`${type}-${person.id || person.name || person.full_name}`} style={styles.personCard}>
-        <div>
-          <div style={styles.personName}>{person.full_name || person.name || "Unnamed"}</div>
-          {person.role ? <div style={styles.personRole}>{person.role}</div> : null}
-          {person.category ? <div style={styles.personRole}>{person.category}</div> : null}
-          {person.email ? <div style={styles.personDetail}>{person.email}</div> : null}
-          {displayPhone ? <div style={styles.personDetail}>{displayPhone}</div> : null}
+      <div style={styles.grid3}>
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>Welcome</h2>
+          <p style={styles.largeText}>
+            Welcome to the club app. Use the tabs above to view diary dates,
+            notices, members, office bearers, coaches and documents.
+          </p>
+          <div style={styles.websiteRow}>
+            <a
+              href="https://woodileebowlingclub.co.uk/home"
+              target="_blank"
+              rel="noreferrer"
+              style={styles.websiteLink}
+            >
+              Visit our website
+            </a>
+          </div>
         </div>
-        <div style={styles.personActionsWrap}>
-          {(telPhone || whatsappPhone) && (
-            <div style={styles.personActions}>
-              {telPhone ? <a href={`tel:${telPhone}`} style={styles.actionLink}>Call</a> : null}
-              {whatsappPhone ? <a href={`https://wa.me/${whatsappPhone}`} target="_blank" rel="noreferrer" style={styles.actionLinkSecondary}>WhatsApp</a> : null}
+
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>Upcoming Diary</h2>
+          {nextUpcomingEvent ? (
+            <div style={styles.eventCard}>
+              <div style={styles.eventTitle}>{safeString(nextUpcomingEvent.title)}</div>
+              <div style={styles.eventDate}>{formatDate(nextUpcomingEvent.event_date)}</div>
+              {shouldShowTime(nextUpcomingEvent.event_time) ? (
+                <div style={styles.eventMeta}>Time: {nextUpcomingEvent.event_time}</div>
+              ) : null}
+              {nextUpcomingEvent.details ? (
+                <div style={styles.eventDetails}>{nextUpcomingEvent.details}</div>
+              ) : null}
             </div>
+          ) : (
+            <p style={styles.emptyText}>No upcoming events.</p>
           )}
-          {isAdmin ? (
-            <div style={styles.inlineActionRow}>
-              <button style={styles.secondaryButton} onClick={() => editHandler(person)}>Edit</button>
-              <button style={styles.deleteButton} onClick={() => deleteHandler(person.id)}>Delete</button>
-            </div>
-          ) : null}
+        </div>
+
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>Latest Notices</h2>
+          {latestNotices.length === 0 ? (
+            <p style={styles.emptyText}>No notices yet.</p>
+          ) : (
+            latestNotices.map((notice) => (
+              <div key={notice.id} style={styles.noticeCard}>
+                <div style={styles.noticeTitle}>{safeString(notice.title)}</div>
+                <div style={styles.noticeBody}>{safeString(notice.content)}</div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     );
   }
 
-  return <div>Replace with code from previous canvas if needed.</div>;
+  function renderDiary() {
+    return (
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Diary</h2>
+
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Add Event</h3>
+
+            <div style={styles.formGrid}>
+              <input
+                style={styles.input}
+                placeholder="Title"
+                value={newEvent.title}
+                onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+              />
+
+              <input
+                style={styles.input}
+                type="date"
+                value={newEvent.event_date}
+                onChange={(e) => setNewEvent({ ...newEvent, event_date: e.target.value })}
+              />
+
+              <input
+                style={styles.input}
+                placeholder="Time"
+                value={newEvent.event_time}
+                onChange={(e) => setNewEvent({ ...newEvent, event_time: e.target.value })}
+              />
+
+              <select
+                style={styles.input}
+                value={newEvent.repeat_type}
+                onChange={(e) => setNewEvent({ ...newEvent, repeat_type: e.target.value })}
+              >
+                <option value="none">Do not repeat</option>
+                <option value="weekly">Repeat weekly</option>
+              </select>
+
+              {newEvent.repeat_type === "weekly" ? (
+                <input
+                  style={styles.input}
+                  type="date"
+                  value={newEvent.repeat_until}
+                  onChange={(e) => setNewEvent({ ...newEvent, repeat_until: e.target.value })}
+                />
+              ) : null}
+            </div>
+
+            {newEvent.event_date ? (
+              <div style={styles.repeatHelp}>
+                First event day: <strong>{getDayNameFromDate(newEvent.event_date)}</strong>
+                {newEvent.repeat_type === "weekly" && newEvent.repeat_until ? (
+                  <>
+                    {" "}— repeats every <strong>{getDayNameFromDate(newEvent.event_date)}</strong> until{" "}
+                    <strong>{formatDate(newEvent.repeat_until)}</strong>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+
+            <textarea
+              style={styles.textarea}
+              placeholder="Details"
+              value={newEvent.details}
+              onChange={(e) => setNewEvent({ ...newEvent, details: e.target.value })}
+            />
+
+            <div style={styles.adminActionRow}>
+              <button style={styles.primaryBtn} onClick={addEvent}>
+                Add Event
+              </button>
+              <button style={styles.secondaryBtn} onClick={deletePastEvents}>
+                Delete Past Events
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {diaryEvents.length === 0 ? (
+          <p style={styles.emptyText}>No diary items yet.</p>
+        ) : (
+          <div style={styles.listWrap}>
+            {diaryEvents.map((event) => (
+              <div key={event.id} style={styles.listCard}>
+                <div style={styles.eventTitle}>{safeString(event.title)}</div>
+                <div style={styles.eventDate}>{formatDate(event.event_date)}</div>
+
+                {shouldShowTime(event.event_time) ? (
+                  <div style={styles.eventMeta}>Time: {event.event_time}</div>
+                ) : null}
+
+                {event.details ? (
+                  <div style={styles.eventDetails}>{event.details}</div>
+                ) : null}
+
+                {adminMode ? (
+                  <button style={styles.deleteBtn} onClick={() => deleteEvent(event.id)}>
+                    Delete
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderNotices() {
+    return (
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Noticeboard</h2>
+
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Add Notice</h3>
+            <input
+              style={styles.input}
+              placeholder="Notice title"
+              value={newNotice.title}
+              onChange={(e) => setNewNotice({ ...newNotice, title: e.target.value })}
+            />
+            <textarea
+              style={styles.textarea}
+              placeholder="Notice content"
+              value={newNotice.content}
+              onChange={(e) => setNewNotice({ ...newNotice, content: e.target.value })}
+            />
+            <button style={styles.primaryBtn} onClick={addNotice}>
+              Add Notice
+            </button>
+          </div>
+        ) : null}
+
+        {notices.length === 0 ? (
+          <p style={styles.emptyText}>No notices yet.</p>
+        ) : (
+          <div style={styles.listWrap}>
+            {notices.map((notice) => (
+              <div key={notice.id} style={styles.listCard}>
+                <div style={styles.noticeTitle}>{safeString(notice.title)}</div>
+                <div style={styles.noticeBody}>{safeString(notice.content)}</div>
+                {adminMode ? (
+                  <button style={styles.deleteBtn} onClick={() => deleteNotice(notice.id)}>
+                    Delete
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderMembersSection(title, items) {
+    return (
+      <div style={styles.memberSection}>
+        <h3 style={styles.sectionTitle}>{title}</h3>
+        {items.length === 0 ? (
+          <p style={styles.emptyText}>None added yet.</p>
+        ) : (
+          items.map((member) => (
+            <div key={member.id} style={styles.listCard}>
+              <div style={styles.noticeTitle}>{safeString(member.full_name)}</div>
+              {member.phone ? <div style={styles.infoLine}>Phone: {member.phone}</div> : null}
+              {member.whatsapp ? <div style={styles.infoLine}>WhatsApp: {member.whatsapp}</div> : null}
+              {member.email ? <div style={styles.infoLine}>Email: {member.email}</div> : null}
+              <ContactButtons item={member} />
+              {adminMode ? (
+                <button style={styles.deleteBtn} onClick={() => deleteMember(member.id)}>
+                  Delete
+                </button>
+              ) : null}
+            </div>
+          ))
+        )}
+      </div>
+    );
+  }
+
+  function renderMembers() {
+    return (
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Members</h2>
+
+        <div style={styles.searchRow}>
+          <input
+            style={styles.input}
+            placeholder="Search members"
+            value={memberSearch}
+            onChange={(e) => setMemberSearch(e.target.value)}
+          />
+        </div>
+
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Add Member</h3>
+            <div style={styles.formGrid}>
+              <input
+                style={styles.input}
+                placeholder="Full name"
+                value={newMember.full_name}
+                onChange={(e) => setNewMember({ ...newMember, full_name: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="Phone"
+                value={newMember.phone}
+                onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="WhatsApp"
+                value={newMember.whatsapp}
+                onChange={(e) => setNewMember({ ...newMember, whatsapp: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="Email"
+                value={newMember.email}
+                onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+              />
+              <select
+                style={styles.input}
+                value={newMember.category}
+                onChange={(e) => setNewMember({ ...newMember, category: e.target.value })}
+              >
+                <option value="gents">Gents</option>
+                <option value="ladies">Ladies</option>
+                <option value="associate">Associate</option>
+              </select>
+            </div>
+            <button style={styles.primaryBtn} onClick={addMember}>
+              Add Member
+            </button>
+          </div>
+        ) : null}
+
+        <div style={styles.membersGrid}>
+          {renderMembersSection("Gents", gentsMembers)}
+          {renderMembersSection("Ladies", ladiesMembers)}
+          {renderMembersSection("Associate", associateMembers)}
+        </div>
+      </div>
+    );
+  }
+
+  function renderOfficeBearers() {
+    return (
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Office Bearers</h2>
+
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Add Office Bearer</h3>
+            <div style={styles.formGrid}>
+              <input
+                style={styles.input}
+                placeholder="Role"
+                value={newOfficeBearer.role}
+                onChange={(e) => setNewOfficeBearer({ ...newOfficeBearer, role: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="Name"
+                value={newOfficeBearer.name}
+                onChange={(e) => setNewOfficeBearer({ ...newOfficeBearer, name: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="Phone"
+                value={newOfficeBearer.phone}
+                onChange={(e) => setNewOfficeBearer({ ...newOfficeBearer, phone: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="WhatsApp"
+                value={newOfficeBearer.whatsapp}
+                onChange={(e) => setNewOfficeBearer({ ...newOfficeBearer, whatsapp: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="Email"
+                value={newOfficeBearer.email}
+                onChange={(e) => setNewOfficeBearer({ ...newOfficeBearer, email: e.target.value })}
+              />
+            </div>
+            <button style={styles.primaryBtn} onClick={addOfficeBearer}>
+              Add Office Bearer
+            </button>
+          </div>
+        ) : null}
+
+        {officeBearers.length === 0 ? (
+          <p style={styles.emptyText}>No office bearers added yet.</p>
+        ) : (
+          <div style={styles.listWrap}>
+            {officeBearers.map((item) => (
+              <div key={item.id} style={styles.listCard}>
+                <div style={styles.noticeTitle}>{safeString(item.role)}</div>
+                <div style={styles.infoLineStrong}>{safeString(item.name)}</div>
+                {item.phone ? <div style={styles.infoLine}>Phone: {item.phone}</div> : null}
+                {item.whatsapp ? <div style={styles.infoLine}>WhatsApp: {item.whatsapp}</div> : null}
+                {item.email ? <div style={styles.infoLine}>Email: {item.email}</div> : null}
+                <ContactButtons item={item} />
+                {adminMode ? (
+                  <button style={styles.deleteBtn} onClick={() => deleteOfficeBearer(item.id)}>
+                    Delete
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderCoaches() {
+    return (
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Club Coaches</h2>
+
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Add Coach</h3>
+            <div style={styles.formGrid}>
+              <input
+                style={styles.input}
+                placeholder="Name"
+                value={newCoach.name}
+                onChange={(e) => setNewCoach({ ...newCoach, name: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="Phone"
+                value={newCoach.phone}
+                onChange={(e) => setNewCoach({ ...newCoach, phone: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="WhatsApp"
+                value={newCoach.whatsapp}
+                onChange={(e) => setNewCoach({ ...newCoach, whatsapp: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="Email"
+                value={newCoach.email}
+                onChange={(e) => setNewCoach({ ...newCoach, email: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="Notes"
+                value={newCoach.notes}
+                onChange={(e) => setNewCoach({ ...newCoach, notes: e.target.value })}
+              />
+            </div>
+            <button style={styles.primaryBtn} onClick={addCoach}>
+              Add Coach
+            </button>
+          </div>
+        ) : null}
+
+        {coaches.length === 0 ? (
+          <p style={styles.emptyText}>No coaches added yet.</p>
+        ) : (
+          <div style={styles.listWrap}>
+            {coaches.map((coach) => (
+              <div key={coach.id} style={styles.listCard}>
+                <div style={styles.noticeTitle}>{safeString(coach.name)}</div>
+                {coach.phone ? <div style={styles.infoLine}>Phone: {coach.phone}</div> : null}
+                {coach.whatsapp ? <div style={styles.infoLine}>WhatsApp: {coach.whatsapp}</div> : null}
+                {coach.email ? <div style={styles.infoLine}>Email: {coach.email}</div> : null}
+                {coach.notes ? <div style={styles.infoLine}>{coach.notes}</div> : null}
+                <ContactButtons item={coach} />
+                {adminMode ? (
+                  <button style={styles.deleteBtn} onClick={() => deleteCoach(coach.id)}>
+                    Delete
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderDocuments() {
+    return (
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Documents</h2>
+
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Upload Document</h3>
+            <input
+              style={styles.input}
+              type="file"
+              onChange={(e) => uploadDocument(e.target.files?.[0])}
+            />
+          </div>
+        ) : null}
+
+        {documents.length === 0 ? (
+          <p style={styles.emptyText}>No documents yet.</p>
+        ) : (
+          <div style={styles.listWrap}>
+            {documents.map((doc) => (
+              <div key={doc.id} style={styles.listCard}>
+                <a href={doc.file_url} target="_blank" rel="noreferrer" style={styles.link}>
+                  {safeString(doc.title, "Open document")}
+                </a>
+                {adminMode ? (
+                  <button style={styles.deleteBtn} onClick={() => deleteDocument(doc.id)}>
+                    Delete
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderContent() {
+    if (loading) {
+      return (
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>Loading...</h2>
+        </div>
+      );
+    }
+
+    switch (activeTab) {
+      case "home":
+        return renderHome();
+      case "diary":
+        return renderDiary();
+      case "notices":
+        return renderNotices();
+      case "members":
+        return renderMembers();
+      case "office":
+        return renderOfficeBearers();
+      case "coaches":
+        return renderCoaches();
+      case "documents":
+        return renderDocuments();
+      default:
+        return renderHome();
+    }
+  }
+
+  return (
+    <div style={styles.page}>
+      <div style={styles.wrap}>
+        <div style={styles.header}>
+          <div style={styles.headerTop}>
+            <div style={styles.brandWrap}>
+              {logo ? <img src={logo} alt="Club Logo" style={styles.logo} /> : null}
+              <div style={styles.titleBlock}>
+                <h1 style={styles.title}>{CLUB_NAME}</h1>
+                <div style={styles.subtitle}>{CLUB_SUBTITLE}</div>
+              </div>
+            </div>
+          </div>
+
+          {!adminMode ? (
+            <div style={styles.adminStripWrap}>
+              {!showAdminLogin ? (
+                <button style={styles.smallAdminToggle} onClick={() => setShowAdminLogin(true)}>
+                  Admin
+                </button>
+              ) : (
+                <div style={styles.compactAdminPanel}>
+                  <input
+                    style={styles.compactPinInput}
+                    type="password"
+                    placeholder="Admin PIN"
+                    value={adminPinInput}
+                    onChange={(e) => setAdminPinInput(e.target.value)}
+                  />
+                  <button style={styles.compactAdminBtn} onClick={handleAdminLogin}>
+                    Go
+                  </button>
+                  <button
+                    style={styles.compactCancelBtn}
+                    onClick={() => {
+                      setShowAdminLogin(false);
+                      setAdminPinInput("");
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={styles.loggedInRow}>
+              <div style={styles.loggedInText}>Logged in as Admin</div>
+              <button style={styles.smallLogoutBtn} onClick={handleAdminLogout}>
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div style={styles.tabBar}>
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              style={{
+                ...styles.tab,
+                ...(activeTab === tab.key ? styles.activeTab : {}),
+              }}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {errorMessage ? <div style={styles.errorBanner}>{errorMessage}</div> : null}
+
+        {renderContent()}
+      </div>
+    </div>
+  );
 }
 
 const styles = {
-  page: { minHeight: "100vh", background: "linear-gradient(180deg, #7f112f 0%, #8f1736 35%, #a11f44 100%)", padding: 18, fontFamily: "Arial, sans-serif" },
-  wrap: { maxWidth: 1280, margin: "0 auto" },
-  header: { background: "rgba(255,255,255,0.10)", borderRadius: 28, padding: 20, marginBottom: 18, boxShadow: "0 10px 26px rgba(0,0,0,0.18)", backdropFilter: "blur(4px)" },
-  headerTopRow: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap", marginBottom: 16 },
-  headerBrand: { display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" },
-  logo: { width: 92, height: 92, objectFit: "contain", borderRadius: 18, background: "rgba(255,255,255,0.95)", padding: 8 },
-  title: { margin: 0, color: "#fff", fontSize: "2.3rem", fontWeight: 800, lineHeight: 1.1 },
-  subtitle: { margin: "8px 0 0 0", color: "#f9e9ef", fontSize: "1.08rem", fontWeight: 600 },
-  headerButtons: { display: "flex", gap: 10, flexWrap: "wrap" },
-  adminButton: { background: "rgba(255,255,255,0.18)", color: "#fff", border: "1px solid rgba(255,255,255,0.35)", borderRadius: 14, padding: "12px 18px", fontWeight: 700, cursor: "pointer" },
-  adminButtonActive: { background: "#ffffff", color: "#8b1e3f", border: "1px solid #ffffff", borderRadius: 14, padding: "12px 18px", fontWeight: 800, cursor: "pointer" },
-  tabBar: { display: "flex", gap: 10, flexWrap: "wrap" },
-  tabButton: { background: "rgba(255,255,255,0.16)", color: "#fff", border: "1px solid rgba(255,255,255,0.28)", borderRadius: 14, padding: "12px 18px", fontWeight: 700, fontSize: "1rem", cursor: "pointer" },
-  activeTabButton: { background: "#ffffff", color: "#8b1e3f", border: "1px solid #ffffff", borderRadius: 14, padding: "12px 18px", fontWeight: 800, fontSize: "1rem", cursor: "pointer" },
-  loadingCard: { background: "#f4eff2", borderRadius: 24, padding: 24, color: "#8b1e3f", fontSize: "1.2rem", fontWeight: 700 },
-  sectionCard: { background: "#f4eff2", borderRadius: 24, padding: 22, marginBottom: 18, boxShadow: "0 10px 24px rgba(0,0,0,0.10)" },
-  sectionTitle: { margin: "0 0 18px 0", color: "#8b1e3f", fontSize: "2rem", fontWeight: 800 },
-  subTitle: { margin: "0 0 14px 0", color: "#8b1e3f", fontSize: "1.35rem", fontWeight: 800 },
-  homeGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 20 },
-  infoTile: { background: "#fff", borderRadius: 18, padding: 18, border: "1px solid #e1d3d8" },
-  tileNumber: { color: "#8b1e3f", fontSize: "2rem", fontWeight: 800, marginBottom: 6 },
-  tileLabel: { color: "#6d4956", fontSize: "1rem", fontWeight: 700 },
-  panel: { background: "#efe5ea", borderRadius: 20, padding: 18, marginBottom: 18 },
-  stack: { display: "flex", flexDirection: "column", gap: 14 },
-  listCard: { background: "#fff", borderRadius: 18, padding: 16, border: "1px solid #e1d3d8" },
-  listTitle: { color: "#8b1e3f", fontSize: "1.15rem", fontWeight: 800, marginBottom: 6 },
-  listMeta: { color: "#6d4956", fontSize: "0.96rem", fontWeight: 700, marginBottom: 8 },
-  listBody: { color: "#412a33", fontSize: "1rem", lineHeight: 1.5, marginTop: 6, whiteSpace: "pre-wrap" },
-  inlineLink: { display: "inline-block", marginTop: 10, color: "#8b1e3f", fontWeight: 800, textDecoration: "none" },
-  peopleGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))", gap: 14 },
-  personCard: { background: "#fff", borderRadius: 18, padding: 16, border: "1px solid #e1d3d8", display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start", flexWrap: "wrap" },
-  personName: { color: "#8b1e3f", fontSize: "1.08rem", fontWeight: 800, marginBottom: 6 },
-  personRole: { color: "#6d4956", fontWeight: 700, marginBottom: 6 },
-  personDetail: { color: "#412a33", fontSize: "0.98rem", marginBottom: 4 },
-  personActionsWrap: { display: "flex", flexDirection: "column", gap: 10, alignItems: "flex-end" },
-  personActions: { display: "flex", gap: 8, flexWrap: "wrap" },
-  actionLink: { background: "#8b1e3f", color: "#fff", textDecoration: "none", borderRadius: 12, padding: "10px 14px", fontWeight: 700, fontSize: "0.95rem" },
-  actionLinkSecondary: { background: "#ffffff", color: "#8b1e3f", textDecoration: "none", border: "2px solid #8b1e3f", borderRadius: 12, padding: "8px 12px", fontWeight: 700, fontSize: "0.95rem" },
-  adminCard: { background: "#efe5ea", borderRadius: 20, padding: 18, marginBottom: 20 },
-  input: { width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: 12, border: "1px solid #d2c5cb", marginBottom: 12, fontSize: "1rem", background: "#fff" },
-  textarea: { width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: 12, border: "1px solid #d2c5cb", marginBottom: 12, fontSize: "1rem", background: "#fff", resize: "vertical", fontFamily: "Arial, sans-serif" },
-  fileInput: { width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: 12, border: "1px solid #d2c5cb", marginBottom: 12, fontSize: "1rem", background: "#fff" },
-  primaryButton: { background: "#8b1e3f", color: "#fff", border: "none", borderRadius: 12, padding: "12px 18px", fontWeight: 800, fontSize: "1rem", cursor: "pointer" },
-  primaryButtonDisabled: { background: "#b88a98", color: "#fff", border: "none", borderRadius: 12, padding: "12px 18px", fontWeight: 800, fontSize: "1rem", cursor: "not-allowed" },
-  secondaryButton: { background: "#8b1e3f", color: "#fff", border: "none", borderRadius: 12, padding: "10px 16px", fontWeight: 800, fontSize: "0.95rem", cursor: "pointer" },
-  deleteButton: { background: "#d9044b", color: "#fff", border: "none", borderRadius: 12, padding: "10px 16px", fontWeight: 800, fontSize: "0.95rem", cursor: "pointer" },
-  linkButton: { display: "inline-block", background: "#ffffff", color: "#8b1e3f", border: "2px solid #8b1e3f", borderRadius: 12, padding: "8px 14px", fontWeight: 800, fontSize: "0.95rem", textDecoration: "none" },
-  documentsToolbar: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" },
-  documentsToolbarLeft: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" },
-  sortLabel: { color: "#6f2237", fontSize: "1rem" },
-  sortSelect: { padding: "10px 12px", borderRadius: 10, border: "1px solid #d2c5cb", fontSize: "0.95rem", background: "#fff" },
-  documentsList: { display: "flex", flexDirection: "column", gap: 14 },
-  documentItem: { background: "#f7f3f5", border: "1px solid #dfd2d8", borderRadius: 18, padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap" },
-  documentInfo: { flex: 1, minWidth: 240 },
-  documentTitleRow: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 },
-  documentTitle: { fontSize: "1.1rem", fontWeight: 800, color: "#8b1e3f" },
-  documentCategory: { background: "#8b1e3f", color: "#fff", borderRadius: 999, padding: "4px 10px", fontSize: "0.8rem", fontWeight: 700 },
-  documentMeta: { color: "#6b5a61", fontSize: "0.95rem", marginTop: 4 },
-  documentMetaSmall: { color: "#8b7680", fontSize: "0.85rem", marginTop: 4 },
-  documentActions: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" },
-  viewerCard: { marginTop: 22, background: "#fff", borderRadius: 18, padding: 14, border: "1px solid #dfd2d8" },
-  viewerHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" },
-  viewerTitle: { fontSize: "1.2rem", fontWeight: 800, color: "#8b1e3f", margin: 0 },
-  viewerFrame: { width: "100%", height: "700px", border: "none", borderRadius: 12, background: "#f5f5f5" },
-  emptyMessage: { padding: 18, borderRadius: 14, background: "#f7f3f5", color: "#6f2237", fontWeight: 700 },
-  formButtonRow: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" },
-  linkLikeButton: { background: "#ffffff", color: "#8b1e3f", border: "2px solid #8b1e3f", borderRadius: 12, padding: "10px 16px", fontWeight: 800, fontSize: "0.95rem", cursor: "pointer" },
-  inlineActionRow: { display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 },
+  page: {
+    minHeight: "100vh",
+    background: "linear-gradient(180deg, #990f3d 0%, #8c1738 35%, #6a0f2e 100%)",
+    padding: 14,
+    fontFamily: "Arial, sans-serif",
+    color: "#23364f",
+  },
+  wrap: {
+    maxWidth: 1480,
+    margin: "0 auto",
+  },
+  header: {
+    background: "linear-gradient(135deg, #9e2648 0%, #8d2743 100%)",
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 18,
+    border: "1px solid rgba(255,255,255,0.15)",
+    boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+  },
+  headerTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 16,
+    flexWrap: "wrap",
+  },
+  brandWrap: {
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
+    flexWrap: "wrap",
+  },
+  logo: {
+    width: 96,
+    height: 96,
+    objectFit: "contain",
+    borderRadius: 18,
+    background: "#fff",
+    padding: 6,
+  },
+  titleBlock: {
+    minWidth: 0,
+  },
+  title: {
+    margin: 0,
+    fontSize: 34,
+    lineHeight: 1.08,
+    color: "#ffffff",
+    fontWeight: 800,
+  },
+  subtitle: {
+    marginTop: 8,
+    fontSize: 18,
+    fontWeight: 700,
+    color: "#f7dde6",
+  },
+  adminStripWrap: {
+    marginTop: 16,
+    display: "flex",
+    justifyContent: "flex-end",
+  },
+  smallAdminToggle: {
+    background: "rgba(255,255,255,0.12)",
+    color: "#fff",
+    border: "1px solid rgba(255,255,255,0.22)",
+    borderRadius: 10,
+    padding: "8px 14px",
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  compactAdminPanel: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  compactPinInput: {
+    padding: 10,
+    borderRadius: 10,
+    border: "1px solid #c7b7be",
+    fontSize: 14,
+    minWidth: 140,
+    background: "#fff",
+  },
+  compactAdminBtn: {
+    background: "#8b2940",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "10px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  compactCancelBtn: {
+    background: "#ddd",
+    color: "#444",
+    border: "none",
+    borderRadius: 10,
+    padding: "10px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  loggedInRow: {
+    marginTop: 16,
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  loggedInText: {
+    fontSize: 15,
+    fontWeight: 700,
+    color: "#fff",
+  },
+  smallLogoutBtn: {
+    background: "#666",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "9px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  tabBar: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    marginBottom: 18,
+  },
+  tab: {
+    background: "rgba(255,255,255,0.12)",
+    color: "#ffffff",
+    border: "1px solid rgba(255,255,255,0.18)",
+    borderRadius: 16,
+    padding: "12px 18px",
+    fontSize: 17,
+    fontWeight: 800,
+    cursor: "pointer",
+  },
+  activeTab: {
+    background: "#ffffff",
+    color: "#8b2940",
+  },
+  errorBanner: {
+    background: "#f7e8ec",
+    color: "#b00020",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 18,
+    fontSize: 16,
+    fontWeight: 800,
+  },
+  grid3: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))",
+    gap: 18,
+  },
+  card: {
+    background: "#ece8eb",
+    borderRadius: 20,
+    padding: 18,
+    minHeight: 220,
+  },
+  cardTitle: {
+    margin: "0 0 16px 0",
+    fontSize: 28,
+    lineHeight: 1.1,
+    color: "#84233a",
+    fontWeight: 800,
+  },
+  sectionTitle: {
+    margin: "0 0 12px 0",
+    fontSize: 21,
+    color: "#84233a",
+    fontWeight: 800,
+  },
+  largeText: {
+    fontSize: 17,
+    lineHeight: 1.5,
+    fontWeight: 700,
+    color: "#2d3f59",
+  },
+  websiteRow: {
+    marginTop: 14,
+  },
+  websiteLink: {
+    display: "inline-block",
+    background: "#8b2940",
+    color: "#fff",
+    textDecoration: "none",
+    borderRadius: 10,
+    padding: "10px 14px",
+    fontSize: 15,
+    fontWeight: 700,
+  },
+  eventCard: {
+    background: "#f7f3f5",
+    borderRadius: 15,
+    padding: 15,
+    border: "1px solid #e0d2d8",
+  },
+  eventTitle: {
+    fontSize: 21,
+    fontWeight: 800,
+    color: "#84233a",
+    marginBottom: 8,
+  },
+  eventDate: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: "#2d3f59",
+    marginBottom: 6,
+  },
+  eventMeta: {
+    fontSize: 15,
+    fontWeight: 600,
+    color: "#2d3f59",
+    marginBottom: 4,
+  },
+  eventDetails: {
+    fontSize: 15,
+    lineHeight: 1.45,
+    color: "#2d3f59",
+    marginTop: 8,
+    whiteSpace: "pre-wrap",
+  },
+  noticeCard: {
+    background: "#f7f3f5",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    border: "1px solid #e0d2d8",
+  },
+  noticeTitle: {
+    fontSize: 19,
+    fontWeight: 800,
+    color: "#84233a",
+    marginBottom: 8,
+  },
+  noticeBody: {
+    fontSize: 15,
+    lineHeight: 1.45,
+    color: "#2d3f59",
+    whiteSpace: "pre-wrap",
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "#2d3f59",
+    fontWeight: 600,
+  },
+  adminBox: {
+    background: "#f4e9ee",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 18,
+  },
+  adminTitle: {
+    marginTop: 0,
+    fontSize: 21,
+    color: "#84233a",
+  },
+  adminActionRow: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  formGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+    gap: 10,
+    marginBottom: 12,
+  },
+  input: {
+    width: "100%",
+    padding: 12,
+    borderRadius: 10,
+    border: "1px solid #c7b7be",
+    fontSize: 15,
+    boxSizing: "border-box",
+    background: "#fff",
+  },
+  textarea: {
+    width: "100%",
+    minHeight: 100,
+    padding: 12,
+    borderRadius: 10,
+    border: "1px solid #c7b7be",
+    fontSize: 15,
+    boxSizing: "border-box",
+    marginBottom: 12,
+    background: "#fff",
+  },
+  repeatHelp: {
+    fontSize: 14,
+    color: "#2d3f59",
+    fontWeight: 600,
+    marginBottom: 12,
+  },
+  primaryBtn: {
+    background: "#8b2940",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "11px 16px",
+    fontSize: 15,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  secondaryBtn: {
+    background: "#666",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "11px 16px",
+    fontSize: 15,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  deleteBtn: {
+    marginTop: 12,
+    background: "#c70039",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "10px 14px",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  listWrap: {
+    display: "grid",
+    gap: 12,
+  },
+  listCard: {
+    background: "#f7f3f5",
+    borderRadius: 14,
+    padding: 14,
+    border: "1px solid #e0d2d8",
+  },
+  membersGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+    gap: 16,
+  },
+  memberSection: {
+    background: "#f7f3f5",
+    borderRadius: 16,
+    padding: 14,
+    border: "1px solid #e0d2d8",
+  },
+  infoLine: {
+    fontSize: 15,
+    color: "#2d3f59",
+    marginBottom: 5,
+    fontWeight: 600,
+    wordBreak: "break-word",
+  },
+  infoLineStrong: {
+    fontSize: 16,
+    color: "#2d3f59",
+    marginBottom: 6,
+    fontWeight: 800,
+    wordBreak: "break-word",
+  },
+  searchRow: {
+    marginBottom: 14,
+  },
+  contactButtons: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    marginTop: 10,
+  },
+  actionBtn: {
+    display: "inline-block",
+    background: "#8b2940",
+    color: "#fff",
+    textDecoration: "none",
+    borderRadius: 10,
+    padding: "8px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  actionBtnAlt: {
+    display: "inline-block",
+    background: "#e9dde2",
+    color: "#6f2134",
+    textDecoration: "none",
+    borderRadius: 10,
+    padding: "8px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  link: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: "#84233a",
+    textDecoration: "none",
+    wordBreak: "break-word",
+  },
 };
