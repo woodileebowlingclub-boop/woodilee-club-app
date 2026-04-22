@@ -547,8 +547,8 @@ export default function App() {
     if (!window.confirm(`Delete ${pastEvents.length} past event(s)?`)) return;
 
     const pastIds = pastEvents.map((e) => e.id).filter(Boolean);
-
     const { error } = await supabase.from(eventsTableName).delete().in("id", pastIds);
+
     if (error) {
       alert(error.message || "Could not delete past events.");
       return;
@@ -899,7 +899,6 @@ export default function App() {
               <button style={styles.primaryBtn} onClick={addEvent}>
                 Add Event
               </button>
-
               <button style={styles.secondaryBtn} onClick={deletePastEvents}>
                 Delete Past Events
               </button>
