@@ -119,7 +119,7 @@ function normaliseEvent(row) {
     id: getFirstValue(row, ["id"]),
     title: getFirstValue(row, ["title", "name", "event_name"], "Untitled event"),
     event_date: getFirstValue(row, ["event_date", "date", "eventDate"]),
-    event_time: getFirstValue(row, ["event_time", "time", "time_text", "date_text_time"]),
+    event_time: getFirstValue(row, ["event_time", "time", "time_text"]),
     details: getFirstValue(row, ["details", "note", "notes", "content", "description"]),
     date_text: getFirstValue(row, ["date_text"]),
   };
@@ -454,8 +454,8 @@ export default function App() {
       const prettyDate = formatDate(dateStr);
       return {
         title: newEvent.title.trim(),
-        date: dateStr,
         event_date: dateStr,
+        date: dateStr,
         date_text: prettyDate,
         event_time: newEvent.event_time.trim() || null,
         time_text: newEvent.event_time.trim() || null,
