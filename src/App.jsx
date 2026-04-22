@@ -104,6 +104,16 @@ function shouldShowTime(timeValue) {
   return t && t !== "00:00" && t !== "00:00:00" && t !== "midnight";
 }
 
+function normaliseMemberCategory(value) {
+  const v = safeString(value).trim().toLowerCase();
+
+  if (["gent", "gents", "men", "male"].includes(v)) return "Gents";
+  if (["lady", "ladies", "women", "female"].includes(v)) return "Ladies";
+  if (["associate", "associates", "assoc"].includes(v)) return "Associate";
+
+  return "Associate";
+}
+
 function normaliseEvent(row) {
   return {
     id: getFirstValue(row, ["id"]),
@@ -130,7 +140,9 @@ function normaliseMember(row) {
     phone: getFirstValue(row, ["phone", "mobile", "telephone", "tel"]),
     whatsapp: getFirstValue(row, ["whatsapp", "whats_app", "whatsapp_number"]),
     email: getFirstValue(row, ["email", "email_address"]),
-    category: getFirstValue(row, ["category", "section", "member_type"], "Gents"),
+    category: normaliseMemberCategory(
+      getFirstValue(row, ["category", "section", "member_type"], "Associate")
+    ),
   };
 }
 
@@ -142,7 +154,9 @@ function normaliseOfficeBearer(row) {
     phone: getFirstValue(row, ["phone", "mobile", "telephone", "tel"]),
     whatsapp: getFirstValue(row, ["whatsapp", "whats_app", "whatsapp_number"]),
     email: getFirstValue(row, ["email", "email_address"]),
-    display_order: Number(getFirstValue(row, ["display_order", "sort_order", "position_order"], 0)),
+    display_order: Number(
+      getFirstValue(row, ["display_order", "sort_order", "position_order"], 0)
+    ),
   };
 }
 
@@ -460,15 +474,9 @@ export default function App() {
     });
   }, [members, memberSearch]);
 
-  const gentsMembers = filteredMembers.filter(
-    (m) => safeString(m.category).toLowerCase() === "gents"
-  );
-  const ladiesMembers = filteredMembers.filter(
-    (m) => safeString(m.category).toLowerCase() === "ladies"
-  );
-  const associateMembers = filteredMembers.filter(
-    (m) => safeString(m.category).toLowerCase() === "associate"
-  );
+  const gentsMembers = filteredMembers.filter((m) => m.category === "Gents");
+  const ladiesMembers = filteredMembers.filter((m) => m.category === "Ladies");
+  const associateMembers = filteredMembers.filter((m) => m.category === "Associate");
 
   async function handleAdminLogin() {
     if (adminPinInput === ADMIN_PIN) {
@@ -609,7 +617,7 @@ export default function App() {
       phone: newMember.phone.trim() || null,
       whatsapp: newMember.whatsapp.trim() || null,
       email: newMember.email.trim() || null,
-      category: newMember.category || "Gents",
+      category: normaliseMemberCategory(newMember.category),
     };
 
     const { error } = await supabase.from(membersTableName).insert([payload]);
@@ -763,7 +771,7 @@ export default function App() {
     ]);
 
     if (insertError) {
-      alert(error.message || "Upload saved but database record failed.");
+      alert(insertError.message || "Upload saved but database record failed.");
       return;
     }
 
