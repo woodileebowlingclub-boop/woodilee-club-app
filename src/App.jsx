@@ -106,11 +106,9 @@ function shouldShowTime(timeValue) {
 
 function normaliseMemberCategory(value) {
   const v = safeString(value).trim().toLowerCase();
-
   if (["gent", "gents", "men", "male"].includes(v)) return "gents";
   if (["lady", "ladies", "women", "female"].includes(v)) return "ladies";
   if (["associate", "associates", "assoc"].includes(v)) return "associate";
-
   return "gents";
 }
 
@@ -262,6 +260,53 @@ export default function App() {
     notes: "",
   });
 
+  const [editingEventId, setEditingEventId] = useState(null);
+  const [editingEvent, setEditingEvent] = useState({
+    title: "",
+    event_date: "",
+    event_time: "",
+    details: "",
+  });
+
+  const [editingNoticeId, setEditingNoticeId] = useState(null);
+  const [editingNotice, setEditingNotice] = useState({
+    title: "",
+    content: "",
+  });
+
+  const [editingMemberId, setEditingMemberId] = useState(null);
+  const [editingMember, setEditingMember] = useState({
+    full_name: "",
+    phone: "",
+    whatsapp: "",
+    email: "",
+    category: "gents",
+  });
+
+  const [editingOfficeBearerId, setEditingOfficeBearerId] = useState(null);
+  const [editingOfficeBearer, setEditingOfficeBearer] = useState({
+    role: "",
+    name: "",
+    phone: "",
+    whatsapp: "",
+    email: "",
+  });
+
+  const [editingCoachId, setEditingCoachId] = useState(null);
+  const [editingCoach, setEditingCoach] = useState({
+    name: "",
+    phone: "",
+    whatsapp: "",
+    email: "",
+    notes: "",
+  });
+
+  const [editingDocumentId, setEditingDocumentId] = useState(null);
+  const [editingDocument, setEditingDocument] = useState({
+    title: "",
+    file_url: "",
+  });
+
   useEffect(() => {
     loadAllData();
   }, []);
@@ -373,7 +418,6 @@ export default function App() {
     });
 
     if (upcoming.length > 0) return upcoming;
-
     return allSortedEvents.slice(-10).reverse();
   }, [allSortedEvents]);
 
@@ -484,6 +528,56 @@ export default function App() {
     alert(rows.length === 1 ? "Event added." : `${rows.length} repeated events added.`);
   }
 
+  function startEditEvent(event) {
+    setEditingEventId(event.id);
+    setEditingEvent({
+      title: safeString(event.title),
+      event_date: safeString(event.event_date),
+      event_time: safeString(event.event_time),
+      details: safeString(event.details),
+    });
+  }
+
+  function cancelEditEvent() {
+    setEditingEventId(null);
+    setEditingEvent({
+      title: "",
+      event_date: "",
+      event_time: "",
+      details: "",
+    });
+  }
+
+  async function saveEditEvent(id) {
+    if (!editingEvent.title.trim() || !editingEvent.event_date) {
+      alert("Please add at least a title and date.");
+      return;
+    }
+
+    const prettyDate = formatDate(editingEvent.event_date);
+
+    const payload = {
+      title: editingEvent.title.trim(),
+      event_date: editingEvent.event_date,
+      date: editingEvent.event_date,
+      date_text: prettyDate,
+      event_time: editingEvent.event_time.trim() || null,
+      time_text: editingEvent.event_time.trim() || null,
+      details: editingEvent.details.trim() || null,
+      note: editingEvent.details.trim() || null,
+    };
+
+    const { error } = await supabase.from("events").update(payload).eq("id", id);
+
+    if (error) {
+      alert(error.message || "Could not update event.");
+      return;
+    }
+
+    cancelEditEvent();
+    loadEvents();
+  }
+
   async function deleteEvent(id) {
     if (!window.confirm("Delete this event?")) return;
 
@@ -537,6 +631,42 @@ export default function App() {
     loadNotices();
   }
 
+  function startEditNotice(notice) {
+    setEditingNoticeId(notice.id);
+    setEditingNotice({
+      title: safeString(notice.title),
+      content: safeString(notice.content),
+    });
+  }
+
+  function cancelEditNotice() {
+    setEditingNoticeId(null);
+    setEditingNotice({ title: "", content: "" });
+  }
+
+  async function saveEditNotice(id) {
+    if (!editingNotice.title.trim() || !editingNotice.content.trim()) {
+      alert("Please enter a notice title and content.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("information_posts")
+      .update({
+        title: editingNotice.title.trim(),
+        content: editingNotice.content.trim(),
+      })
+      .eq("id", id);
+
+    if (error) {
+      alert(error.message || "Could not update notice.");
+      return;
+    }
+
+    cancelEditNotice();
+    loadNotices();
+  }
+
   async function deleteNotice(id) {
     if (!window.confirm("Delete this notice?")) return;
 
@@ -581,6 +711,54 @@ export default function App() {
 
     await loadMembers();
     alert("Member added.");
+  }
+
+  function startEditMember(member) {
+    setEditingMemberId(member.id);
+    setEditingMember({
+      full_name: safeString(member.full_name),
+      phone: safeString(member.phone),
+      whatsapp: safeString(member.whatsapp),
+      email: safeString(member.email),
+      category: normaliseMemberCategory(member.category),
+    });
+  }
+
+  function cancelEditMember() {
+    setEditingMemberId(null);
+    setEditingMember({
+      full_name: "",
+      phone: "",
+      whatsapp: "",
+      email: "",
+      category: "gents",
+    });
+  }
+
+  async function saveEditMember(id) {
+    if (!editingMember.full_name.trim()) {
+      alert("Please enter a member name.");
+      return;
+    }
+
+    const payload = {
+      full_name: editingMember.full_name.trim(),
+      name: editingMember.full_name.trim(),
+      phone: editingMember.phone.trim() || null,
+      whatsapp: editingMember.whatsapp.trim() || null,
+      email: editingMember.email.trim() || null,
+      category: normaliseMemberCategory(editingMember.category),
+    };
+
+    const { error } = await supabase.from("members").update(payload).eq("id", id);
+
+    if (error) {
+      alert(error.message || "Could not update member.");
+      return;
+    }
+
+    cancelEditMember();
+    loadMembers();
   }
 
   async function deleteMember(id) {
@@ -634,6 +812,53 @@ export default function App() {
     alert("Office bearer added.");
   }
 
+  function startEditOfficeBearer(item) {
+    setEditingOfficeBearerId(item.id);
+    setEditingOfficeBearer({
+      role: safeString(item.role),
+      name: safeString(item.name),
+      phone: safeString(item.phone),
+      whatsapp: safeString(item.whatsapp),
+      email: safeString(item.email),
+    });
+  }
+
+  function cancelEditOfficeBearer() {
+    setEditingOfficeBearerId(null);
+    setEditingOfficeBearer({
+      role: "",
+      name: "",
+      phone: "",
+      whatsapp: "",
+      email: "",
+    });
+  }
+
+  async function saveEditOfficeBearer(id) {
+    if (!editingOfficeBearer.role.trim() || !editingOfficeBearer.name.trim()) {
+      alert("Please enter role and name.");
+      return;
+    }
+
+    const payload = {
+      role: editingOfficeBearer.role.trim(),
+      name: editingOfficeBearer.name.trim(),
+      phone: editingOfficeBearer.phone.trim() || null,
+      whatsapp: editingOfficeBearer.whatsapp.trim() || null,
+      email: editingOfficeBearer.email.trim() || null,
+    };
+
+    const { error } = await supabase.from("office_bearers").update(payload).eq("id", id);
+
+    if (error) {
+      alert(error.message || "Could not update office bearer.");
+      return;
+    }
+
+    cancelEditOfficeBearer();
+    loadOfficeBearers();
+  }
+
   async function deleteOfficeBearer(id) {
     if (!window.confirm("Delete this office bearer?")) return;
 
@@ -678,6 +903,53 @@ export default function App() {
     loadCoaches();
   }
 
+  function startEditCoach(coach) {
+    setEditingCoachId(coach.id);
+    setEditingCoach({
+      name: safeString(coach.name),
+      phone: safeString(coach.phone),
+      whatsapp: safeString(coach.whatsapp),
+      email: safeString(coach.email),
+      notes: safeString(coach.notes),
+    });
+  }
+
+  function cancelEditCoach() {
+    setEditingCoachId(null);
+    setEditingCoach({
+      name: "",
+      phone: "",
+      whatsapp: "",
+      email: "",
+      notes: "",
+    });
+  }
+
+  async function saveEditCoach(id) {
+    if (!editingCoach.name.trim()) {
+      alert("Please enter coach name.");
+      return;
+    }
+
+    const payload = {
+      name: editingCoach.name.trim(),
+      phone: editingCoach.phone.trim() || null,
+      whatsapp: editingCoach.whatsapp.trim() || null,
+      email: editingCoach.email.trim() || null,
+      notes: editingCoach.notes.trim() || null,
+    };
+
+    const { error } = await supabase.from("club_coaches").update(payload).eq("id", id);
+
+    if (error) {
+      alert(error.message || "Could not update coach.");
+      return;
+    }
+
+    cancelEditCoach();
+    loadCoaches();
+  }
+
   async function deleteCoach(id) {
     if (!window.confirm("Delete this coach?")) return;
 
@@ -719,6 +991,45 @@ export default function App() {
       return;
     }
 
+    loadDocuments();
+  }
+
+  function startEditDocument(doc) {
+    setEditingDocumentId(doc.id);
+    setEditingDocument({
+      title: safeString(doc.title),
+      file_url: safeString(doc.file_url),
+    });
+  }
+
+  function cancelEditDocument() {
+    setEditingDocumentId(null);
+    setEditingDocument({
+      title: "",
+      file_url: "",
+    });
+  }
+
+  async function saveEditDocument(id) {
+    if (!editingDocument.title.trim()) {
+      alert("Please enter a document title.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("documents")
+      .update({
+        title: editingDocument.title.trim(),
+        file_url: editingDocument.file_url.trim() || null,
+      })
+      .eq("id", id);
+
+    if (error) {
+      alert(error.message || "Could not update document.");
+      return;
+    }
+
+    cancelEditDocument();
     loadDocuments();
   }
 
@@ -876,22 +1187,72 @@ export default function App() {
           <div style={styles.listWrap}>
             {diaryEvents.map((event) => (
               <div key={event.id} style={styles.listCard}>
-                <div style={styles.eventTitle}>{safeString(event.title)}</div>
-                <div style={styles.eventDate}>{formatDate(event.event_date)}</div>
+                {editingEventId === event.id ? (
+                  <>
+                    <div style={styles.formGrid}>
+                      <input
+                        style={styles.input}
+                        placeholder="Title"
+                        value={editingEvent.title}
+                        onChange={(e) => setEditingEvent({ ...editingEvent, title: e.target.value })}
+                      />
+                      <input
+                        style={styles.input}
+                        type="date"
+                        value={editingEvent.event_date}
+                        onChange={(e) =>
+                          setEditingEvent({ ...editingEvent, event_date: e.target.value })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="Time"
+                        value={editingEvent.event_time}
+                        onChange={(e) =>
+                          setEditingEvent({ ...editingEvent, event_time: e.target.value })
+                        }
+                      />
+                    </div>
+                    <textarea
+                      style={styles.textarea}
+                      placeholder="Details"
+                      value={editingEvent.details}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, details: e.target.value })}
+                    />
+                    <div style={styles.contactButtons}>
+                      <button style={styles.primaryBtn} onClick={() => saveEditEvent(event.id)}>
+                        Save
+                      </button>
+                      <button style={styles.secondaryBtn} onClick={cancelEditEvent}>
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={styles.eventTitle}>{safeString(event.title)}</div>
+                    <div style={styles.eventDate}>{formatDate(event.event_date)}</div>
 
-                {shouldShowTime(event.event_time) ? (
-                  <div style={styles.eventMeta}>Time: {event.event_time}</div>
-                ) : null}
+                    {shouldShowTime(event.event_time) ? (
+                      <div style={styles.eventMeta}>Time: {event.event_time}</div>
+                    ) : null}
 
-                {event.details ? (
-                  <div style={styles.eventDetails}>{event.details}</div>
-                ) : null}
+                    {event.details ? (
+                      <div style={styles.eventDetails}>{event.details}</div>
+                    ) : null}
 
-                {adminMode ? (
-                  <button style={styles.deleteBtn} onClick={() => deleteEvent(event.id)}>
-                    Delete
-                  </button>
-                ) : null}
+                    {adminMode ? (
+                      <div style={styles.contactButtons}>
+                        <button style={styles.primaryBtn} onClick={() => startEditEvent(event)}>
+                          Edit
+                        </button>
+                        <button style={styles.deleteBtn} onClick={() => deleteEvent(event.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -932,13 +1293,47 @@ export default function App() {
           <div style={styles.listWrap}>
             {notices.map((notice) => (
               <div key={notice.id} style={styles.listCard}>
-                <div style={styles.noticeTitle}>{safeString(notice.title)}</div>
-                <div style={styles.noticeBody}>{safeString(notice.content)}</div>
-                {adminMode ? (
-                  <button style={styles.deleteBtn} onClick={() => deleteNotice(notice.id)}>
-                    Delete
-                  </button>
-                ) : null}
+                {editingNoticeId === notice.id ? (
+                  <>
+                    <input
+                      style={styles.input}
+                      placeholder="Notice title"
+                      value={editingNotice.title}
+                      onChange={(e) => setEditingNotice({ ...editingNotice, title: e.target.value })}
+                    />
+                    <textarea
+                      style={styles.textarea}
+                      placeholder="Notice content"
+                      value={editingNotice.content}
+                      onChange={(e) =>
+                        setEditingNotice({ ...editingNotice, content: e.target.value })
+                      }
+                    />
+                    <div style={styles.contactButtons}>
+                      <button style={styles.primaryBtn} onClick={() => saveEditNotice(notice.id)}>
+                        Save
+                      </button>
+                      <button style={styles.secondaryBtn} onClick={cancelEditNotice}>
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={styles.noticeTitle}>{safeString(notice.title)}</div>
+                    <div style={styles.noticeBody}>{safeString(notice.content)}</div>
+                    {adminMode ? (
+                      <div style={styles.contactButtons}>
+                        <button style={styles.primaryBtn} onClick={() => startEditNotice(notice)}>
+                          Edit
+                        </button>
+                        <button style={styles.deleteBtn} onClick={() => deleteNotice(notice.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -956,16 +1351,79 @@ export default function App() {
         ) : (
           items.map((member) => (
             <div key={member.id} style={styles.listCard}>
-              <div style={styles.noticeTitle}>{safeString(member.full_name)}</div>
-              {member.phone ? <div style={styles.infoLine}>Phone: {member.phone}</div> : null}
-              {member.whatsapp ? <div style={styles.infoLine}>WhatsApp: {member.whatsapp}</div> : null}
-              {member.email ? <div style={styles.infoLine}>Email: {member.email}</div> : null}
-              <ContactButtons item={member} />
-              {adminMode ? (
-                <button style={styles.deleteBtn} onClick={() => deleteMember(member.id)}>
-                  Delete
-                </button>
-              ) : null}
+              {editingMemberId === member.id ? (
+                <>
+                  <div style={styles.formGrid}>
+                    <input
+                      style={styles.input}
+                      placeholder="Full name"
+                      value={editingMember.full_name}
+                      onChange={(e) =>
+                        setEditingMember({ ...editingMember, full_name: e.target.value })
+                      }
+                    />
+                    <input
+                      style={styles.input}
+                      placeholder="Phone"
+                      value={editingMember.phone}
+                      onChange={(e) => setEditingMember({ ...editingMember, phone: e.target.value })}
+                    />
+                    <input
+                      style={styles.input}
+                      placeholder="WhatsApp"
+                      value={editingMember.whatsapp}
+                      onChange={(e) =>
+                        setEditingMember({ ...editingMember, whatsapp: e.target.value })
+                      }
+                    />
+                    <input
+                      style={styles.input}
+                      placeholder="Email"
+                      value={editingMember.email}
+                      onChange={(e) => setEditingMember({ ...editingMember, email: e.target.value })}
+                    />
+                    <select
+                      style={styles.input}
+                      value={editingMember.category}
+                      onChange={(e) =>
+                        setEditingMember({ ...editingMember, category: e.target.value })
+                      }
+                    >
+                      <option value="gents">Gents</option>
+                      <option value="ladies">Ladies</option>
+                      <option value="associate">Associate</option>
+                    </select>
+                  </div>
+                  <div style={styles.contactButtons}>
+                    <button style={styles.primaryBtn} onClick={() => saveEditMember(member.id)}>
+                      Save
+                    </button>
+                    <button style={styles.secondaryBtn} onClick={cancelEditMember}>
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={styles.noticeTitle}>{safeString(member.full_name)}</div>
+                  {member.phone ? <div style={styles.infoLine}>Phone: {member.phone}</div> : null}
+                  {member.whatsapp ? (
+                    <div style={styles.infoLine}>WhatsApp: {member.whatsapp}</div>
+                  ) : null}
+                  {member.email ? <div style={styles.infoLine}>Email: {member.email}</div> : null}
+                  <ContactButtons item={member} />
+                  {adminMode ? (
+                    <div style={styles.contactButtons}>
+                      <button style={styles.primaryBtn} onClick={() => startEditMember(member)}>
+                        Edit
+                      </button>
+                      <button style={styles.deleteBtn} onClick={() => deleteMember(member.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
           ))
         )}
@@ -1071,7 +1529,9 @@ export default function App() {
                 style={styles.input}
                 placeholder="WhatsApp"
                 value={newOfficeBearer.whatsapp}
-                onChange={(e) => setNewOfficeBearer({ ...newOfficeBearer, whatsapp: e.target.value })}
+                onChange={(e) =>
+                  setNewOfficeBearer({ ...newOfficeBearer, whatsapp: e.target.value })
+                }
               />
               <input
                 style={styles.input}
@@ -1092,17 +1552,93 @@ export default function App() {
           <div style={styles.listWrap}>
             {officeBearers.map((item) => (
               <div key={item.id} style={styles.listCard}>
-                <div style={styles.noticeTitle}>{safeString(item.role)}</div>
-                <div style={styles.infoLineStrong}>{safeString(item.name)}</div>
-                {item.phone ? <div style={styles.infoLine}>Phone: {item.phone}</div> : null}
-                {item.whatsapp ? <div style={styles.infoLine}>WhatsApp: {item.whatsapp}</div> : null}
-                {item.email ? <div style={styles.infoLine}>Email: {item.email}</div> : null}
-                <ContactButtons item={item} />
-                {adminMode ? (
-                  <button style={styles.deleteBtn} onClick={() => deleteOfficeBearer(item.id)}>
-                    Delete
-                  </button>
-                ) : null}
+                {editingOfficeBearerId === item.id ? (
+                  <>
+                    <div style={styles.formGrid}>
+                      <input
+                        style={styles.input}
+                        placeholder="Role"
+                        value={editingOfficeBearer.role}
+                        onChange={(e) =>
+                          setEditingOfficeBearer({ ...editingOfficeBearer, role: e.target.value })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="Name"
+                        value={editingOfficeBearer.name}
+                        onChange={(e) =>
+                          setEditingOfficeBearer({ ...editingOfficeBearer, name: e.target.value })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="Phone"
+                        value={editingOfficeBearer.phone}
+                        onChange={(e) =>
+                          setEditingOfficeBearer({ ...editingOfficeBearer, phone: e.target.value })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="WhatsApp"
+                        value={editingOfficeBearer.whatsapp}
+                        onChange={(e) =>
+                          setEditingOfficeBearer({
+                            ...editingOfficeBearer,
+                            whatsapp: e.target.value,
+                          })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="Email"
+                        value={editingOfficeBearer.email}
+                        onChange={(e) =>
+                          setEditingOfficeBearer({ ...editingOfficeBearer, email: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div style={styles.contactButtons}>
+                      <button
+                        style={styles.primaryBtn}
+                        onClick={() => saveEditOfficeBearer(item.id)}
+                      >
+                        Save
+                      </button>
+                      <button style={styles.secondaryBtn} onClick={cancelEditOfficeBearer}>
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={styles.noticeTitle}>{safeString(item.role)}</div>
+                    <div style={styles.infoLineStrong}>{safeString(item.name)}</div>
+                    {item.phone ? <div style={styles.infoLine}>Phone: {item.phone}</div> : null}
+                    {item.whatsapp ? (
+                      <div style={styles.infoLine}>WhatsApp: {item.whatsapp}</div>
+                    ) : null}
+                    {item.email ? <div style={styles.infoLine}>Email: {item.email}</div> : null}
+                    <ContactButtons item={item} />
+                    {adminMode ? (
+                      <div style={styles.contactButtons}>
+                        <button
+                          style={styles.primaryBtn}
+                          onClick={() => startEditOfficeBearer(item)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          style={styles.deleteBtn}
+                          onClick={() => deleteOfficeBearer(item.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -1163,17 +1699,79 @@ export default function App() {
           <div style={styles.listWrap}>
             {coaches.map((coach) => (
               <div key={coach.id} style={styles.listCard}>
-                <div style={styles.noticeTitle}>{safeString(coach.name)}</div>
-                {coach.phone ? <div style={styles.infoLine}>Phone: {coach.phone}</div> : null}
-                {coach.whatsapp ? <div style={styles.infoLine}>WhatsApp: {coach.whatsapp}</div> : null}
-                {coach.email ? <div style={styles.infoLine}>Email: {coach.email}</div> : null}
-                {coach.notes ? <div style={styles.infoLine}>{coach.notes}</div> : null}
-                <ContactButtons item={coach} />
-                {adminMode ? (
-                  <button style={styles.deleteBtn} onClick={() => deleteCoach(coach.id)}>
-                    Delete
-                  </button>
-                ) : null}
+                {editingCoachId === coach.id ? (
+                  <>
+                    <div style={styles.formGrid}>
+                      <input
+                        style={styles.input}
+                        placeholder="Name"
+                        value={editingCoach.name}
+                        onChange={(e) => setEditingCoach({ ...editingCoach, name: e.target.value })}
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="Phone"
+                        value={editingCoach.phone}
+                        onChange={(e) =>
+                          setEditingCoach({ ...editingCoach, phone: e.target.value })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="WhatsApp"
+                        value={editingCoach.whatsapp}
+                        onChange={(e) =>
+                          setEditingCoach({ ...editingCoach, whatsapp: e.target.value })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="Email"
+                        value={editingCoach.email}
+                        onChange={(e) =>
+                          setEditingCoach({ ...editingCoach, email: e.target.value })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="Notes"
+                        value={editingCoach.notes}
+                        onChange={(e) =>
+                          setEditingCoach({ ...editingCoach, notes: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div style={styles.contactButtons}>
+                      <button style={styles.primaryBtn} onClick={() => saveEditCoach(coach.id)}>
+                        Save
+                      </button>
+                      <button style={styles.secondaryBtn} onClick={cancelEditCoach}>
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={styles.noticeTitle}>{safeString(coach.name)}</div>
+                    {coach.phone ? <div style={styles.infoLine}>Phone: {coach.phone}</div> : null}
+                    {coach.whatsapp ? (
+                      <div style={styles.infoLine}>WhatsApp: {coach.whatsapp}</div>
+                    ) : null}
+                    {coach.email ? <div style={styles.infoLine}>Email: {coach.email}</div> : null}
+                    {coach.notes ? <div style={styles.infoLine}>{coach.notes}</div> : null}
+                    <ContactButtons item={coach} />
+                    {adminMode ? (
+                      <div style={styles.contactButtons}>
+                        <button style={styles.primaryBtn} onClick={() => startEditCoach(coach)}>
+                          Edit
+                        </button>
+                        <button style={styles.deleteBtn} onClick={() => deleteCoach(coach.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -1204,14 +1802,50 @@ export default function App() {
           <div style={styles.listWrap}>
             {documents.map((doc) => (
               <div key={doc.id} style={styles.listCard}>
-                <a href={doc.file_url} target="_blank" rel="noreferrer" style={styles.link}>
-                  {safeString(doc.title, "Open document")}
-                </a>
-                {adminMode ? (
-                  <button style={styles.deleteBtn} onClick={() => deleteDocument(doc.id)}>
-                    Delete
-                  </button>
-                ) : null}
+                {editingDocumentId === doc.id ? (
+                  <>
+                    <input
+                      style={styles.input}
+                      placeholder="Document title"
+                      value={editingDocument.title}
+                      onChange={(e) =>
+                        setEditingDocument({ ...editingDocument, title: e.target.value })
+                      }
+                    />
+                    <input
+                      style={styles.input}
+                      placeholder="Document URL"
+                      value={editingDocument.file_url}
+                      onChange={(e) =>
+                        setEditingDocument({ ...editingDocument, file_url: e.target.value })
+                      }
+                    />
+                    <div style={styles.contactButtons}>
+                      <button style={styles.primaryBtn} onClick={() => saveEditDocument(doc.id)}>
+                        Save
+                      </button>
+                      <button style={styles.secondaryBtn} onClick={cancelEditDocument}>
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <a href={doc.file_url} target="_blank" rel="noreferrer" style={styles.link}>
+                      {safeString(doc.title, "Open document")}
+                    </a>
+                    {adminMode ? (
+                      <div style={styles.contactButtons}>
+                        <button style={styles.primaryBtn} onClick={() => startEditDocument(doc)}>
+                          Edit
+                        </button>
+                        <button style={styles.deleteBtn} onClick={() => deleteDocument(doc.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -1650,13 +2284,12 @@ const styles = {
     cursor: "pointer",
   },
   deleteBtn: {
-    marginTop: 12,
     background: "#c70039",
     color: "#fff",
     border: "none",
     borderRadius: 10,
-    padding: "10px 14px",
-    fontSize: 14,
+    padding: "11px 16px",
+    fontSize: 15,
     fontWeight: 700,
     cursor: "pointer",
   },
