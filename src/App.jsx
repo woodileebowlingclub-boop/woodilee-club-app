@@ -206,7 +206,12 @@ function ContactButtons({ item }) {
         </a>
       ) : null}
       {whatsappLink ? (
-        <a href={whatsappLink} target="_blank" rel="noreferrer" style={styles.actionBtnAlt}>
+        <a
+          href={whatsappLink}
+          target="_blank"
+          rel="noreferrer"
+          style={styles.actionBtnAlt}
+        >
           WhatsApp
         </a>
       ) : null}
@@ -360,7 +365,9 @@ export default function App() {
     if (result.ok) {
       setOfficeTableName(result.tableName);
       setOfficeBearers(
-        [...result.rows].sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0))
+        [...result.rows].sort(
+          (a, b) => Number(a.display_order || 0) - Number(b.display_order || 0)
+        )
       );
     } else {
       setOfficeBearers([]);
@@ -478,7 +485,7 @@ export default function App() {
   }
 
   async function addEvent() {
-    if (!newEvent.title || !newEvent.event_date) {
+    if (!newEvent.title.trim() || !newEvent.event_date) {
       alert("Please add at least a title and date.");
       return;
     }
@@ -500,10 +507,10 @@ export default function App() {
     }
 
     const rows = eventDates.map((dateStr) => ({
-      title: newEvent.title,
+      title: newEvent.title.trim(),
       event_date: dateStr,
-      event_time: newEvent.event_time || null,
-      details: newEvent.details || null,
+      event_time: newEvent.event_time.trim() || null,
+      details: newEvent.details.trim() || null,
     }));
 
     const { error } = await supabase.from(eventsTableName).insert(rows);
@@ -558,15 +565,15 @@ export default function App() {
   }
 
   async function addNotice() {
-    if (!newNotice.title || !newNotice.content) {
+    if (!newNotice.title.trim() || !newNotice.content.trim()) {
       alert("Please enter a notice title and content.");
       return;
     }
 
     const { error } = await supabase.from(noticesTableName).insert([
       {
-        title: newNotice.title,
-        content: newNotice.content,
+        title: newNotice.title.trim(),
+        content: newNotice.content.trim(),
       },
     ]);
 
@@ -592,20 +599,20 @@ export default function App() {
   }
 
   async function addMember() {
-    if (!newMember.full_name) {
+    if (!newMember.full_name.trim()) {
       alert("Please enter a member name.");
       return;
     }
 
-    const { error } = await supabase.from(membersTableName).insert([
-      {
-        full_name: newMember.full_name,
-        phone: newMember.phone || null,
-        whatsapp: newMember.whatsapp || null,
-        email: newMember.email || null,
-        category: newMember.category || "Gents",
-      },
-    ]);
+    const payload = {
+      full_name: newMember.full_name.trim(),
+      phone: newMember.phone.trim() || null,
+      whatsapp: newMember.whatsapp.trim() || null,
+      email: newMember.email.trim() || null,
+      category: newMember.category || "Gents",
+    };
+
+    const { error } = await supabase.from(membersTableName).insert([payload]);
 
     if (error) {
       alert(error.message || "Could not add member.");
@@ -620,7 +627,8 @@ export default function App() {
       category: "Gents",
     });
 
-    loadMembers();
+    await loadMembers();
+    alert("Member added.");
   }
 
   async function deleteMember(id) {
@@ -636,7 +644,7 @@ export default function App() {
   }
 
   async function addOfficeBearer() {
-    if (!newOfficeBearer.role || !newOfficeBearer.name) {
+    if (!newOfficeBearer.role.trim() || !newOfficeBearer.name.trim()) {
       alert("Please enter role and name.");
       return;
     }
@@ -646,16 +654,16 @@ export default function App() {
         ? Math.max(...officeBearers.map((x) => Number(x.display_order || 0))) + 1
         : 1;
 
-    const { error } = await supabase.from(officeTableName).insert([
-      {
-        role: newOfficeBearer.role,
-        name: newOfficeBearer.name,
-        phone: newOfficeBearer.phone || null,
-        whatsapp: newOfficeBearer.whatsapp || null,
-        email: newOfficeBearer.email || null,
-        display_order: nextOrder,
-      },
-    ]);
+    const payload = {
+      role: newOfficeBearer.role.trim(),
+      name: newOfficeBearer.name.trim(),
+      phone: newOfficeBearer.phone.trim() || null,
+      whatsapp: newOfficeBearer.whatsapp.trim() || null,
+      email: newOfficeBearer.email.trim() || null,
+      display_order: nextOrder,
+    };
+
+    const { error } = await supabase.from(officeTableName).insert([payload]);
 
     if (error) {
       alert(error.message || "Could not add office bearer.");
@@ -670,7 +678,8 @@ export default function App() {
       email: "",
     });
 
-    loadOfficeBearers();
+    await loadOfficeBearers();
+    alert("Office bearer added.");
   }
 
   async function deleteOfficeBearer(id) {
@@ -686,18 +695,18 @@ export default function App() {
   }
 
   async function addCoach() {
-    if (!newCoach.name) {
+    if (!newCoach.name.trim()) {
       alert("Please enter coach name.");
       return;
     }
 
     const { error } = await supabase.from(coachesTableName).insert([
       {
-        name: newCoach.name,
-        phone: newCoach.phone || null,
-        whatsapp: newCoach.whatsapp || null,
-        email: newCoach.email || null,
-        notes: newCoach.notes || null,
+        name: newCoach.name.trim(),
+        phone: newCoach.phone.trim() || null,
+        whatsapp: newCoach.whatsapp.trim() || null,
+        email: newCoach.email.trim() || null,
+        notes: newCoach.notes.trim() || null,
       },
     ]);
 
@@ -754,7 +763,7 @@ export default function App() {
     ]);
 
     if (insertError) {
-      alert(insertError.message || "Upload saved but database record failed.");
+      alert(error.message || "Upload saved but database record failed.");
       return;
     }
 
@@ -782,7 +791,6 @@ export default function App() {
             Welcome to the club app. Use the tabs above to view diary dates,
             notices, members, office bearers, coaches and documents.
           </p>
-
           <div style={styles.websiteRow}>
             <a
               href="https://woodileebowlingclub.co.uk/home"
