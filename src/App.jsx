@@ -286,7 +286,7 @@ export default function App() {
     const { data, error } = await supabase
       .from("events")
       .select("*")
-      .order("date", { ascending: true });
+      .order("event_date", { ascending: true });
 
     if (error) {
       setEvents([]);
