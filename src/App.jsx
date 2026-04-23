@@ -348,7 +348,9 @@ export default function App() {
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (!error) setNotices((data || []).map(normaliseNotice));
+    if (!error) {
+      setNotices((data || []).map(normaliseNotice));
+    }
   }
 
   async function loadMembers() {
@@ -615,10 +617,12 @@ export default function App() {
       return;
     }
 
+    const bodyText = newNotice.content.trim();
+
     const { error } = await supabase.from("information_posts").insert([
       {
         title: newNotice.title.trim(),
-        message: newNotice.content.trim(),
+        message: bodyText,
       },
     ]);
 
@@ -650,11 +654,13 @@ export default function App() {
       return;
     }
 
+    const bodyText = editingNotice.content.trim();
+
     const { error } = await supabase
       .from("information_posts")
       .update({
         title: editingNotice.title.trim(),
-        message: editingNotice.content.trim(),
+        message: bodyText,
       })
       .eq("id", id);
 
