@@ -127,7 +127,7 @@ function normaliseNotice(row) {
   return {
     id: getFirstValue(row, ["id"]),
     title: getFirstValue(row, ["title", "heading", "name"], "Notice"),
-    content: getFirstValue(row, ["content", "details", "description", "text"]),
+    content: getFirstValue(row, ["message", "content", "details", "description", "text"]),
     created_at: getFirstValue(row, ["created_at"]),
   };
 }
@@ -618,7 +618,7 @@ export default function App() {
     const { error } = await supabase.from("information_posts").insert([
       {
         title: newNotice.title.trim(),
-        content: newNotice.content.trim(),
+        message: newNotice.content.trim(),
       },
     ]);
 
@@ -654,7 +654,7 @@ export default function App() {
       .from("information_posts")
       .update({
         title: editingNotice.title.trim(),
-        content: editingNotice.content.trim(),
+        message: editingNotice.content.trim(),
       })
       .eq("id", id);
 
@@ -1156,7 +1156,8 @@ export default function App() {
                 First event day: <strong>{getDayNameFromDate(newEvent.event_date)}</strong>
                 {newEvent.repeat_type === "weekly" && newEvent.repeat_until ? (
                   <>
-                    {" "}— repeats every <strong>{getDayNameFromDate(newEvent.event_date)}</strong> until{" "}
+                    {" "}
+                    — repeats every <strong>{getDayNameFromDate(newEvent.event_date)}</strong> until{" "}
                     <strong>{formatDate(newEvent.repeat_until)}</strong>
                   </>
                 ) : null}
@@ -2209,6 +2210,7 @@ const styles = {
     lineHeight: 1.45,
     color: "#2d3f59",
     whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
   },
   emptyText: {
     fontSize: 16,
