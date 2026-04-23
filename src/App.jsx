@@ -104,6 +104,11 @@ function shouldShowTime(timeValue) {
   return !!t && t !== "00:00" && t !== "00:00:00" && t !== "midnight";
 }
 
+function isWebLink(value) {
+  const text = safeString(value).trim().toLowerCase();
+  return text.startsWith("http://") || text.startsWith("https://");
+}
+
 function normaliseMemberCategory(value) {
   const v = safeString(value).trim().toLowerCase();
   if (["gent", "gents", "men", "male"].includes(v)) return "gents";
@@ -128,7 +133,7 @@ function normaliseNotice(row) {
     id: getFirstValue(row, ["id"]),
     title: getFirstValue(row, ["title", "heading", "name"], "Notice"),
     content: getFirstValue(row, ["message", "content", "details", "description", "text"]),
-    created_at: getFirstValue(row, ["created_at"]),
+    created_at: getFirstValue(row, ["created_at", "date_posted"]),
   };
 }
 
@@ -346,7 +351,7 @@ export default function App() {
     const { data, error } = await supabase
       .from("information_posts")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("date_posted", { ascending: false });
 
     if (!error) {
       setNotices((data || []).map(normaliseNotice));
@@ -1098,7 +1103,20 @@ export default function App() {
             latestNotices.map((notice) => (
               <div key={notice.id} style={styles.noticeCard}>
                 <div style={styles.noticeTitle}>{safeString(notice.title)}</div>
-                <div style={styles.noticeBody}>{safeString(notice.content)}</div>
+                <div style={styles.noticeBody}>
+                  {isWebLink(notice.content) ? (
+                    <a
+                      href={safeString(notice.content)}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={styles.link}
+                    >
+                      {safeString(notice.content)}
+                    </a>
+                  ) : (
+                    safeString(notice.content)
+                  )}
+                </div>
               </div>
             ))
           )}
@@ -1328,7 +1346,20 @@ export default function App() {
                 ) : (
                   <>
                     <div style={styles.noticeTitle}>{safeString(notice.title)}</div>
-                    <div style={styles.noticeBody}>{safeString(notice.content)}</div>
+                    <div style={styles.noticeBody}>
+                      {isWebLink(notice.content) ? (
+                        <a
+                          href={safeString(notice.content)}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={styles.link}
+                        >
+                          {safeString(notice.content)}
+                        </a>
+                      ) : (
+                        safeString(notice.content)
+                      )}
+                    </div>
                     {adminMode ? (
                       <div style={styles.contactButtons}>
                         <button style={styles.primaryBtn} onClick={() => startEditNotice(notice)}>
