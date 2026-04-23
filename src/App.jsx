@@ -11,6 +11,7 @@ const TABS = [
   { key: "home", label: "Home" },
   { key: "diary", label: "Diary" },
   { key: "notices", label: "Noticeboard" },
+  { key: "competitions", label: "Competitions" },
   { key: "members", label: "Members" },
   { key: "office", label: "Office Bearers" },
   { key: "coaches", label: "Club Coaches" },
@@ -137,6 +138,17 @@ function normaliseNotice(row) {
   };
 }
 
+function normaliseCompetition(row) {
+  return {
+    id: getFirstValue(row, ["id"]),
+    title: getFirstValue(row, ["title", "name", "competition_name"], "Competition"),
+    details: getFirstValue(row, ["details", "content", "description", "notes"]),
+    file_url: getFirstValue(row, ["file_url", "url", "link"]),
+    event_date: getFirstValue(row, ["event_date", "competition_date", "date"]),
+    created_at: getFirstValue(row, ["created_at"]),
+  };
+}
+
 function normaliseMember(row) {
   return {
     id: getFirstValue(row, ["id"]),
@@ -222,6 +234,7 @@ export default function App() {
 
   const [events, setEvents] = useState([]);
   const [notices, setNotices] = useState([]);
+  const [competitions, setCompetitions] = useState([]);
   const [members, setMembers] = useState([]);
   const [officeBearers, setOfficeBearers] = useState([]);
   const [coaches, setCoaches] = useState([]);
@@ -239,6 +252,13 @@ export default function App() {
   const [newNotice, setNewNotice] = useState({
     title: "",
     content: "",
+  });
+
+  const [newCompetition, setNewCompetition] = useState({
+    title: "",
+    details: "",
+    event_date: "",
+    file_url: "",
   });
 
   const [newMember, setNewMember] = useState({
@@ -277,6 +297,14 @@ export default function App() {
   const [editingNotice, setEditingNotice] = useState({
     title: "",
     content: "",
+  });
+
+  const [editingCompetitionId, setEditingCompetitionId] = useState(null);
+  const [editingCompetition, setEditingCompetition] = useState({
+    title: "",
+    details: "",
+    event_date: "",
+    file_url: "",
   });
 
   const [editingMemberId, setEditingMemberId] = useState(null);
@@ -323,6 +351,7 @@ export default function App() {
     await Promise.all([
       loadEvents(),
       loadNotices(),
+      loadCompetitions(),
       loadMembers(),
       loadOfficeBearers(),
       loadCoaches(),
@@ -355,6 +384,17 @@ export default function App() {
 
     if (!error) {
       setNotices((data || []).map(normaliseNotice));
+    }
+  }
+
+  async function loadCompetitions() {
+    const { data, error } = await supabase
+      .from("competitions")
+      .select("*")
+      .order("event_date", { ascending: true });
+
+    if (!error) {
+      setCompetitions((data || []).map(normaliseCompetition));
     }
   }
 
@@ -439,8 +479,23 @@ export default function App() {
     });
   }, [allSortedEvents]);
 
+  const sortedCompetitions = useMemo(() => {
+    return [...competitions].sort((a, b) => {
+      const aHasDate = !!a.event_date;
+      const bHasDate = !!b.event_date;
+
+      if (aHasDate && bHasDate) {
+        return new Date(a.event_date) - new Date(b.event_date);
+      }
+      if (aHasDate && !bHasDate) return -1;
+      if (!aHasDate && bHasDate) return 1;
+      return safeString(a.title).localeCompare(safeString(b.title));
+    });
+  }, [competitions]);
+
   const nextUpcomingEvent = diaryEvents.length > 0 ? diaryEvents[0] : null;
   const latestNotices = notices.slice(0, 5);
+  const homeCompetitions = sortedCompetitions.slice(0, 5);
 
   const filteredMembers = useMemo(() => {
     const q = memberSearch.trim().toLowerCase();
@@ -688,6 +743,143 @@ export default function App() {
     }
 
     loadNotices();
+  }
+
+  async function addCompetition() {
+    if (!newCompetition.title.trim()) {
+      alert("Please enter a competition title.");
+      return;
+    }
+
+    const payload = {
+      title: newCompetition.title.trim(),
+      details: newCompetition.details.trim() || null,
+      event_date: newCompetition.event_date || null,
+      file_url: newCompetition.file_url.trim() || null,
+    };
+
+    const { error } = await supabase.from("competitions").insert([payload]);
+
+    if (error) {
+      alert(error.message || "Could not add competition.");
+      return;
+    }
+
+    setNewCompetition({
+      title: "",
+      details: "",
+      event_date: "",
+      file_url: "",
+    });
+
+    await loadCompetitions();
+    alert("Competition added.");
+  }
+
+  function startEditCompetition(item) {
+    setEditingCompetitionId(item.id);
+    setEditingCompetition({
+      title: safeString(item.title),
+      details: safeString(item.details),
+      event_date: safeString(item.event_date),
+      file_url: safeString(item.file_url),
+    });
+  }
+
+  function cancelEditCompetition() {
+    setEditingCompetitionId(null);
+    setEditingCompetition({
+      title: "",
+      details: "",
+      event_date: "",
+      file_url: "",
+    });
+  }
+
+  async function saveEditCompetition(id) {
+    if (!editingCompetition.title.trim()) {
+      alert("Please enter a competition title.");
+      return;
+    }
+
+    const payload = {
+      title: editingCompetition.title.trim(),
+      details: editingCompetition.details.trim() || null,
+      event_date: editingCompetition.event_date || null,
+      file_url: editingCompetition.file_url.trim() || null,
+    };
+
+    const { error } = await supabase.from("competitions").update(payload).eq("id", id);
+
+    if (error) {
+      alert(error.message || "Could not update competition.");
+      return;
+    }
+
+    cancelEditCompetition();
+    loadCompetitions();
+  }
+
+  async function deleteCompetition(id) {
+    if (!window.confirm("Delete this competition?")) return;
+
+    const { error } = await supabase.from("competitions").delete().eq("id", id);
+    if (error) {
+      alert(error.message || "Could not delete competition.");
+      return;
+    }
+
+    loadCompetitions();
+  }
+
+  async function uploadCompetitionFile(file) {
+    if (!file) return;
+
+    const fileName = `${Date.now()}-${file.name}`;
+    const filePath = fileName;
+
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(filePath, file);
+
+    if (uploadError) {
+      alert(uploadError.message || "Competition file upload failed.");
+      return;
+    }
+
+    const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
+
+    setNewCompetition((prev) => ({
+      ...prev,
+      file_url: publicData?.publicUrl || "",
+    }));
+
+    alert("Competition file uploaded. Now click Add Competition.");
+  }
+
+  async function uploadCompetitionEditFile(file) {
+    if (!file) return;
+
+    const fileName = `${Date.now()}-${file.name}`;
+    const filePath = fileName;
+
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(filePath, file);
+
+    if (uploadError) {
+      alert(uploadError.message || "Competition file upload failed.");
+      return;
+    }
+
+    const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
+
+    setEditingCompetition((prev) => ({
+      ...prev,
+      file_url: publicData?.publicUrl || "",
+    }));
+
+    alert("Replacement file uploaded. Now click Save.");
   }
 
   async function addMember() {
@@ -1058,12 +1250,12 @@ export default function App() {
 
   function renderHome() {
     return (
-      <div style={styles.grid3}>
+      <div style={styles.grid4}>
         <div style={styles.card}>
           <h2 style={styles.cardTitle}>Welcome</h2>
           <p style={styles.largeText}>
             Welcome to the club app. Use the tabs above to view diary dates,
-            notices, members, office bearers, coaches and documents.
+            notices, competitions, members, office bearers, coaches and documents.
           </p>
           <div style={styles.websiteRow}>
             <a
@@ -1117,6 +1309,35 @@ export default function App() {
                     safeString(notice.content)
                   )}
                 </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>Competitions</h2>
+          {homeCompetitions.length === 0 ? (
+            <p style={styles.emptyText}>No competitions added yet.</p>
+          ) : (
+            homeCompetitions.map((item) => (
+              <div key={item.id} style={styles.noticeCard}>
+                <div style={styles.noticeTitle}>{safeString(item.title)}</div>
+                {item.event_date ? (
+                  <div style={styles.eventMeta}>Date: {formatDate(item.event_date)}</div>
+                ) : null}
+                {item.details ? <div style={styles.noticeBody}>{safeString(item.details)}</div> : null}
+                {item.file_url ? (
+                  <div style={{ marginTop: 8 }}>
+                    <a
+                      href={item.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={styles.link}
+                    >
+                      Open file
+                    </a>
+                  </div>
+                ) : null}
               </div>
             ))
           )}
@@ -1366,6 +1587,170 @@ export default function App() {
                           Edit
                         </button>
                         <button style={styles.deleteBtn} onClick={() => deleteNotice(notice.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderCompetitions() {
+    return (
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Competitions</h2>
+
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Add Competition</h3>
+
+            <div style={styles.formGrid}>
+              <input
+                style={styles.input}
+                placeholder="Competition title"
+                value={newCompetition.title}
+                onChange={(e) => setNewCompetition({ ...newCompetition, title: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                type="date"
+                value={newCompetition.event_date}
+                onChange={(e) =>
+                  setNewCompetition({ ...newCompetition, event_date: e.target.value })
+                }
+              />
+              <input
+                style={styles.input}
+                placeholder="File URL (optional)"
+                value={newCompetition.file_url}
+                onChange={(e) => setNewCompetition({ ...newCompetition, file_url: e.target.value })}
+              />
+            </div>
+
+            <textarea
+              style={styles.textarea}
+              placeholder="Competition details"
+              value={newCompetition.details}
+              onChange={(e) => setNewCompetition({ ...newCompetition, details: e.target.value })}
+            />
+
+            <div style={styles.adminActionRow}>
+              <input
+                style={styles.input}
+                type="file"
+                onChange={(e) => uploadCompetitionFile(e.target.files?.[0])}
+              />
+              <button style={styles.primaryBtn} onClick={addCompetition}>
+                Add Competition
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {sortedCompetitions.length === 0 ? (
+          <p style={styles.emptyText}>No competitions added yet.</p>
+        ) : (
+          <div style={styles.listWrap}>
+            {sortedCompetitions.map((item) => (
+              <div key={item.id} style={styles.listCard}>
+                {editingCompetitionId === item.id ? (
+                  <>
+                    <div style={styles.formGrid}>
+                      <input
+                        style={styles.input}
+                        placeholder="Competition title"
+                        value={editingCompetition.title}
+                        onChange={(e) =>
+                          setEditingCompetition({ ...editingCompetition, title: e.target.value })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        type="date"
+                        value={editingCompetition.event_date}
+                        onChange={(e) =>
+                          setEditingCompetition({
+                            ...editingCompetition,
+                            event_date: e.target.value,
+                          })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="File URL"
+                        value={editingCompetition.file_url}
+                        onChange={(e) =>
+                          setEditingCompetition({ ...editingCompetition, file_url: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <textarea
+                      style={styles.textarea}
+                      placeholder="Competition details"
+                      value={editingCompetition.details}
+                      onChange={(e) =>
+                        setEditingCompetition({ ...editingCompetition, details: e.target.value })
+                      }
+                    />
+
+                    <div style={styles.adminActionRow}>
+                      <input
+                        style={styles.input}
+                        type="file"
+                        onChange={(e) => uploadCompetitionEditFile(e.target.files?.[0])}
+                      />
+                    </div>
+
+                    <div style={styles.contactButtons}>
+                      <button
+                        style={styles.primaryBtn}
+                        onClick={() => saveEditCompetition(item.id)}
+                      >
+                        Save
+                      </button>
+                      <button style={styles.secondaryBtn} onClick={cancelEditCompetition}>
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={styles.noticeTitle}>{safeString(item.title)}</div>
+                    {item.event_date ? (
+                      <div style={styles.infoLineStrong}>Date: {formatDate(item.event_date)}</div>
+                    ) : null}
+                    {item.details ? <div style={styles.noticeBody}>{safeString(item.details)}</div> : null}
+                    {item.file_url ? (
+                      <div style={{ marginTop: 10 }}>
+                        <a
+                          href={item.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={styles.link}
+                        >
+                          Open file
+                        </a>
+                      </div>
+                    ) : null}
+                    {adminMode ? (
+                      <div style={styles.contactButtons}>
+                        <button
+                          style={styles.primaryBtn}
+                          onClick={() => startEditCompetition(item)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          style={styles.deleteBtn}
+                          onClick={() => deleteCompetition(item.id)}
+                        >
                           Delete
                         </button>
                       </div>
@@ -1908,6 +2293,8 @@ export default function App() {
         return renderDiary();
       case "notices":
         return renderNotices();
+      case "competitions":
+        return renderCompetitions();
       case "members":
         return renderMembers();
       case "office":
@@ -2160,6 +2547,11 @@ const styles = {
     gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))",
     gap: 18,
   },
+  grid4: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+    gap: 18,
+  },
   card: {
     background: "#ece8eb",
     borderRadius: 20,
@@ -2228,6 +2620,7 @@ const styles = {
     color: "#2d3f59",
     marginTop: 8,
     whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
   },
   noticeCard: {
     background: "#f7f3f5",
@@ -2241,6 +2634,9 @@ const styles = {
     fontWeight: 800,
     color: "#84233a",
     marginBottom: 8,
+    whiteSpace: "normal",
+    wordBreak: "break-word",
+    overflowWrap: "anywhere",
   },
   noticeBody: {
     fontSize: 15,
@@ -2248,6 +2644,7 @@ const styles = {
     color: "#2d3f59",
     whiteSpace: "pre-wrap",
     wordBreak: "break-word",
+    overflowWrap: "anywhere",
   },
   emptyText: {
     fontSize: 16,
@@ -2341,6 +2738,7 @@ const styles = {
     borderRadius: 14,
     padding: 14,
     border: "1px solid #e0d2d8",
+    minWidth: 0,
   },
   membersGrid: {
     display: "grid",
@@ -2359,6 +2757,7 @@ const styles = {
     marginBottom: 5,
     fontWeight: 600,
     wordBreak: "break-word",
+    overflowWrap: "anywhere",
   },
   infoLineStrong: {
     fontSize: 16,
@@ -2366,6 +2765,7 @@ const styles = {
     marginBottom: 6,
     fontWeight: 800,
     wordBreak: "break-word",
+    overflowWrap: "anywhere",
   },
   searchRow: {
     marginBottom: 14,
@@ -2402,5 +2802,6 @@ const styles = {
     color: "#84233a",
     textDecoration: "none",
     wordBreak: "break-word",
+    overflowWrap: "anywhere",
   },
 };
