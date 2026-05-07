@@ -135,6 +135,7 @@ function normaliseNotice(row) {
     id: getFirstValue(row, ["id"]),
     title: getFirstValue(row, ["title", "heading", "name"], "Notice"),
     content: getFirstValue(row, ["message", "content", "details", "description", "text"]),
+    file_url: getFirstValue(row, ["file_url", "url", "link"]),
     created_at: getFirstValue(row, ["created_at", "date_posted"]),
   };
 }
@@ -254,6 +255,7 @@ export default function App() {
   const [newNotice, setNewNotice] = useState({
     title: "",
     content: "",
+    file_url: "",
   });
 
   const [newCompetition, setNewCompetition] = useState({
@@ -300,6 +302,7 @@ export default function App() {
   const [editingNotice, setEditingNotice] = useState({
     title: "",
     content: "",
+    file_url: "",
   });
 
   const [editingCompetitionId, setEditingCompetitionId] = useState(null);
@@ -537,7 +540,7 @@ export default function App() {
     setAdminMode(false);
   }
 
-  async function uploadDiaryFile(file) {
+  async function uploadFileAndSet(file, setter, successMessage, errorMessageText) {
     if (!file) return;
 
     const fileName = `${Date.now()}-${file.name}`;
@@ -548,43 +551,72 @@ export default function App() {
       .upload(filePath, file);
 
     if (uploadError) {
-      alert(uploadError.message || "Diary file upload failed.");
+      alert(uploadError.message || errorMessageText);
       return;
     }
 
     const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
 
-    setNewEvent((prev) => ({
+    setter((prev) => ({
       ...prev,
       file_url: publicData?.publicUrl || "",
     }));
 
-    alert("Diary file uploaded. Now click Add Event.");
+    alert(successMessage);
   }
 
-  async function uploadDiaryEditFile(file) {
-    if (!file) return;
+  function uploadDiaryFile(file) {
+    return uploadFileAndSet(
+      file,
+      setNewEvent,
+      "Diary file uploaded. Now click Add Event.",
+      "Diary file upload failed."
+    );
+  }
 
-    const fileName = `${Date.now()}-${file.name}`;
-    const filePath = fileName;
+  function uploadDiaryEditFile(file) {
+    return uploadFileAndSet(
+      file,
+      setEditingEvent,
+      "Replacement diary file uploaded. Now click Save.",
+      "Diary file upload failed."
+    );
+  }
 
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET)
-      .upload(filePath, file);
+  function uploadNoticeFile(file) {
+    return uploadFileAndSet(
+      file,
+      setNewNotice,
+      "Noticeboard file uploaded. Now click Add Notice.",
+      "Noticeboard file upload failed."
+    );
+  }
 
-    if (uploadError) {
-      alert(uploadError.message || "Diary file upload failed.");
-      return;
-    }
+  function uploadNoticeEditFile(file) {
+    return uploadFileAndSet(
+      file,
+      setEditingNotice,
+      "Replacement noticeboard file uploaded. Now click Save.",
+      "Noticeboard file upload failed."
+    );
+  }
 
-    const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
+  function uploadCompetitionFile(file) {
+    return uploadFileAndSet(
+      file,
+      setNewCompetition,
+      "Competition file uploaded. Now click Add Competition.",
+      "Competition file upload failed."
+    );
+  }
 
-    setEditingEvent((prev) => ({
-      ...prev,
-      file_url: publicData?.publicUrl || "",
-    }));
-
-    alert("Replacement diary file uploaded. Now click Save.");
+  function uploadCompetitionEditFile(file) {
+    return uploadFileAndSet(
+      file,
+      setEditingCompetition,
+      "Replacement file uploaded. Now click Save.",
+      "Competition file upload failed."
+    );
   }
 
   async function addEvent() {
@@ -741,6 +773,7 @@ export default function App() {
       {
         title: newNotice.title.trim(),
         message: bodyText,
+        file_url: newNotice.file_url.trim() || null,
       },
     ]);
 
@@ -749,7 +782,7 @@ export default function App() {
       return;
     }
 
-    setNewNotice({ title: "", content: "" });
+    setNewNotice({ title: "", content: "", file_url: "" });
     loadNotices();
   }
 
@@ -758,12 +791,13 @@ export default function App() {
     setEditingNotice({
       title: safeString(notice.title),
       content: safeString(notice.content),
+      file_url: safeString(notice.file_url),
     });
   }
 
   function cancelEditNotice() {
     setEditingNoticeId(null);
-    setEditingNotice({ title: "", content: "" });
+    setEditingNotice({ title: "", content: "", file_url: "" });
   }
 
   async function saveEditNotice(id) {
@@ -779,6 +813,7 @@ export default function App() {
       .update({
         title: editingNotice.title.trim(),
         message: bodyText,
+        file_url: editingNotice.file_url.trim() || null,
       })
       .eq("id", id);
 
@@ -888,56 +923,6 @@ export default function App() {
     }
 
     loadCompetitions();
-  }
-
-  async function uploadCompetitionFile(file) {
-    if (!file) return;
-
-    const fileName = `${Date.now()}-${file.name}`;
-    const filePath = fileName;
-
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET)
-      .upload(filePath, file);
-
-    if (uploadError) {
-      alert(uploadError.message || "Competition file upload failed.");
-      return;
-    }
-
-    const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-
-    setNewCompetition((prev) => ({
-      ...prev,
-      file_url: publicData?.publicUrl || "",
-    }));
-
-    alert("Competition file uploaded. Now click Add Competition.");
-  }
-
-  async function uploadCompetitionEditFile(file) {
-    if (!file) return;
-
-    const fileName = `${Date.now()}-${file.name}`;
-    const filePath = fileName;
-
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET)
-      .upload(filePath, file);
-
-    if (uploadError) {
-      alert(uploadError.message || "Competition file upload failed.");
-      return;
-    }
-
-    const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-
-    setEditingCompetition((prev) => ({
-      ...prev,
-      file_url: publicData?.publicUrl || "",
-    }));
-
-    alert("Replacement file uploaded. Now click Save.");
   }
 
   async function addMember() {
@@ -1306,6 +1291,17 @@ export default function App() {
     loadDocuments();
   }
 
+  function FileLink({ url }) {
+    if (!url) return null;
+    return (
+      <div style={{ marginTop: 10 }}>
+        <a href={url} target="_blank" rel="noreferrer" style={styles.link}>
+          Open file
+        </a>
+      </div>
+    );
+  }
+
   function renderHome() {
     return (
       <div style={styles.grid4}>
@@ -1339,18 +1335,7 @@ export default function App() {
               {nextUpcomingEvent.details ? (
                 <div style={styles.eventDetails}>{nextUpcomingEvent.details}</div>
               ) : null}
-              {nextUpcomingEvent.file_url ? (
-                <div style={{ marginTop: 10 }}>
-                  <a
-                    href={nextUpcomingEvent.file_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={styles.link}
-                  >
-                    Open file
-                  </a>
-                </div>
-              ) : null}
+              <FileLink url={nextUpcomingEvent.file_url} />
             </div>
           ) : (
             <p style={styles.emptyText}>No upcoming events.</p>
@@ -1379,6 +1364,7 @@ export default function App() {
                     safeString(notice.content)
                   )}
                 </div>
+                <FileLink url={notice.file_url} />
               </div>
             ))
           )}
@@ -1396,13 +1382,7 @@ export default function App() {
                   <div style={styles.eventMeta}>Date: {formatDate(item.event_date)}</div>
                 ) : null}
                 {item.details ? <div style={styles.noticeBody}>{safeString(item.details)}</div> : null}
-                {item.file_url ? (
-                  <div style={{ marginTop: 8 }}>
-                    <a href={item.file_url} target="_blank" rel="noreferrer" style={styles.link}>
-                      Open file
-                    </a>
-                  </div>
-                ) : null}
+                <FileLink url={item.file_url} />
               </div>
             ))
           )}
@@ -1481,24 +1461,21 @@ export default function App() {
               onChange={(e) => setNewEvent({ ...newEvent, details: e.target.value })}
             />
 
-            <div style={styles.adminActionRow}>
+            <div style={styles.formGrid}>
               <input
                 style={styles.input}
                 type="file"
                 onChange={(e) => uploadDiaryFile(e.target.files?.[0])}
               />
-
-              {newEvent.file_url ? (
-                <a
-                  href={newEvent.file_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={styles.link}
-                >
-                  File uploaded
-                </a>
-              ) : null}
+              <input
+                style={styles.input}
+                placeholder="Or paste Canva/file link"
+                value={newEvent.file_url}
+                onChange={(e) => setNewEvent({ ...newEvent, file_url: e.target.value })}
+              />
             </div>
+
+            {newEvent.file_url ? <FileLink url={newEvent.file_url} /> : null}
 
             <div style={styles.adminActionRow}>
               <button style={styles.primaryBtn} onClick={addEvent}>
@@ -1551,14 +1528,12 @@ export default function App() {
                         }
                       />
                     </div>
-
                     <textarea
                       style={styles.textarea}
                       placeholder="Details"
                       value={editingEvent.details}
                       onChange={(e) => setEditingEvent({ ...editingEvent, details: e.target.value })}
                     />
-
                     <div style={styles.adminActionRow}>
                       <input
                         style={styles.input}
@@ -1566,7 +1541,6 @@ export default function App() {
                         onChange={(e) => uploadDiaryEditFile(e.target.files?.[0])}
                       />
                     </div>
-
                     <div style={styles.contactButtons}>
                       <button style={styles.primaryBtn} onClick={() => saveEditEvent(event.id)}>
                         Save
@@ -1589,18 +1563,7 @@ export default function App() {
                       <div style={styles.eventDetails}>{event.details}</div>
                     ) : null}
 
-                    {event.file_url ? (
-                      <div style={{ marginTop: 10 }}>
-                        <a
-                          href={event.file_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={styles.link}
-                        >
-                          Open file
-                        </a>
-                      </div>
-                    ) : null}
+                    <FileLink url={event.file_url} />
 
                     {adminMode ? (
                       <div style={styles.contactButtons}>
@@ -1608,6 +1571,798 @@ export default function App() {
                           Edit
                         </button>
                         <button style={styles.deleteBtn} onClick={() => deleteEvent(event.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderNotices() {
+    return (
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Noticeboard</h2>
+
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Add Notice</h3>
+            <input
+              style={styles.input}
+              placeholder="Notice title"
+              value={newNotice.title}
+              onChange={(e) => setNewNotice({ ...newNotice, title: e.target.value })}
+            />
+            <textarea
+              style={styles.textarea}
+              placeholder="Notice content"
+              value={newNotice.content}
+              onChange={(e) => setNewNotice({ ...newNotice, content: e.target.value })}
+            />
+
+            <div style={styles.formGrid}>
+              <input
+                style={styles.input}
+                type="file"
+                onChange={(e) => uploadNoticeFile(e.target.files?.[0])}
+              />
+              <input
+                style={styles.input}
+                placeholder="Or paste Canva/file link"
+                value={newNotice.file_url}
+                onChange={(e) => setNewNotice({ ...newNotice, file_url: e.target.value })}
+              />
+            </div>
+
+            {newNotice.file_url ? <FileLink url={newNotice.file_url} /> : null}
+
+            <button style={styles.primaryBtn} onClick={addNotice}>
+              Add Notice
+            </button>
+          </div>
+        ) : null}
+
+        {notices.length === 0 ? (
+          <p style={styles.emptyText}>No notices yet.</p>
+        ) : (
+          <div style={styles.listWrap}>
+            {notices.map((notice) => (
+              <div key={notice.id} style={styles.listCard}>
+                {editingNoticeId === notice.id ? (
+                  <>
+                    <input
+                      style={styles.input}
+                      placeholder="Notice title"
+                      value={editingNotice.title}
+                      onChange={(e) => setEditingNotice({ ...editingNotice, title: e.target.value })}
+                    />
+                    <textarea
+                      style={styles.textarea}
+                      placeholder="Notice content"
+                      value={editingNotice.content}
+                      onChange={(e) =>
+                        setEditingNotice({ ...editingNotice, content: e.target.value })
+                      }
+                    />
+                    <input
+                      style={styles.input}
+                      placeholder="File URL"
+                      value={editingNotice.file_url}
+                      onChange={(e) =>
+                        setEditingNotice({ ...editingNotice, file_url: e.target.value })
+                      }
+                    />
+                    <div style={styles.adminActionRow}>
+                      <input
+                        style={styles.input}
+                        type="file"
+                        onChange={(e) => uploadNoticeEditFile(e.target.files?.[0])}
+                      />
+                    </div>
+                    <div style={styles.contactButtons}>
+                      <button style={styles.primaryBtn} onClick={() => saveEditNotice(notice.id)}>
+                        Save
+                      </button>
+                      <button style={styles.secondaryBtn} onClick={cancelEditNotice}>
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={styles.noticeTitle}>{safeString(notice.title)}</div>
+                    <div style={styles.noticeBody}>
+                      {isWebLink(notice.content) ? (
+                        <a
+                          href={safeString(notice.content)}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={styles.link}
+                        >
+                          {safeString(notice.content)}
+                        </a>
+                      ) : (
+                        safeString(notice.content)
+                      )}
+                    </div>
+                    <FileLink url={notice.file_url} />
+                    {adminMode ? (
+                      <div style={styles.contactButtons}>
+                        <button style={styles.primaryBtn} onClick={() => startEditNotice(notice)}>
+                          Edit
+                        </button>
+                        <button style={styles.deleteBtn} onClick={() => deleteNotice(notice.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderCompetitions() {
+    return (
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Competitions</h2>
+
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Add Competition</h3>
+
+            <div style={styles.formGrid}>
+              <input
+                style={styles.input}
+                placeholder="Competition title"
+                value={newCompetition.title}
+                onChange={(e) => setNewCompetition({ ...newCompetition, title: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                type="date"
+                value={newCompetition.event_date}
+                onChange={(e) =>
+                  setNewCompetition({ ...newCompetition, event_date: e.target.value })
+                }
+              />
+              <input
+                style={styles.input}
+                placeholder="File URL (optional)"
+                value={newCompetition.file_url}
+                onChange={(e) => setNewCompetition({ ...newCompetition, file_url: e.target.value })}
+              />
+            </div>
+
+            <textarea
+              style={styles.textarea}
+              placeholder="Competition details"
+              value={newCompetition.details}
+              onChange={(e) => setNewCompetition({ ...newCompetition, details: e.target.value })}
+            />
+
+            <div style={styles.adminActionRow}>
+              <input
+                style={styles.input}
+                type="file"
+                onChange={(e) => uploadCompetitionFile(e.target.files?.[0])}
+              />
+              <button style={styles.primaryBtn} onClick={addCompetition}>
+                Add Competition
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {sortedCompetitions.length === 0 ? (
+          <p style={styles.emptyText}>No competitions added yet.</p>
+        ) : (
+          <div style={styles.listWrap}>
+            {sortedCompetitions.map((item) => (
+              <div key={item.id} style={styles.listCard}>
+                {editingCompetitionId === item.id ? (
+                  <>
+                    <div style={styles.formGrid}>
+                      <input
+                        style={styles.input}
+                        placeholder="Competition title"
+                        value={editingCompetition.title}
+                        onChange={(e) =>
+                          setEditingCompetition({ ...editingCompetition, title: e.target.value })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        type="date"
+                        value={editingCompetition.event_date}
+                        onChange={(e) =>
+                          setEditingCompetition({
+                            ...editingCompetition,
+                            event_date: e.target.value,
+                          })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="File URL"
+                        value={editingCompetition.file_url}
+                        onChange={(e) =>
+                          setEditingCompetition({ ...editingCompetition, file_url: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <textarea
+                      style={styles.textarea}
+                      placeholder="Competition details"
+                      value={editingCompetition.details}
+                      onChange={(e) =>
+                        setEditingCompetition({ ...editingCompetition, details: e.target.value })
+                      }
+                    />
+
+                    <div style={styles.adminActionRow}>
+                      <input
+                        style={styles.input}
+                        type="file"
+                        onChange={(e) => uploadCompetitionEditFile(e.target.files?.[0])}
+                      />
+                    </div>
+
+                    <div style={styles.contactButtons}>
+                      <button
+                        style={styles.primaryBtn}
+                        onClick={() => saveEditCompetition(item.id)}
+                      >
+                        Save
+                      </button>
+                      <button style={styles.secondaryBtn} onClick={cancelEditCompetition}>
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={styles.noticeTitle}>{safeString(item.title)}</div>
+                    {item.event_date ? (
+                      <div style={styles.infoLineStrong}>Date: {formatDate(item.event_date)}</div>
+                    ) : null}
+                    {item.details ? <div style={styles.noticeBody}>{safeString(item.details)}</div> : null}
+                    <FileLink url={item.file_url} />
+                    {adminMode ? (
+                      <div style={styles.contactButtons}>
+                        <button
+                          style={styles.primaryBtn}
+                          onClick={() => startEditCompetition(item)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          style={styles.deleteBtn}
+                          onClick={() => deleteCompetition(item.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderMembersSection(title, items) {
+    return (
+      <div style={styles.memberSection}>
+        <h3 style={styles.sectionTitle}>{title}</h3>
+        {items.length === 0 ? (
+          <p style={styles.emptyText}>None added yet.</p>
+        ) : (
+          items.map((member) => (
+            <div key={member.id} style={styles.listCard}>
+              {editingMemberId === member.id ? (
+                <>
+                  <div style={styles.formGrid}>
+                    <input
+                      style={styles.input}
+                      placeholder="Full name"
+                      value={editingMember.full_name}
+                      onChange={(e) =>
+                        setEditingMember({ ...editingMember, full_name: e.target.value })
+                      }
+                    />
+                    <input
+                      style={styles.input}
+                      placeholder="Phone"
+                      value={editingMember.phone}
+                      onChange={(e) => setEditingMember({ ...editingMember, phone: e.target.value })}
+                    />
+                    <input
+                      style={styles.input}
+                      placeholder="WhatsApp"
+                      value={editingMember.whatsapp}
+                      onChange={(e) =>
+                        setEditingMember({ ...editingMember, whatsapp: e.target.value })
+                      }
+                    />
+                    <input
+                      style={styles.input}
+                      placeholder="Email"
+                      value={editingMember.email}
+                      onChange={(e) => setEditingMember({ ...editingMember, email: e.target.value })}
+                    />
+                    <select
+                      style={styles.input}
+                      value={editingMember.category}
+                      onChange={(e) =>
+                        setEditingMember({ ...editingMember, category: e.target.value })
+                      }
+                    >
+                      <option value="gents">Gents</option>
+                      <option value="ladies">Ladies</option>
+                      <option value="associate">Associate</option>
+                    </select>
+                  </div>
+                  <div style={styles.contactButtons}>
+                    <button style={styles.primaryBtn} onClick={() => saveEditMember(member.id)}>
+                      Save
+                    </button>
+                    <button style={styles.secondaryBtn} onClick={cancelEditMember}>
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={styles.noticeTitle}>{safeString(member.full_name)}</div>
+                  {member.phone ? <div style={styles.infoLine}>Phone: {member.phone}</div> : null}
+                  {member.whatsapp ? (
+                    <div style={styles.infoLine}>WhatsApp: {member.whatsapp}</div>
+                  ) : null}
+                  {member.email ? <div style={styles.infoLine}>Email: {member.email}</div> : null}
+                  <ContactButtons item={member} />
+                  {adminMode ? (
+                    <div style={styles.contactButtons}>
+                      <button style={styles.primaryBtn} onClick={() => startEditMember(member)}>
+                        Edit
+                      </button>
+                      <button style={styles.deleteBtn} onClick={() => deleteMember(member.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    );
+  }
+
+  function renderMembers() {
+    return (
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Members</h2>
+
+        <div style={styles.searchRow}>
+          <input
+            style={styles.input}
+            placeholder="Search members"
+            value={memberSearch}
+            onChange={(e) => setMemberSearch(e.target.value)}
+          />
+        </div>
+
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Add Member</h3>
+            <div style={styles.formGrid}>
+              <input
+                style={styles.input}
+                placeholder="Full name"
+                value={newMember.full_name}
+                onChange={(e) => setNewMember({ ...newMember, full_name: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="Phone"
+                value={newMember.phone}
+                onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="WhatsApp"
+                value={newMember.whatsapp}
+                onChange={(e) => setNewMember({ ...newMember, whatsapp: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="Email"
+                value={newMember.email}
+                onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+              />
+              <select
+                style={styles.input}
+                value={newMember.category}
+                onChange={(e) => setNewMember({ ...newMember, category: e.target.value })}
+              >
+                <option value="gents">Gents</option>
+                <option value="ladies">Ladies</option>
+                <option value="associate">Associate</option>
+              </select>
+            </div>
+            <button style={styles.primaryBtn} onClick={addMember}>
+              Add Member
+            </button>
+          </div>
+        ) : null}
+
+        <div style={styles.membersGrid}>
+          {renderMembersSection("Gents", gentsMembers)}
+          {renderMembersSection("Ladies", ladiesMembers)}
+          {renderMembersSection("Associate", associateMembers)}
+        </div>
+      </div>
+    );
+  }
+
+  function renderOfficeBearers() {
+    return (
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Office Bearers</h2>
+
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Add Office Bearer</h3>
+            <div style={styles.formGrid}>
+              <input
+                style={styles.input}
+                placeholder="Role"
+                value={newOfficeBearer.role}
+                onChange={(e) => setNewOfficeBearer({ ...newOfficeBearer, role: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="Name"
+                value={newOfficeBearer.name}
+                onChange={(e) => setNewOfficeBearer({ ...newOfficeBearer, name: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="Phone"
+                value={newOfficeBearer.phone}
+                onChange={(e) => setNewOfficeBearer({ ...newOfficeBearer, phone: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="WhatsApp"
+                value={newOfficeBearer.whatsapp}
+                onChange={(e) =>
+                  setNewOfficeBearer({ ...newOfficeBearer, whatsapp: e.target.value })
+                }
+              />
+              <input
+                style={styles.input}
+                placeholder="Email"
+                value={newOfficeBearer.email}
+                onChange={(e) => setNewOfficeBearer({ ...newOfficeBearer, email: e.target.value })}
+              />
+            </div>
+            <button style={styles.primaryBtn} onClick={addOfficeBearer}>
+              Add Office Bearer
+            </button>
+          </div>
+        ) : null}
+
+        {officeBearers.length === 0 ? (
+          <p style={styles.emptyText}>No office bearers added yet.</p>
+        ) : (
+          <div style={styles.listWrap}>
+            {officeBearers.map((item) => (
+              <div key={item.id} style={styles.listCard}>
+                {editingOfficeBearerId === item.id ? (
+                  <>
+                    <div style={styles.formGrid}>
+                      <input
+                        style={styles.input}
+                        placeholder="Role"
+                        value={editingOfficeBearer.role}
+                        onChange={(e) =>
+                          setEditingOfficeBearer({ ...editingOfficeBearer, role: e.target.value })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="Name"
+                        value={editingOfficeBearer.name}
+                        onChange={(e) =>
+                          setEditingOfficeBearer({ ...editingOfficeBearer, name: e.target.value })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="Phone"
+                        value={editingOfficeBearer.phone}
+                        onChange={(e) =>
+                          setEditingOfficeBearer({ ...editingOfficeBearer, phone: e.target.value })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="WhatsApp"
+                        value={editingOfficeBearer.whatsapp}
+                        onChange={(e) =>
+                          setEditingOfficeBearer({
+                            ...editingOfficeBearer,
+                            whatsapp: e.target.value,
+                          })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="Email"
+                        value={editingOfficeBearer.email}
+                        onChange={(e) =>
+                          setEditingOfficeBearer({ ...editingOfficeBearer, email: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div style={styles.contactButtons}>
+                      <button
+                        style={styles.primaryBtn}
+                        onClick={() => saveEditOfficeBearer(item.id)}
+                      >
+                        Save
+                      </button>
+                      <button style={styles.secondaryBtn} onClick={cancelEditOfficeBearer}>
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={styles.noticeTitle}>{safeString(item.role)}</div>
+                    <div style={styles.infoLineStrong}>{safeString(item.name)}</div>
+                    {item.phone ? <div style={styles.infoLine}>Phone: {item.phone}</div> : null}
+                    {item.whatsapp ? (
+                      <div style={styles.infoLine}>WhatsApp: {item.whatsapp}</div>
+                    ) : null}
+                    {item.email ? <div style={styles.infoLine}>Email: {item.email}</div> : null}
+                    <ContactButtons item={item} />
+                    {adminMode ? (
+                      <div style={styles.contactButtons}>
+                        <button
+                          style={styles.primaryBtn}
+                          onClick={() => startEditOfficeBearer(item)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          style={styles.deleteBtn}
+                          onClick={() => deleteOfficeBearer(item.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderCoaches() {
+    return (
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Club Coaches</h2>
+
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Add Coach</h3>
+            <div style={styles.formGrid}>
+              <input
+                style={styles.input}
+                placeholder="Name"
+                value={newCoach.name}
+                onChange={(e) => setNewCoach({ ...newCoach, name: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="Phone"
+                value={newCoach.phone}
+                onChange={(e) => setNewCoach({ ...newCoach, phone: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="WhatsApp"
+                value={newCoach.whatsapp}
+                onChange={(e) => setNewCoach({ ...newCoach, whatsapp: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="Email"
+                value={newCoach.email}
+                onChange={(e) => setNewCoach({ ...newCoach, email: e.target.value })}
+              />
+              <input
+                style={styles.input}
+                placeholder="Notes"
+                value={newCoach.notes}
+                onChange={(e) => setNewCoach({ ...newCoach, notes: e.target.value })}
+              />
+            </div>
+            <button style={styles.primaryBtn} onClick={addCoach}>
+              Add Coach
+            </button>
+          </div>
+        ) : null}
+
+        {coaches.length === 0 ? (
+          <p style={styles.emptyText}>No coaches added yet.</p>
+        ) : (
+          <div style={styles.listWrap}>
+            {coaches.map((coach) => (
+              <div key={coach.id} style={styles.listCard}>
+                {editingCoachId === coach.id ? (
+                  <>
+                    <div style={styles.formGrid}>
+                      <input
+                        style={styles.input}
+                        placeholder="Name"
+                        value={editingCoach.name}
+                        onChange={(e) => setEditingCoach({ ...editingCoach, name: e.target.value })}
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="Phone"
+                        value={editingCoach.phone}
+                        onChange={(e) =>
+                          setEditingCoach({ ...editingCoach, phone: e.target.value })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="WhatsApp"
+                        value={editingCoach.whatsapp}
+                        onChange={(e) =>
+                          setEditingCoach({ ...editingCoach, whatsapp: e.target.value })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="Email"
+                        value={editingCoach.email}
+                        onChange={(e) =>
+                          setEditingCoach({ ...editingCoach, email: e.target.value })
+                        }
+                      />
+                      <input
+                        style={styles.input}
+                        placeholder="Notes"
+                        value={editingCoach.notes}
+                        onChange={(e) =>
+                          setEditingCoach({ ...editingCoach, notes: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div style={styles.contactButtons}>
+                      <button style={styles.primaryBtn} onClick={() => saveEditCoach(coach.id)}>
+                        Save
+                      </button>
+                      <button style={styles.secondaryBtn} onClick={cancelEditCoach}>
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={styles.noticeTitle}>{safeString(coach.name)}</div>
+                    {coach.phone ? <div style={styles.infoLine}>Phone: {coach.phone}</div> : null}
+                    {coach.whatsapp ? (
+                      <div style={styles.infoLine}>WhatsApp: {coach.whatsapp}</div>
+                    ) : null}
+                    {coach.email ? <div style={styles.infoLine}>Email: {coach.email}</div> : null}
+                    {coach.notes ? <div style={styles.infoLine}>{coach.notes}</div> : null}
+                    <ContactButtons item={coach} />
+                    {adminMode ? (
+                      <div style={styles.contactButtons}>
+                        <button style={styles.primaryBtn} onClick={() => startEditCoach(coach)}>
+                          Edit
+                        </button>
+                        <button style={styles.deleteBtn} onClick={() => deleteCoach(coach.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderDocuments() {
+    return (
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Documents</h2>
+
+        {adminMode ? (
+          <div style={styles.adminBox}>
+            <h3 style={styles.adminTitle}>Upload Document</h3>
+            <input
+              style={styles.input}
+              type="file"
+              onChange={(e) => uploadDocument(e.target.files?.[0])}
+            />
+          </div>
+        ) : null}
+
+        {documents.length === 0 ? (
+          <p style={styles.emptyText}>No documents yet.</p>
+        ) : (
+          <div style={styles.listWrap}>
+            {documents.map((doc) => (
+              <div key={doc.id} style={styles.listCard}>
+                {editingDocumentId === doc.id ? (
+                  <>
+                    <input
+                      style={styles.input}
+                      placeholder="Document title"
+                      value={editingDocument.title}
+                      onChange={(e) =>
+                        setEditingDocument({ ...editingDocument, title: e.target.value })
+                      }
+                    />
+                    <input
+                      style={styles.input}
+                      placeholder="Document URL"
+                      value={editingDocument.file_url}
+                      onChange={(e) =>
+                        setEditingDocument({ ...editingDocument, file_url: e.target.value })
+                      }
+                    />
+                    <div style={styles.contactButtons}>
+                      <button style={styles.primaryBtn} onClick={() => saveEditDocument(doc.id)}>
+                        Save
+                      </button>
+                      <button style={styles.secondaryBtn} onClick={cancelEditDocument}>
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <a href={doc.file_url} target="_blank" rel="noreferrer" style={styles.link}>
+                      {safeString(doc.title, "Open document")}
+                    </a>
+                    {adminMode ? (
+                      <div style={styles.contactButtons}>
+                        <button style={styles.primaryBtn} onClick={() => startEditDocument(doc)}>
+                          Edit
+                        </button>
+                        <button style={styles.deleteBtn} onClick={() => deleteDocument(doc.id)}>
                           Delete
                         </button>
                       </div>
@@ -1653,7 +2408,501 @@ export default function App() {
     }
   }
 
-  /* KEEP ALL YOUR EXISTING renderNotices, renderCompetitions, renderMembers,
-     renderOfficeBearers, renderCoaches, renderDocuments AND styles BELOW
-     EXACTLY AS THEY ARE IN YOUR CURRENT FILE */
+  return (
+    <div style={styles.page}>
+      <div style={styles.wrap}>
+        <div style={styles.header}>
+          <div style={styles.headerTop}>
+            <div style={styles.brandWrap}>
+              {logo ? <img src={logo} alt="Club Logo" style={styles.logo} /> : null}
+              <div style={styles.titleBlock}>
+                <h1 style={styles.title}>{CLUB_NAME}</h1>
+                <div style={styles.subtitle}>{CLUB_SUBTITLE}</div>
+              </div>
+            </div>
+          </div>
+
+          {!adminMode ? (
+            <div style={styles.adminStripWrap}>
+              {!showAdminLogin ? (
+                <button style={styles.smallAdminToggle} onClick={() => setShowAdminLogin(true)}>
+                  Admin
+                </button>
+              ) : (
+                <div style={styles.compactAdminPanel}>
+                  <input
+                    style={styles.compactPinInput}
+                    type="password"
+                    placeholder="Admin PIN"
+                    value={adminPinInput}
+                    onChange={(e) => setAdminPinInput(e.target.value)}
+                  />
+                  <button style={styles.compactAdminBtn} onClick={handleAdminLogin}>
+                    Go
+                  </button>
+                  <button
+                    style={styles.compactCancelBtn}
+                    onClick={() => {
+                      setShowAdminLogin(false);
+                      setAdminPinInput("");
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={styles.loggedInRow}>
+              <div style={styles.loggedInText}>Logged in as Admin</div>
+              <button style={styles.smallLogoutBtn} onClick={handleAdminLogout}>
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div style={styles.tabBar}>
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              style={{
+                ...styles.tab,
+                ...(activeTab === tab.key ? styles.activeTab : {}),
+              }}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {errorMessage ? <div style={styles.errorBanner}>{errorMessage}</div> : null}
+
+        {renderContent()}
+      </div>
+    </div>
+  );
 }
+
+const styles = {
+  page: {
+    minHeight: "100vh",
+    background: "linear-gradient(180deg, #990f3d 0%, #8c1738 35%, #6a0f2e 100%)",
+    padding: 14,
+    fontFamily: "Arial, sans-serif",
+    color: "#23364f",
+  },
+  wrap: {
+    maxWidth: 1480,
+    margin: "0 auto",
+  },
+  header: {
+    background: "linear-gradient(135deg, #9e2648 0%, #8d2743 100%)",
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 18,
+    border: "1px solid rgba(255,255,255,0.15)",
+    boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+  },
+  headerTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 16,
+    flexWrap: "wrap",
+  },
+  brandWrap: {
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
+    flexWrap: "wrap",
+  },
+  logo: {
+    width: 96,
+    height: 96,
+    objectFit: "contain",
+    borderRadius: 18,
+    background: "#fff",
+    padding: 6,
+  },
+  titleBlock: {
+    minWidth: 0,
+  },
+  title: {
+    margin: 0,
+    fontSize: 34,
+    lineHeight: 1.08,
+    color: "#ffffff",
+    fontWeight: 800,
+  },
+  subtitle: {
+    marginTop: 8,
+    fontSize: 18,
+    fontWeight: 700,
+    color: "#f7dde6",
+  },
+  adminStripWrap: {
+    marginTop: 16,
+    display: "flex",
+    justifyContent: "flex-end",
+  },
+  smallAdminToggle: {
+    background: "rgba(255,255,255,0.12)",
+    color: "#fff",
+    border: "1px solid rgba(255,255,255,0.22)",
+    borderRadius: 10,
+    padding: "8px 14px",
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  compactAdminPanel: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  compactPinInput: {
+    padding: 10,
+    borderRadius: 10,
+    border: "1px solid #c7b7be",
+    fontSize: 14,
+    minWidth: 140,
+    background: "#fff",
+  },
+  compactAdminBtn: {
+    background: "#8b2940",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "10px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  compactCancelBtn: {
+    background: "#ddd",
+    color: "#444",
+    border: "none",
+    borderRadius: 10,
+    padding: "10px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  loggedInRow: {
+    marginTop: 16,
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  loggedInText: {
+    fontSize: 15,
+    fontWeight: 700,
+    color: "#fff",
+  },
+  smallLogoutBtn: {
+    background: "#666",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "9px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  tabBar: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    marginBottom: 18,
+  },
+  tab: {
+    background: "rgba(255,255,255,0.12)",
+    color: "#ffffff",
+    border: "1px solid rgba(255,255,255,0.18)",
+    borderRadius: 16,
+    padding: "12px 18px",
+    fontSize: 17,
+    fontWeight: 800,
+    cursor: "pointer",
+  },
+  activeTab: {
+    background: "#ffffff",
+    color: "#8b2940",
+  },
+  errorBanner: {
+    background: "#f7e8ec",
+    color: "#b00020",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 18,
+    fontSize: 16,
+    fontWeight: 800,
+  },
+  grid3: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))",
+    gap: 18,
+  },
+  grid4: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+    gap: 18,
+  },
+  card: {
+    background: "#ece8eb",
+    borderRadius: 20,
+    padding: 18,
+    minHeight: 220,
+  },
+  cardTitle: {
+    margin: "0 0 16px 0",
+    fontSize: 28,
+    lineHeight: 1.1,
+    color: "#84233a",
+    fontWeight: 800,
+  },
+  sectionTitle: {
+    margin: "0 0 12px 0",
+    fontSize: 21,
+    color: "#84233a",
+    fontWeight: 800,
+  },
+  largeText: {
+    fontSize: 17,
+    lineHeight: 1.5,
+    fontWeight: 700,
+    color: "#2d3f59",
+  },
+  websiteRow: {
+    marginTop: 14,
+  },
+  websiteLink: {
+    display: "inline-block",
+    background: "#8b2940",
+    color: "#fff",
+    textDecoration: "none",
+    borderRadius: 10,
+    padding: "10px 14px",
+    fontSize: 15,
+    fontWeight: 700,
+  },
+  eventCard: {
+    background: "#f7f3f5",
+    borderRadius: 15,
+    padding: 15,
+    border: "1px solid #e0d2d8",
+  },
+  eventTitle: {
+    fontSize: 21,
+    fontWeight: 800,
+    color: "#84233a",
+    marginBottom: 8,
+  },
+  eventDate: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: "#2d3f59",
+    marginBottom: 6,
+  },
+  eventMeta: {
+    fontSize: 15,
+    fontWeight: 600,
+    color: "#2d3f59",
+    marginBottom: 4,
+  },
+  eventDetails: {
+    fontSize: 15,
+    lineHeight: 1.45,
+    color: "#2d3f59",
+    marginTop: 8,
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+  },
+  noticeCard: {
+    background: "#f7f3f5",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    border: "1px solid #e0d2d8",
+  },
+  noticeTitle: {
+    fontSize: 19,
+    fontWeight: 800,
+    color: "#84233a",
+    marginBottom: 8,
+    whiteSpace: "normal",
+    wordBreak: "break-word",
+    overflowWrap: "anywhere",
+  },
+  noticeBody: {
+    fontSize: 15,
+    lineHeight: 1.45,
+    color: "#2d3f59",
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+    overflowWrap: "anywhere",
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "#2d3f59",
+    fontWeight: 600,
+  },
+  adminBox: {
+    background: "#f4e9ee",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 18,
+  },
+  adminTitle: {
+    marginTop: 0,
+    fontSize: 21,
+    color: "#84233a",
+  },
+  adminActionRow: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    marginBottom: 12,
+  },
+  formGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+    gap: 10,
+    marginBottom: 12,
+  },
+  input: {
+    width: "100%",
+    padding: 12,
+    borderRadius: 10,
+    border: "1px solid #c7b7be",
+    fontSize: 15,
+    boxSizing: "border-box",
+    background: "#fff",
+  },
+  textarea: {
+    width: "100%",
+    minHeight: 100,
+    padding: 12,
+    borderRadius: 10,
+    border: "1px solid #c7b7be",
+    fontSize: 15,
+    boxSizing: "border-box",
+    marginBottom: 12,
+    background: "#fff",
+  },
+  repeatHelp: {
+    fontSize: 14,
+    color: "#2d3f59",
+    fontWeight: 600,
+    marginBottom: 12,
+  },
+  primaryBtn: {
+    background: "#8b2940",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "11px 16px",
+    fontSize: 15,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  secondaryBtn: {
+    background: "#666",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "11px 16px",
+    fontSize: 15,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  deleteBtn: {
+    background: "#c70039",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "11px 16px",
+    fontSize: 15,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  listWrap: {
+    display: "grid",
+    gap: 12,
+  },
+  listCard: {
+    background: "#f7f3f5",
+    borderRadius: 14,
+    padding: 14,
+    border: "1px solid #e0d2d8",
+    minWidth: 0,
+  },
+  membersGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+    gap: 16,
+  },
+  memberSection: {
+    background: "#f7f3f5",
+    borderRadius: 16,
+    padding: 14,
+    border: "1px solid #e0d2d8",
+  },
+  infoLine: {
+    fontSize: 15,
+    color: "#2d3f59",
+    marginBottom: 5,
+    fontWeight: 600,
+    wordBreak: "break-word",
+    overflowWrap: "anywhere",
+  },
+  infoLineStrong: {
+    fontSize: 16,
+    color: "#2d3f59",
+    marginBottom: 6,
+    fontWeight: 800,
+    wordBreak: "break-word",
+    overflowWrap: "anywhere",
+  },
+  searchRow: {
+    marginBottom: 14,
+  },
+  contactButtons: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    marginTop: 10,
+  },
+  actionBtn: {
+    display: "inline-block",
+    background: "#8b2940",
+    color: "#fff",
+    textDecoration: "none",
+    borderRadius: 10,
+    padding: "8px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  actionBtnAlt: {
+    display: "inline-block",
+    background: "#e9dde2",
+    color: "#6f2134",
+    textDecoration: "none",
+    borderRadius: 10,
+    padding: "8px 12px",
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  link: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: "#84233a",
+    textDecoration: "none",
+    wordBreak: "break-word",
+    overflowWrap: "anywhere",
+  },
+};
