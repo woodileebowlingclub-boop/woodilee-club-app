@@ -1313,7 +1313,7 @@ export default function App() {
           </p>
           <div style={styles.websiteRow}>
             <a
-              href="https://woodileebowlingclub.co.uk/home"
+              href="http://www.woodileebowlingclub.co.uk"
               target="_blank"
               rel="noreferrer"
               style={styles.websiteLink}
