@@ -163,7 +163,8 @@ window.WOODILEE_CLUB_DATA = {
       "total": 1,
       "played": 1
     }
-  ]
+  ],
+  "lastUpdated": "1 June 2026"
 };
 
 (function () {
@@ -240,9 +241,80 @@ window.WOODILEE_CLUB_DATA = {
     });
   }
 
+  function addTiedLabels() {
+    var data = window.WOODILEE_CLUB_DATA || {};
+    var players = data.mondayNightPoints || [];
+    var table = document.querySelector(".leader-table");
+    if (!table || !players.length) {
+      return;
+    }
+
+    var totalCounts = players.reduce(function (counts, player) {
+      counts[player.total] = (counts[player.total] || 0) + 1;
+      return counts;
+    }, {});
+
+    Array.prototype.forEach.call(table.querySelectorAll("tbody tr"), function (row, index) {
+      var player = players[index];
+      var nameCell = row.children[1];
+      if (!player || !nameCell || totalCounts[player.total] < 2 || nameCell.querySelector('[data-tied-label="true"]')) {
+        return;
+      }
+
+      var label = document.createElement("span");
+      label.textContent = "Tied";
+      label.dataset.tiedLabel = "true";
+      label.style.display = "inline-block";
+      label.style.marginLeft = "8px";
+      label.style.padding = "2px 7px";
+      label.style.borderRadius = "999px";
+      label.style.background = "#f5bc32";
+      label.style.color = "#0e3d2a";
+      label.style.fontSize = "11px";
+      label.style.fontWeight = "900";
+      label.style.textTransform = "uppercase";
+      nameCell.appendChild(label);
+    });
+  }
+
+  function updateLastUpdatedDate() {
+    var data = window.WOODILEE_CLUB_DATA || {};
+    var label = document.getElementById("lastUpdated");
+    if (!label || !data.lastUpdated) {
+      return;
+    }
+
+    label.textContent = "Last updated: " + data.lastUpdated + " - Average is total points divided by games played.";
+  }
+
+  function addWhatsAppButton() {
+    if (document.querySelector('[data-whatsapp-share="true"]')) {
+      return;
+    }
+
+    var actions = document.querySelector(".hero-actions");
+    if (!actions) {
+      return;
+    }
+
+    var shareUrl = "https://tinyurl.com/5j67nk5d";
+    var message = "Woodilee Bowling Club - fixtures, Monday Night points and club links: " + shareUrl;
+    var button = document.createElement("a");
+    button.className = "button secondary";
+    button.href = "https://wa.me/?text=" + encodeURIComponent(message);
+    button.target = "_blank";
+    button.rel = "noopener";
+    button.dataset.whatsappShare = "true";
+    button.textContent = "Share on WhatsApp";
+    actions.appendChild(button);
+  }
+
   function refreshLandingExtras() {
     refreshPhoneLeaders();
     addAverageColumn();
+    addTiedLabels();
+    updateLastUpdatedDate();
+    addWhatsAppButton();
   }
 
   if (document.readyState === "loading") {
