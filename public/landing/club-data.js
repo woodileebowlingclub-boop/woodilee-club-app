@@ -191,11 +191,65 @@ window.WOODILEE_CLUB_DATA = {
     }).join("");
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", refreshPhoneLeaders);
-  } else {
-    refreshPhoneLeaders();
+  function addAverageColumn() {
+    var data = window.WOODILEE_CLUB_DATA || {};
+    var players = data.mondayNightPoints || [];
+    var table = document.querySelector(".leader-table");
+    if (!table || !players.length) {
+      return;
+    }
+
+    var headRow = table.querySelector("thead tr");
+    if (headRow && !headRow.querySelector('[data-average-column="true"]')) {
+      var totalHead = headRow.children[2];
+      var averageHead = document.createElement("th");
+      averageHead.textContent = "Avg";
+      averageHead.dataset.averageColumn = "true";
+      averageHead.style.width = "1%";
+      averageHead.style.whiteSpace = "nowrap";
+      if (totalHead && totalHead.nextSibling) {
+        headRow.insertBefore(averageHead, totalHead.nextSibling);
+      } else {
+        headRow.appendChild(averageHead);
+      }
+    }
+
+    Array.prototype.forEach.call(table.querySelectorAll("tbody tr"), function (row, index) {
+      if (row.querySelector('[data-average-column="true"]')) {
+        return;
+      }
+      var player = players[index];
+      if (!player) {
+        return;
+      }
+      var average = player.played ? (player.total / player.played).toFixed(2) : "-";
+      var averageCell = document.createElement("td");
+      averageCell.textContent = average;
+      averageCell.dataset.averageColumn = "true";
+      averageCell.style.width = "1%";
+      averageCell.style.whiteSpace = "nowrap";
+      averageCell.style.fontSize = "13px";
+      averageCell.style.fontWeight = "900";
+      averageCell.style.color = "#64736b";
+      var totalCell = row.children[2];
+      if (totalCell && totalCell.nextSibling) {
+        row.insertBefore(averageCell, totalCell.nextSibling);
+      } else {
+        row.appendChild(averageCell);
+      }
+    });
   }
 
-  window.addEventListener("load", refreshPhoneLeaders);
+  function refreshLandingExtras() {
+    refreshPhoneLeaders();
+    addAverageColumn();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", refreshLandingExtras);
+  } else {
+    refreshLandingExtras();
+  }
+
+  window.addEventListener("load", refreshLandingExtras);
 }());
