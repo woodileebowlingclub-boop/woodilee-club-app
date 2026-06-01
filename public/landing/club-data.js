@@ -253,23 +253,63 @@ window.WOODILEE_CLUB_DATA = {
       counts[player.total] = (counts[player.total] || 0) + 1;
       return counts;
     }, {});
+    var rankByTotal = {};
+    players.forEach(function (player, index) {
+      if (!rankByTotal[player.total]) {
+        rankByTotal[player.total] = index + 1;
+      }
+    });
+    function ordinal(value) {
+      var suffix = "th";
+      if (value % 100 < 11 || value % 100 > 13) {
+        if (value % 10 === 1) suffix = "st";
+        if (value % 10 === 2) suffix = "nd";
+        if (value % 10 === 3) suffix = "rd";
+      }
+      return value + suffix;
+    }
+
+    var tieColours = [
+      {"background": "#f5bc32", "color": "#0e3d2a"},
+      {"background": "#dbeafe", "color": "#1e3a8a"},
+      {"background": "#dcfce7", "color": "#166534"},
+      {"background": "#fce7f3", "color": "#9d174d"},
+      {"background": "#ede9fe", "color": "#5b21b6"},
+      {"background": "#ffedd5", "color": "#9a3412"}
+    ];
+    var tieColourByTotal = {};
+    var tieGroupIndex = 0;
+
+    Array.prototype.forEach.call(players, function (player) {
+      if (totalCounts[player.total] > 1 && !tieColourByTotal[player.total]) {
+        tieColourByTotal[player.total] = tieColours[tieGroupIndex % tieColours.length];
+        tieGroupIndex += 1;
+      }
+    });
 
     Array.prototype.forEach.call(table.querySelectorAll("tbody tr"), function (row, index) {
       var player = players[index];
+      var rankCell = row.children[0];
       var nameCell = row.children[1];
-      if (!player || !nameCell || totalCounts[player.total] < 2 || nameCell.querySelector('[data-tied-label="true"]')) {
+      if (!player || !nameCell || totalCounts[player.total] < 2) {
+        return;
+      }
+      if (rankCell) {
+        rankCell.textContent = rankByTotal[player.total];
+      }
+      if (nameCell.querySelector('[data-tied-label="true"]')) {
         return;
       }
 
       var label = document.createElement("span");
-      label.textContent = "Tied";
+      label.textContent = "Tied " + ordinal(rankByTotal[player.total]);
       label.dataset.tiedLabel = "true";
       label.style.display = "inline-block";
       label.style.marginLeft = "8px";
       label.style.padding = "2px 7px";
       label.style.borderRadius = "999px";
-      label.style.background = "#f5bc32";
-      label.style.color = "#0e3d2a";
+      label.style.background = tieColourByTotal[player.total].background;
+      label.style.color = tieColourByTotal[player.total].color;
       label.style.fontSize = "11px";
       label.style.fontWeight = "900";
       label.style.textTransform = "uppercase";
