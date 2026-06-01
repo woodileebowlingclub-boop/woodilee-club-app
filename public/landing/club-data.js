@@ -165,3 +165,37 @@ window.WOODILEE_CLUB_DATA = {
     }
   ]
 };
+
+(function () {
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, function (char) {
+      return {"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;"}[char];
+    });
+  }
+
+  function refreshPhoneLeaders() {
+    var data = window.WOODILEE_CLUB_DATA || {};
+    var players = data.mondayNightPoints || [];
+    var panels = Array.prototype.slice.call(document.querySelectorAll(".phone-panel"));
+    var panel = panels.find(function (item) {
+      var label = item.querySelector("span");
+      return label && label.textContent.trim() === "Monday Night Points";
+    });
+
+    if (!panel || !players.length) {
+      return;
+    }
+
+    panel.innerHTML = '<span>Monday Night Points</span>' + players.slice(0, 3).map(function (player, index) {
+      return '<div class="leader-row"><span class="rank">' + (index + 1) + '</span><span>' + escapeHtml(player.name) + '</span><strong>' + player.total + '</strong></div>';
+    }).join("");
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", refreshPhoneLeaders);
+  } else {
+    refreshPhoneLeaders();
+  }
+
+  window.addEventListener("load", refreshPhoneLeaders);
+}());
