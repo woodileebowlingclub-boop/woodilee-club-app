@@ -25,8 +25,18 @@ window.WOODILEE_CLUB_DATA = {
   "mondayNightPoints": [
     {
       "name": "Kenny Cook",
-      "total": 14,
-      "played": 5
+      "total": 17,
+      "played": 6
+    },
+    {
+      "name": "Willie Gregory",
+      "total": 17,
+      "played": 6
+    },
+    {
+      "name": "Ian Whiteford",
+      "total": 15,
+      "played": 7
     },
     {
       "name": "Aileen Miller",
@@ -34,17 +44,17 @@ window.WOODILEE_CLUB_DATA = {
       "played": 5
     },
     {
-      "name": "Ian Whiteford",
+      "name": "David Mitchell",
       "total": 14,
-      "played": 6
-    },
-    {
-      "name": "Willie Gregory",
-      "total": 13,
-      "played": 5
+      "played": 7
     },
     {
       "name": "Andy Sharp",
+      "total": 13,
+      "played": 6
+    },
+    {
+      "name": "Alex Maxwell",
       "total": 12,
       "played": 5
     },
@@ -54,49 +64,44 @@ window.WOODILEE_CLUB_DATA = {
       "played": 5
     },
     {
-      "name": "David Mitchell",
+      "name": "Ronnie McKinnon",
       "total": 11,
       "played": 6
     },
     {
-      "name": "Alex Maxwell",
+      "name": "Davie Munro",
       "total": 11,
       "played": 4
     },
     {
-      "name": "Davie Munro",
-      "total": 10,
-      "played": 3
-    },
-    {
-      "name": "Fiona Green",
-      "total": 8,
-      "played": 5
-    },
-    {
-      "name": "Ricky Irvine",
-      "total": 8,
-      "played": 6
-    },
-    {
       "name": "Rab McLaughlin",
-      "total": 7,
-      "played": 3
+      "total": 10,
+      "played": 4
     },
     {
       "name": "Peter Barber",
-      "total": 7,
-      "played": 3
-    },
-    {
-      "name": "Ronnie McKinnon",
-      "total": 7,
-      "played": 5
+      "total": 10,
+      "played": 4
     },
     {
       "name": "Adam Turner",
-      "total": 7,
-      "played": 3
+      "total": 10,
+      "played": 4
+    },
+    {
+      "name": "Fiona Green",
+      "total": 9,
+      "played": 6
+    },
+    {
+      "name": "Ricky Irvine",
+      "total": 9,
+      "played": 7
+    },
+    {
+      "name": "Frank Devlin",
+      "total": 9,
+      "played": 4
     },
     {
       "name": "Alan Ralston",
@@ -109,9 +114,9 @@ window.WOODILEE_CLUB_DATA = {
       "played": 2
     },
     {
-      "name": "Frank Devlin",
+      "name": "Alan Gill",
       "total": 6,
-      "played": 3
+      "played": 4
     },
     {
       "name": "Ross Gregory",
@@ -119,14 +124,14 @@ window.WOODILEE_CLUB_DATA = {
       "played": 2
     },
     {
-      "name": "Alan Gill",
-      "total": 5,
-      "played": 3
-    },
-    {
       "name": "Willie Brown",
       "total": 4,
       "played": 1
+    },
+    {
+      "name": "Chuck Irvine",
+      "total": 4,
+      "played": 2
     },
     {
       "name": "Trevor Barraclough",
@@ -140,11 +145,6 @@ window.WOODILEE_CLUB_DATA = {
     },
     {
       "name": "Chris Moran",
-      "total": 3,
-      "played": 1
-    },
-    {
-      "name": "Chuck Irvine",
       "total": 3,
       "played": 1
     },
