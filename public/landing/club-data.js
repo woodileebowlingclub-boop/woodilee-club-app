@@ -162,7 +162,7 @@ window.WOODILEE_CLUB_DATA = {
       card.className = "info-card";
       card.dataset.worldCupSpecial = "true";
       card.style.borderTop = "5px solid #b5221f";
-      card.innerHTML = '<span>Club event</span><h3>World Cup Special</h3><p>Details for the World Cup Special will be shared in the club app and with members.</p>';
+      card.innerHTML = '<span>Club event</span><h3>World Cup Special</h3><p>Open the club app for World Cup Special details.</p><a class="button primary" href="https://woodilee-club-app-v4hu.vercel.app/">Open World Cup Special</a>';
       side.insertBefore(card, side.firstChild);
     }
     var updated = document.getElementById("lastUpdated");
