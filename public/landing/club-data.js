@@ -98,7 +98,7 @@ window.WOODILEE_CLUB_DATA = {
     var style = document.querySelector('[data-woodilee-soft-theme="true"]') || document.createElement("style");
     if (!style.dataset.woodileeSoftTheme) {
       style.dataset.woodileeSoftTheme = "true";
-      style.textContent = "body{background:#f1f8ed}.site-header{background:rgba(241,248,237,.96)!important;border-bottom:4px solid #b5221f}.hero{color:#16221b!important;background:linear-gradient(90deg,rgba(241,248,237,.98),rgba(241,248,237,.88)),linear-gradient(135deg,#f2faee,#d5ebca 48%,#e9f5e3)!important}.hero-inner{grid-template-columns:1fr!important}.app-card,.quick-facts,.club-band{display:none!important}.button.primary{background:#f5bc32!important;color:#1c2c24!important}.hero .button.secondary,.nav .button.secondary{color:#24352d!important;background:rgba(255,255,255,.72)!important;border-color:rgba(36,53,45,.22)!important}.snapshot-panel{border-top:5px solid #f5bc32}.leader-table{font-size:14px!important}.leader-table th,.leader-table td{padding:11px 13px!important}.leader-table tr.podium td{background:#fff3c4!important}.cta{background:linear-gradient(90deg,rgba(36,53,45,.94),rgba(181,34,31,.88))!important}";
+      style.textContent = "body{background:#f1f8ed}.site-header{background:rgba(241,248,237,.96)!important;border-bottom:4px solid #b5221f}.hero{color:#16221b!important;background:linear-gradient(90deg,rgba(241,248,237,.98),rgba(241,248,237,.88)),linear-gradient(135deg,#f2faee,#d5ebca 48%,#e9f5e3)!important}.hero-inner{grid-template-columns:1fr!important}.app-card,.quick-facts,.club-band,.snapshot-side{display:none!important}.live-snapshot{grid-template-columns:1fr!important}.button.primary{background:#f5bc32!important;color:#1c2c24!important}.hero .button.secondary,.nav .button.secondary{color:#24352d!important;background:rgba(255,255,255,.72)!important;border-color:rgba(36,53,45,.22)!important}.snapshot-panel{border-top:5px solid #f5bc32}.leader-table{font-size:14px!important}.leader-table th,.leader-table td{padding:11px 13px!important}.leader-table tr.podium td{background:#fff3c4!important}.cta{background:linear-gradient(90deg,rgba(36,53,45,.94),rgba(181,34,31,.88))!important}";
       document.head.appendChild(style);
     }
 
@@ -123,7 +123,7 @@ window.WOODILEE_CLUB_DATA = {
     if (actions && !document.querySelector('[data-whatsapp-share="true"]')) {
       var share = document.createElement("a");
       share.className = "button secondary";
-      share.href = "https://wa.me/?text=" + encodeURIComponent("Woodilee Bowling Club - fixtures, Monday Night points and club links: https://tinyurl.com/5j67nk5d");
+      share.href = "https://wa.me/?text=" + encodeURIComponent("Woodilee Bowling Club - Monday Night points and club links: https://tinyurl.com/5j67nk5d");
       share.target = "_blank";
       share.rel = "noopener";
       share.dataset.whatsappShare = "true";
