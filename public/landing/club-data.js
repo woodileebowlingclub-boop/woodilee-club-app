@@ -1,26 +1,8 @@
 window.WOODILEE_CLUB_DATA = {
   "fixtures": [
-    {
-      "title": "Woodilee v St Rollox",
-      "opponent": "St Rollox",
-      "date": "2026-06-02",
-      "time": "19:30",
-      "team": "Woodilee"
-    },
-    {
-      "title": "Gents Seniors",
-      "opponent": "Gents Seniors",
-      "date": "2026-06-03",
-      "time": "14:00",
-      "team": "Woodilee"
-    },
-    {
-      "title": "Thursday Bounce",
-      "opponent": "Thursday Bounce",
-      "date": "2026-06-04",
-      "time": "18:45",
-      "team": "Woodilee"
-    }
+    { "title": "Woodilee v St Rollox", "opponent": "St Rollox", "date": "2026-06-02", "time": "19:30", "team": "Woodilee" },
+    { "title": "Gents Seniors", "opponent": "Gents Seniors", "date": "2026-06-03", "time": "14:00", "team": "Woodilee" },
+    { "title": "Thursday Bounce", "opponent": "Thursday Bounce", "date": "2026-06-04", "time": "18:45", "team": "Woodilee" }
   ],
   "mondayNightPoints": [
     { "name": "Kenny Cook", "total": 21, "played": 7 },
@@ -116,10 +98,15 @@ window.WOODILEE_CLUB_DATA = {
     var style = document.querySelector('[data-woodilee-soft-theme="true"]') || document.createElement("style");
     if (!style.dataset.woodileeSoftTheme) {
       style.dataset.woodileeSoftTheme = "true";
-      style.textContent = "body{background:#f1f8ed}.site-header{background:rgba(241,248,237,.96)!important;border-bottom:4px solid #b5221f}.hero{color:#16221b!important;background:linear-gradient(90deg,rgba(241,248,237,.98),rgba(241,248,237,.88)),linear-gradient(135deg,#f2faee,#d5ebca 48%,#e9f5e3)!important}.hero-inner{grid-template-columns:1fr!important}.app-card{display:none!important}.button.primary{background:#f5bc32!important;color:#1c2c24!important}.hero .button.secondary,.nav .button.secondary{color:#24352d!important;background:rgba(255,255,255,.72)!important;border-color:rgba(36,53,45,.22)!important}.quick-facts .fact{background:rgba(255,255,255,.78)!important}.snapshot-panel{border-top:5px solid #f5bc32}.leader-table{font-size:14px!important}.leader-table th,.leader-table td{padding:11px 13px!important}.leader-table tr.podium td{background:#fff3c4!important}.club-band{background:#24352d!important;border-top:5px solid #b5221f}.cta{background:linear-gradient(90deg,rgba(36,53,45,.94),rgba(181,34,31,.88))!important}";
+      style.textContent = "body{background:#f1f8ed}.site-header{background:rgba(241,248,237,.96)!important;border-bottom:4px solid #b5221f}.hero{color:#16221b!important;background:linear-gradient(90deg,rgba(241,248,237,.98),rgba(241,248,237,.88)),linear-gradient(135deg,#f2faee,#d5ebca 48%,#e9f5e3)!important}.hero-inner{grid-template-columns:1fr!important}.app-card,.quick-facts,.club-band{display:none!important}.button.primary{background:#f5bc32!important;color:#1c2c24!important}.hero .button.secondary,.nav .button.secondary{color:#24352d!important;background:rgba(255,255,255,.72)!important;border-color:rgba(36,53,45,.22)!important}.snapshot-panel{border-top:5px solid #f5bc32}.leader-table{font-size:14px!important}.leader-table th,.leader-table td{padding:11px 13px!important}.leader-table tr.podium td{background:#fff3c4!important}.cta{background:linear-gradient(90deg,rgba(36,53,45,.94),rgba(181,34,31,.88))!important}";
       document.head.appendChild(style);
     }
 
+    var visitLink = document.querySelector('.nav-links a[href="#visit"]');
+    if (visitLink) {
+      visitLink.href = "#contact";
+      visitLink.textContent = "Contact";
+    }
     var headline = document.querySelector("h1");
     if (headline) headline.textContent = "Woodilee Bowling Club";
     var copy = document.querySelector(".hero-copy");
