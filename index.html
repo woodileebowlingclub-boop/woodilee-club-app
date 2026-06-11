@@ -8,5 +8,22 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      function renameDiaryToFixtures() {
+        var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        var node;
+        while ((node = walker.nextNode())) {
+          node.nodeValue = node.nodeValue
+            .replace(/Members diary/g, "Members fixtures")
+            .replace(/members diary/g, "members fixtures")
+            .replace(/Diary/g, "Fixtures")
+            .replace(/diary/g, "fixtures");
+        }
+      }
+      var observer = new MutationObserver(renameDiaryToFixtures);
+      observer.observe(document.body, { childList: true, subtree: true });
+      document.addEventListener("DOMContentLoaded", renameDiaryToFixtures);
+      window.addEventListener("load", renameDiaryToFixtures);
+    </script>
   </body>
 </html>
