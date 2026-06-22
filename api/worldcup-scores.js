@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+  res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=30');
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   try {
