@@ -11,11 +11,6 @@ window.WOODILEE_CLUB_DATA = {
       "played": 9
     },
     {
-      "name": "Willie Gregory",
-      "total": 21,
-      "played": 7
-    },
-    {
       "name": "Aileen Miller",
       "total": 19,
       "played": 7
@@ -26,7 +21,7 @@ window.WOODILEE_CLUB_DATA = {
       "played": 10
     },
     {
-      "name": "Frank Devlin",
+      "name": "Alex Maxwell",
       "total": 18,
       "played": 7
     },
@@ -34,6 +29,16 @@ window.WOODILEE_CLUB_DATA = {
       "name": "Ian Whiteford",
       "total": 18,
       "played": 10
+    },
+    {
+      "name": "Ronnie McKinnon",
+      "total": 18,
+      "played": 9
+    },
+    {
+      "name": "Willie Gregory",
+      "total": 18,
+      "played": 7
     },
     {
       "name": "Davie Munro",
@@ -51,14 +56,9 @@ window.WOODILEE_CLUB_DATA = {
       "played": 7
     },
     {
-      "name": "Alex Maxwell",
+      "name": "Frank Devlin",
       "total": 15,
       "played": 7
-    },
-    {
-      "name": "Ronnie McKinnon",
-      "total": 15,
-      "played": 9
     },
     {
       "name": "Alan Gill",
@@ -146,7 +146,7 @@ window.WOODILEE_CLUB_DATA = {
       "played": 1
     }
   ],
-  "lastUpdated": "22 June 2026"
+  "lastUpdated": "23 June 2026"
 };
 
 (function () {
