@@ -6,22 +6,22 @@ window.WOODILEE_CLUB_DATA = {
   ],
   "mondayNightPoints": [
     { "name": "Kenny Cook", "total": 29, "played": 10 },
-    { "name": "Aileen Miller", "total": 23, "played": 8 },
-    { "name": "Ronnie McKinnon", "total": 21, "played": 10 },
+    { "name": "Aileen Miller", "total": 27, "played": 9 },
+    { "name": "Alan Gill", "total": 22, "played": 9 },
+    { "name": "Ronnie McKinnon", "total": 22, "played": 11 },
+    { "name": "Davie Munro", "total": 21, "played": 8 },
     { "name": "David Mitchell", "total": 20, "played": 11 },
-    { "name": "Davie Munro", "total": 20, "played": 7 },
+    { "name": "Fiona Green", "total": 20, "played": 10 },
     { "name": "Ian Whiteford", "total": 19, "played": 11 },
-    { "name": "Alan Gill", "total": 18, "played": 8 },
     { "name": "Alex Maxwell", "total": 18, "played": 7 },
+    { "name": "Ricky Irvine", "total": 18, "played": 12 },
     { "name": "Willie Gregory", "total": 18, "played": 7 },
-    { "name": "Fiona Green", "total": 17, "played": 9 },
-    { "name": "Ricky Irvine", "total": 17, "played": 11 },
+    { "name": "Andy Sharp", "total": 16, "played": 9 },
     { "name": "Frank Devlin", "total": 16, "played": 8 },
     { "name": "Adam Turner", "total": 15, "played": 7 },
-    { "name": "Andy Sharp", "total": 15, "played": 8 },
     { "name": "Peter Barber", "total": 14, "played": 5 },
+    { "name": "Rab McLaughlin", "total": 13, "played": 5 },
     { "name": "Willie McIntyre", "total": 12, "played": 6 },
-    { "name": "Rab McLaughlin", "total": 10, "played": 4 },
     { "name": "Chuck Irvine", "total": 8, "played": 4 },
     { "name": "Alan Ralston", "total": 6, "played": 3 },
     { "name": "Charlie Cameron", "total": 6, "played": 2 },
@@ -34,7 +34,7 @@ window.WOODILEE_CLUB_DATA = {
     { "name": "Jin McDonald", "total": 1, "played": 1 },
     { "name": "Karrie McDonald", "total": 1, "played": 1 }
   ],
-  "lastUpdated": "29 June 2026"
+  "lastUpdated": "7 July 2026"
 };
 
 (function () {
