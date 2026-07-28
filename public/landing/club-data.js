@@ -5,27 +5,27 @@ window.WOODILEE_CLUB_DATA = {
     { "title": "Thursday Bounce", "opponent": "Thursday Bounce", "date": "2026-06-04", "time": "18:45", "team": "Woodilee" }
   ],
   "mondayNightPoints": [
-    { "name": "Kenny Cook", "total": 29, "played": 10 },
-    { "name": "Aileen Miller", "total": 29, "played": 11 },
-    { "name": "David Mitchell", "total": 26, "played": 13 },
-    { "name": "Alan Gill", "total": 25, "played": 10 },
-    { "name": "Fiona Green", "total": 24, "played": 11 },
-    { "name": "Ronnie McKinnon", "total": 24, "played": 13 },
+    { "name": "Kenny Cook", "total": 33, "played": 11 },
+    { "name": "Aileen Miller", "total": 33, "played": 12 },
+    { "name": "David Mitchell", "total": 27, "played": 14 },
+    { "name": "Ronnie McKinnon", "total": 27, "played": 14 },
+    { "name": "Alan Gill", "total": 26, "played": 11 },
+    { "name": "Fiona Green", "total": 25, "played": 12 },
+    { "name": "Alex Maxwell", "total": 24, "played": 9 },
+    { "name": "Davie Munro", "total": 24, "played": 11 },
+    { "name": "Ian Whiteford", "total": 24, "played": 14 },
     { "name": "Willie Gregory", "total": 23, "played": 9 },
-    { "name": "Davie Munro", "total": 23, "played": 10 },
-    { "name": "Ian Whiteford", "total": 23, "played": 13 },
-    { "name": "Alex Maxwell", "total": 21, "played": 8 },
-    { "name": "Ricky Irvine", "total": 21, "played": 13 },
+    { "name": "Ricky Irvine", "total": 22, "played": 14 },
+    { "name": "Peter Barber", "total": 21, "played": 7 },
     { "name": "Frank Devlin", "total": 19, "played": 9 },
-    { "name": "Peter Barber", "total": 18, "played": 6 },
-    { "name": "Andy Sharp", "total": 18, "played": 11 },
+    { "name": "Andy Sharp", "total": 19, "played": 12 },
     { "name": "Rab McLaughlin", "total": 17, "played": 6 },
     { "name": "Willie McIntyre", "total": 17, "played": 8 },
     { "name": "Adam Turner", "total": 15, "played": 7 },
+    { "name": "Chuck Irvine", "total": 12, "played": 6 },
+    { "name": "Charlie Cameron", "total": 11, "played": 4 },
     { "name": "Alan Ralston", "total": 9, "played": 4 },
-    { "name": "Chuck Irvine", "total": 9, "played": 5 },
     { "name": "Willie Brown", "total": 8, "played": 2 },
-    { "name": "Charlie Cameron", "total": 7, "played": 3 },
     { "name": "Ross Gregory", "total": 6, "played": 3 },
     { "name": "Rita Gordon", "total": 4, "played": 4 },
     { "name": "Chris Moran", "total": 3, "played": 1 },
@@ -34,7 +34,7 @@ window.WOODILEE_CLUB_DATA = {
     { "name": "Jin McDonald", "total": 1, "played": 1 },
     { "name": "Karrie McDonald", "total": 1, "played": 1 }
   ],
-  "lastUpdated": "22 July 2026"
+  "lastUpdated": "28 July 2026"
 };
 
 (function () {
