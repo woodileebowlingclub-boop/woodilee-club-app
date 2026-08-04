@@ -5,23 +5,23 @@ window.WOODILEE_CLUB_DATA = {
     { "title": "Thursday Bounce", "opponent": "Thursday Bounce", "date": "2026-06-04", "time": "18:45", "team": "Woodilee" }
   ],
   "mondayNightPoints": [
+    { "name": "Aileen Miller", "total": 36, "played": 13 },
     { "name": "Kenny Cook", "total": 33, "played": 11 },
-    { "name": "Aileen Miller", "total": 33, "played": 12 },
-    { "name": "David Mitchell", "total": 27, "played": 14 },
-    { "name": "Ronnie McKinnon", "total": 27, "played": 14 },
-    { "name": "Alan Gill", "total": 26, "played": 11 },
+    { "name": "David Mitchell", "total": 30, "played": 15 },
+    { "name": "Davie Munro", "total": 28, "played": 12 },
+    { "name": "Ronnie McKinnon", "total": 28, "played": 15 },
+    { "name": "Alan Gill", "total": 27, "played": 12 },
+    { "name": "Alex Maxwell", "total": 25, "played": 10 },
     { "name": "Fiona Green", "total": 25, "played": 12 },
-    { "name": "Alex Maxwell", "total": 24, "played": 9 },
-    { "name": "Davie Munro", "total": 24, "played": 11 },
-    { "name": "Ian Whiteford", "total": 24, "played": 14 },
+    { "name": "Ian Whiteford", "total": 25, "played": 15 },
     { "name": "Willie Gregory", "total": 23, "played": 9 },
-    { "name": "Ricky Irvine", "total": 22, "played": 14 },
+    { "name": "Andy Sharp", "total": 23, "played": 13 },
+    { "name": "Ricky Irvine", "total": 23, "played": 15 },
     { "name": "Peter Barber", "total": 21, "played": 7 },
     { "name": "Frank Devlin", "total": 19, "played": 9 },
-    { "name": "Andy Sharp", "total": 19, "played": 12 },
+    { "name": "Adam Turner", "total": 18, "played": 8 },
     { "name": "Rab McLaughlin", "total": 17, "played": 6 },
     { "name": "Willie McIntyre", "total": 17, "played": 8 },
-    { "name": "Adam Turner", "total": 15, "played": 7 },
     { "name": "Chuck Irvine", "total": 12, "played": 6 },
     { "name": "Charlie Cameron", "total": 11, "played": 4 },
     { "name": "Alan Ralston", "total": 9, "played": 4 },
@@ -34,7 +34,7 @@ window.WOODILEE_CLUB_DATA = {
     { "name": "Jin McDonald", "total": 1, "played": 1 },
     { "name": "Karrie McDonald", "total": 1, "played": 1 }
   ],
-  "lastUpdated": "28 July 2026"
+  "lastUpdated": "4 August 2026"
 };
 
 (function () {
