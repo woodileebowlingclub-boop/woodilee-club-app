@@ -100,6 +100,11 @@ function toWhatsAppLink(value) {
   return cleaned ? `https://wa.me/${cleaned}` : "";
 }
 
+function isUkMobile(value) {
+  const cleaned = safeString(value).replace(/\D/g, "");
+  return cleaned.startsWith("07") && cleaned.length === 11;
+}
+
 function shouldShowTime(timeValue) {
   const t = safeString(timeValue).trim().toLowerCase();
   return !!t && t !== "00:00" && t !== "00:00:00" && t !== "midnight";
@@ -197,9 +202,11 @@ function normaliseDocument(row) {
   };
 }
 
-function ContactButtons({ item }) {
+function ContactButtons({ item, mobileWhatsAppOnly = false }) {
   const phone = cleanPhone(item.phone);
-  const whatsappLink = toWhatsAppLink(item.whatsapp || item.phone);
+  const whatsappNumber = item.whatsapp || item.phone;
+  const whatsappLink =
+    mobileWhatsAppOnly && !isUkMobile(whatsappNumber) ? "" : toWhatsAppLink(whatsappNumber);
   const email = safeString(item.email);
 
   if (!phone && !whatsappLink && !email) return null;
@@ -233,6 +240,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
+  const [memberFilter, setMemberFilter] = useState("full");
 
   const [events, setEvents] = useState([]);
   const [notices, setNotices] = useState([]);
@@ -408,6 +416,7 @@ export default function App() {
     const { data, error } = await supabase
       .from("members")
       .select("*")
+      .eq("active", true)
       .order("full_name", { ascending: true });
 
     if (!error) setMembers((data || []).map(normaliseMember));
@@ -417,14 +426,11 @@ export default function App() {
     const { data, error } = await supabase
       .from("office_bearers")
       .select("*")
+      .eq("active", true)
       .order("display_order", { ascending: true });
 
     if (!error) {
-      setOfficeBearers(
-        (data || [])
-          .map(normaliseOfficeBearer)
-          .sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0))
-      );
+      setOfficeBearers((data || []).map(normaliseOfficeBearer));
     }
   }
 
@@ -432,6 +438,7 @@ export default function App() {
     const { data, error } = await supabase
       .from("club_coaches")
       .select("*")
+      .eq("active", true)
       .order("name", { ascending: true });
 
     if (!error) setCoaches((data || []).map(normaliseCoach));
@@ -507,24 +514,23 @@ export default function App() {
     const q = memberSearch.trim().toLowerCase();
     if (!q) return members;
 
-    return members.filter((m) => {
-      const haystack = [
-        safeString(m.full_name),
-        safeString(m.phone),
-        safeString(m.whatsapp),
-        safeString(m.email),
-        safeString(m.category),
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(q);
-    });
+    return members.filter((m) => safeString(m.full_name).toLowerCase().includes(q));
   }, [members, memberSearch]);
 
+  const fullMembers = filteredMembers.filter((m) => m.category !== "associate");
   const gentsMembers = filteredMembers.filter((m) => m.category === "gents");
   const ladiesMembers = filteredMembers.filter((m) => m.category === "ladies");
   const associateMembers = filteredMembers.filter((m) => m.category === "associate");
+
+  const memberFilterOptions = [
+    { key: "full", label: "Full Members", items: fullMembers },
+    { key: "associate", label: "Associate Members", items: associateMembers },
+    { key: "gents", label: "Gents", items: gentsMembers },
+    { key: "ladies", label: "Ladies", items: ladiesMembers },
+  ];
+
+  const selectedMemberFilter =
+    memberFilterOptions.find((option) => option.key === memberFilter) || memberFilterOptions[0];
 
   async function handleAdminLogin() {
     if (adminPinInput === ADMIN_PIN) {
@@ -1934,7 +1940,7 @@ export default function App() {
                     <div style={styles.infoLine}>WhatsApp: {member.whatsapp}</div>
                   ) : null}
                   {member.email ? <div style={styles.infoLine}>Email: {member.email}</div> : null}
-                  <ContactButtons item={member} />
+                  <ContactButtons item={member} mobileWhatsAppOnly />
                   {adminMode ? (
                     <div style={styles.contactButtons}>
                       <button style={styles.primaryBtn} onClick={() => startEditMember(member)}>
@@ -1962,10 +1968,30 @@ export default function App() {
         <div style={styles.searchRow}>
           <input
             style={styles.input}
-            placeholder="Search members"
+            placeholder="Search by first name or surname"
             value={memberSearch}
             onChange={(e) => setMemberSearch(e.target.value)}
           />
+        </div>
+
+        <div style={styles.memberFilterBar} aria-label="Filter members">
+          {memberFilterOptions.map((option) => {
+            const isActive = option.key === memberFilter;
+            return (
+              <button
+                key={option.key}
+                type="button"
+                aria-pressed={isActive}
+                style={{
+                  ...styles.memberFilterBtn,
+                  ...(isActive ? styles.activeMemberFilterBtn : {}),
+                }}
+                onClick={() => setMemberFilter(option.key)}
+              >
+                {option.label}
+              </button>
+            );
+          })}
         </div>
 
         {adminMode ? (
@@ -2013,9 +2039,7 @@ export default function App() {
         ) : null}
 
         <div style={styles.membersGrid}>
-          {renderMembersSection("Gents", gentsMembers)}
-          {renderMembersSection("Ladies", ladiesMembers)}
-          {renderMembersSection("Associate", associateMembers)}
+          {renderMembersSection(selectedMemberFilter.label, selectedMemberFilter.items)}
         </div>
       </div>
     );
@@ -2143,7 +2167,7 @@ export default function App() {
                       <div style={styles.infoLine}>WhatsApp: {item.whatsapp}</div>
                     ) : null}
                     {item.email ? <div style={styles.infoLine}>Email: {item.email}</div> : null}
-                    <ContactButtons item={item} />
+                    <ContactButtons item={item} mobileWhatsAppOnly />
                     {adminMode ? (
                       <div style={styles.contactButtons}>
                         <button
@@ -2174,6 +2198,15 @@ export default function App() {
     return (
       <div style={styles.card}>
         <h2 style={styles.cardTitle}>Club Coaches</h2>
+
+        <div style={styles.coachingInfo}>
+          <div style={styles.infoLineStrong}>Adult coaching</div>
+          <div style={styles.infoLine}>
+            One-to-one coaching is available. Please contact one of the coaches below.
+          </div>
+          <div style={styles.infoLineStrong}>Youth Section coaching times</div>
+          <div style={styles.infoLine}>Tuesdays, 4:15–5:00pm</div>
+        </div>
 
         {adminMode ? (
           <div style={styles.adminBox}>
@@ -2282,7 +2315,7 @@ export default function App() {
                     ) : null}
                     {coach.email ? <div style={styles.infoLine}>Email: {coach.email}</div> : null}
                     {coach.notes ? <div style={styles.infoLine}>{coach.notes}</div> : null}
-                    <ContactButtons item={coach} />
+                    <ContactButtons item={coach} mobileWhatsAppOnly />
                     {adminMode ? (
                       <div style={styles.contactButtons}>
                         <button style={styles.primaryBtn} onClick={() => startEditCoach(coach)}>
@@ -2870,6 +2903,33 @@ const styles = {
   },
   searchRow: {
     marginBottom: 14,
+  },
+  memberFilterBar: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    marginBottom: 16,
+  },
+  coachingInfo: {
+    background: "#f4e9ee",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 18,
+  },
+  memberFilterBtn: {
+    background: "#e9dde2",
+    color: "#6f2134",
+    border: "1px solid #c7b7be",
+    borderRadius: 999,
+    padding: "9px 13px",
+    fontSize: 14,
+    fontWeight: 800,
+    cursor: "pointer",
+  },
+  activeMemberFilterBtn: {
+    background: "#8b2940",
+    color: "#fff",
+    borderColor: "#8b2940",
   },
   contactButtons: {
     display: "flex",
