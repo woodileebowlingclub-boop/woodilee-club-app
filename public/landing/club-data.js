@@ -62,14 +62,29 @@ window.WOODILEE_CLUB_DATA = {
     });
   }
 
+  function average(player) {
+    return player.played ? player.total / player.played : 0;
+  }
+
+  function comparePlayers(a, b) {
+    return b.total - a.total || average(b) - average(a) || a.name.localeCompare(b.name);
+  }
+
+  function standingKey(player) {
+    return player.total + "|" + average(player);
+  }
+
   function addTies(players, table) {
-    var counts = {}, rankByTotal = {}, colours = [["#f5bc32", "#0e3d2a"], ["#dbeafe", "#1e3a8a"], ["#dcfce7", "#166534"], ["#fce7f3", "#9d174d"], ["#ede9fe", "#5b21b6"], ["#ffedd5", "#9a3412"]], colourByTotal = {}, group = 0;
+    var counts = {}, rankByStanding = {}, colours = [["#f5bc32", "#0e3d2a"], ["#dbeafe", "#1e3a8a"], ["#dcfce7", "#166534"], ["#fce7f3", "#9d174d"], ["#ede9fe", "#5b21b6"], ["#ffedd5", "#9a3412"]], colourByStanding = {}, group = 0;
+    players.sort(comparePlayers);
     players.forEach(function (player, index) {
-      counts[player.total] = (counts[player.total] || 0) + 1;
-      if (!rankByTotal[player.total]) rankByTotal[player.total] = index + 1;
+      var key = standingKey(player);
+      counts[key] = (counts[key] || 0) + 1;
+      if (!rankByStanding[key]) rankByStanding[key] = index + 1;
     });
     players.forEach(function (player) {
-      if (counts[player.total] > 1 && !colourByTotal[player.total]) colourByTotal[player.total] = colours[group++ % colours.length];
+      var key = standingKey(player);
+      if (counts[key] > 1 && !colourByStanding[key]) colourByStanding[key] = colours[group++ % colours.length];
     });
     function ordinal(value) {
       var suffix = "th";
@@ -82,11 +97,13 @@ window.WOODILEE_CLUB_DATA = {
     }
     Array.prototype.forEach.call(table.querySelectorAll("tbody tr"), function (row, index) {
       var player = players[index], rank = row.children[0], name = row.children[1];
-      if (!player || !name || counts[player.total] < 2) return;
-      if (rank) rank.textContent = rankByTotal[player.total];
-      if (name.querySelector('[data-tied-label="true"]')) return;
-      var colour = colourByTotal[player.total], label = document.createElement("span");
-      label.textContent = "Tied " + ordinal(rankByTotal[player.total]);
+      if (!player || !name) return;
+      var key = standingKey(player), existing = name.querySelector('[data-tied-label="true"]');
+      if (rank) rank.textContent = rankByStanding[key];
+      if (existing) existing.remove();
+      if (counts[key] < 2) return;
+      var colour = colourByStanding[key], label = document.createElement("span");
+      label.textContent = "Tied " + ordinal(rankByStanding[key]);
       label.dataset.tiedLabel = "true";
       label.style.cssText = "display:inline-block;margin-left:8px;padding:2px 7px;border-radius:999px;font-size:11px;font-weight:900;text-transform:uppercase;background:" + colour[0] + ";color:" + colour[1];
       name.appendChild(label);
@@ -95,6 +112,7 @@ window.WOODILEE_CLUB_DATA = {
 
   function applyLandingExtras() {
     var data = window.WOODILEE_CLUB_DATA || {}, players = data.mondayNightPoints || [];
+    players.sort(comparePlayers);
     var style = document.querySelector('[data-woodilee-soft-theme="true"]') || document.createElement("style");
     if (!style.dataset.woodileeSoftTheme) {
       style.dataset.woodileeSoftTheme = "true";
@@ -155,6 +173,9 @@ window.WOODILEE_CLUB_DATA = {
     var updated = document.getElementById("lastUpdated");
     if (updated && data.lastUpdated) updated.textContent = "Last updated: " + data.lastUpdated + " - Average is total points divided by games played.";
   }
+
+  var initialPlayers = (window.WOODILEE_CLUB_DATA && window.WOODILEE_CLUB_DATA.mondayNightPoints) || [];
+  initialPlayers.sort(comparePlayers);
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", applyLandingExtras); else applyLandingExtras();
   window.addEventListener("load", applyLandingExtras);
