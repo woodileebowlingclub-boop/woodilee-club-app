@@ -23,148 +23,148 @@ window.WOODILEE_CLUB_DATA = {
     }
   ],
   "mondayNightPoints": [
-    {
-      "name": "Aileen Miller",
-      "total": 40,
-      "played": 14
-    },
-    {
-      "name": "Kenny Cook",
-      "total": 37,
-      "played": 13
-    },
-    {
-      "name": "David Mitchell",
-      "total": 32,
-      "played": 17
-    },
-    {
-      "name": "Alan Gill",
-      "total": 30,
-      "played": 13
-    },
-    {
-      "name": "Ian Whiteford",
-      "total": 30,
-      "played": 17
-    },
-    {
-      "name": "Ronnie McKinnon",
-      "total": 30,
-      "played": 17
-    },
-    {
-      "name": "Davie Munro",
-      "total": 29,
-      "played": 13
-    },
-    {
-      "name": "Fiona Green",
-      "total": 29,
-      "played": 14
-    },
-    {
-      "name": "Andy Sharp",
-      "total": 27,
-      "played": 15
-    },
-    {
-      "name": "Alex Maxwell",
-      "total": 26,
-      "played": 11
-    },
-    {
-      "name": "Ricky Irvine",
-      "total": 25,
-      "played": 17
-    },
-    {
-      "name": "Willie Gregory",
-      "total": 23,
-      "played": 9
-    },
-    {
-      "name": "Peter Barber",
-      "total": 22,
-      "played": 8
-    },
-    {
-      "name": "Rab McLaughlin",
-      "total": 20,
-      "played": 7
-    },
-    {
-      "name": "Frank Devlin",
-      "total": 20,
-      "played": 10
-    },
-    {
-      "name": "Adam Turner",
-      "total": 19,
-      "played": 9
-    },
-    {
-      "name": "Willie McIntyre",
-      "total": 17,
-      "played": 8
-    },
-    {
-      "name": "Chuck Irvine",
-      "total": 12,
-      "played": 6
-    },
-    {
-      "name": "Charlie Cameron",
-      "total": 11,
-      "played": 4
-    },
-    {
-      "name": "Alan Ralston",
-      "total": 9,
-      "played": 4
-    },
-    {
-      "name": "Willie Brown",
-      "total": 8,
-      "played": 2
-    },
-    {
-      "name": "Ross Gregory",
-      "total": 6,
-      "played": 3
-    },
-    {
-      "name": "Rita Gordon",
-      "total": 4,
-      "played": 4
-    },
-    {
-      "name": "Chris Moran",
-      "total": 3,
-      "played": 1
-    },
-    {
-      "name": "Trevor Barraclough",
-      "total": 3,
-      "played": 1
-    },
-    {
-      "name": "Anne Carr",
-      "total": 3,
-      "played": 3
-    },
-    {
-      "name": "Jin McDonald",
-      "total": 1,
-      "played": 1
-    },
-    {
-      "name": "Karrie McDonald",
-      "total": 1,
-      "played": 1
-    }
+      {
+          "name": "Aileen Miller",
+          "total": 43,
+          "played": 15
+      },
+      {
+          "name": "Kenny Cook",
+          "total": 38,
+          "played": 14
+      },
+      {
+          "name": "David Mitchell",
+          "total": 33,
+          "played": 18
+      },
+      {
+          "name": "Ian Whiteford",
+          "total": 33,
+          "played": 18
+      },
+      {
+          "name": "Ronnie McKinnon",
+          "total": 33,
+          "played": 18
+      },
+      {
+          "name": "Davie Munro",
+          "total": 32,
+          "played": 14
+      },
+      {
+          "name": "Alan Gill",
+          "total": 31,
+          "played": 14
+      },
+      {
+          "name": "Andy Sharp",
+          "total": 31,
+          "played": 16
+      },
+      {
+          "name": "Fiona Green",
+          "total": 29,
+          "played": 14
+      },
+      {
+          "name": "Alex Maxwell",
+          "total": 27,
+          "played": 12
+      },
+      {
+          "name": "Ricky Irvine",
+          "total": 26,
+          "played": 18
+      },
+      {
+          "name": "Rab McLaughlin",
+          "total": 24,
+          "played": 8
+      },
+      {
+          "name": "Peter Barber",
+          "total": 23,
+          "played": 9
+      },
+      {
+          "name": "Willie Gregory",
+          "total": 23,
+          "played": 9
+      },
+      {
+          "name": "Adam Turner",
+          "total": 23,
+          "played": 10
+      },
+      {
+          "name": "Frank Devlin",
+          "total": 21,
+          "played": 11
+      },
+      {
+          "name": "Willie McIntyre",
+          "total": 17,
+          "played": 8
+      },
+      {
+          "name": "Charlie Cameron",
+          "total": 15,
+          "played": 5
+      },
+      {
+          "name": "Chuck Irvine",
+          "total": 12,
+          "played": 6
+      },
+      {
+          "name": "Alan Ralston",
+          "total": 9,
+          "played": 4
+      },
+      {
+          "name": "Willie Brown",
+          "total": 8,
+          "played": 2
+      },
+      {
+          "name": "Ross Gregory",
+          "total": 6,
+          "played": 3
+      },
+      {
+          "name": "Anne Carr",
+          "total": 4,
+          "played": 4
+      },
+      {
+          "name": "Rita Gordon",
+          "total": 4,
+          "played": 4
+      },
+      {
+          "name": "Chris Moran",
+          "total": 3,
+          "played": 1
+      },
+      {
+          "name": "Trevor Barraclough",
+          "total": 3,
+          "played": 1
+      },
+      {
+          "name": "Jin McDonald",
+          "total": 1,
+          "played": 1
+      },
+      {
+          "name": "Karrie McDonald",
+          "total": 1,
+          "played": 1
+      }
   ],
-  "lastUpdated": "18 August 2026"
+  "lastUpdated": "25 August 2026"
 };
 
 (function () {
