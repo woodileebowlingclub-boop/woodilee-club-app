@@ -25,33 +25,33 @@ window.WOODILEE_CLUB_DATA = {
   "mondayNightPoints": [
       {
           "name": "Aileen Miller",
-          "total": 43,
-          "played": 15
+          "total": 47,
+          "played": 16
       },
       {
           "name": "Kenny Cook",
-          "total": 38,
-          "played": 14
-      },
-      {
-          "name": "David Mitchell",
-          "total": 33,
-          "played": 18
-      },
-      {
-          "name": "Ian Whiteford",
-          "total": 33,
-          "played": 18
-      },
-      {
-          "name": "Ronnie McKinnon",
-          "total": 33,
-          "played": 18
+          "total": 39,
+          "played": 15
       },
       {
           "name": "Davie Munro",
-          "total": 32,
-          "played": 14
+          "total": 36,
+          "played": 15
+      },
+      {
+          "name": "David Mitchell",
+          "total": 36,
+          "played": 19
+      },
+      {
+          "name": "Ian Whiteford",
+          "total": 34,
+          "played": 19
+      },
+      {
+          "name": "Ronnie McKinnon",
+          "total": 34,
+          "played": 19
       },
       {
           "name": "Alan Gill",
@@ -64,28 +64,33 @@ window.WOODILEE_CLUB_DATA = {
           "played": 16
       },
       {
+          "name": "Alex Maxwell",
+          "total": 30,
+          "played": 13
+      },
+      {
           "name": "Fiona Green",
           "total": 29,
           "played": 14
       },
       {
-          "name": "Alex Maxwell",
-          "total": 27,
-          "played": 12
-      },
-      {
           "name": "Ricky Irvine",
-          "total": 26,
-          "played": 18
-      },
-      {
-          "name": "Rab McLaughlin",
-          "total": 24,
-          "played": 8
+          "total": 29,
+          "played": 19
       },
       {
           "name": "Peter Barber",
-          "total": 23,
+          "total": 26,
+          "played": 10
+      },
+      {
+          "name": "Adam Turner",
+          "total": 26,
+          "played": 11
+      },
+      {
+          "name": "Rab McLaughlin",
+          "total": 25,
           "played": 9
       },
       {
@@ -94,14 +99,9 @@ window.WOODILEE_CLUB_DATA = {
           "played": 9
       },
       {
-          "name": "Adam Turner",
-          "total": 23,
-          "played": 10
-      },
-      {
           "name": "Frank Devlin",
-          "total": 21,
-          "played": 11
+          "total": 22,
+          "played": 12
       },
       {
           "name": "Willie McIntyre",
@@ -110,8 +110,8 @@ window.WOODILEE_CLUB_DATA = {
       },
       {
           "name": "Charlie Cameron",
-          "total": 15,
-          "played": 5
+          "total": 16,
+          "played": 6
       },
       {
           "name": "Chuck Irvine",
@@ -135,8 +135,8 @@ window.WOODILEE_CLUB_DATA = {
       },
       {
           "name": "Anne Carr",
-          "total": 4,
-          "played": 4
+          "total": 5,
+          "played": 5
       },
       {
           "name": "Rita Gordon",
@@ -164,7 +164,7 @@ window.WOODILEE_CLUB_DATA = {
           "played": 1
       }
   ],
-  "lastUpdated": "25 August 2026"
+  "lastUpdated": "2 September 2026"
 };
 
 (function () {
