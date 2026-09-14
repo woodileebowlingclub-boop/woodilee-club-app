@@ -25,8 +25,13 @@ window.WOODILEE_CLUB_DATA = {
   "mondayNightPoints": [
       {
           "name": "Aileen Miller",
-          "total": 47,
-          "played": 16
+          "total": 48,
+          "played": 17
+      },
+      {
+          "name": "David Mitchell",
+          "total": 40,
+          "played": 20
       },
       {
           "name": "Kenny Cook",
@@ -34,19 +39,19 @@ window.WOODILEE_CLUB_DATA = {
           "played": 15
       },
       {
+          "name": "Ian Whiteford",
+          "total": 37,
+          "played": 19
+      },
+      {
           "name": "Davie Munro",
           "total": 36,
           "played": 15
       },
       {
-          "name": "David Mitchell",
-          "total": 36,
-          "played": 19
-      },
-      {
-          "name": "Ian Whiteford",
+          "name": "Alex Maxwell",
           "total": 34,
-          "played": 19
+          "played": 14
       },
       {
           "name": "Ronnie McKinnon",
@@ -54,24 +59,19 @@ window.WOODILEE_CLUB_DATA = {
           "played": 19
       },
       {
+          "name": "Fiona Green",
+          "total": 33,
+          "played": 15
+      },
+      {
           "name": "Alan Gill",
-          "total": 31,
-          "played": 14
+          "total": 32,
+          "played": 15
       },
       {
           "name": "Andy Sharp",
-          "total": 31,
-          "played": 16
-      },
-      {
-          "name": "Alex Maxwell",
-          "total": 30,
-          "played": 13
-      },
-      {
-          "name": "Fiona Green",
-          "total": 29,
-          "played": 14
+          "total": 32,
+          "played": 17
       },
       {
           "name": "Ricky Irvine",
@@ -80,8 +80,8 @@ window.WOODILEE_CLUB_DATA = {
       },
       {
           "name": "Peter Barber",
-          "total": 26,
-          "played": 10
+          "total": 27,
+          "played": 11
       },
       {
           "name": "Adam Turner",
@@ -164,7 +164,7 @@ window.WOODILEE_CLUB_DATA = {
           "played": 1
       }
   ],
-  "lastUpdated": "2 September 2026"
+  "lastUpdated": "14 September 2026"
 };
 
 (function () {
